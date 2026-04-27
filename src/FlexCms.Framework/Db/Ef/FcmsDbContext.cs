@@ -1,14 +1,28 @@
+using FlexCms.Framework.Auth;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
 namespace FlexCms.Framework.Db.Ef;
 
-public class FcmsDbContext : DbContext
+public class FcmsDbContext : IdentityDbContext<FcmsUser, FcmsRole, Guid>
 {
     public FcmsDbContext(DbContextOptions<FcmsDbContext> options) : base(options) { }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+
+        modelBuilder.Entity<FcmsUser>().ToTable("fcmsusers");
+        modelBuilder.Entity<FcmsRole>().ToTable("fcmsroles");
+        modelBuilder.Entity<IdentityUserRole<Guid>>().ToTable("fcmsuserroles");
+        modelBuilder.Entity<IdentityUserClaim<Guid>>().ToTable("fcmsuserclaims");
+        modelBuilder.Entity<IdentityUserLogin<Guid>>().ToTable("fcmsuserlogins");
+        modelBuilder.Entity<IdentityRoleClaim<Guid>>().ToTable("fcmsroleclaims");
+        modelBuilder.Entity<IdentityUserToken<Guid>>().ToTable("fcmsusertokens");
+
+        // Roles list is embedded in Mongo only; ignore in EF
+        modelBuilder.Entity<FcmsUser>().Ignore(u => u.Roles);
 
         // Apply global soft-delete query filter for all BaseEfEntity types
         foreach (var entityType in modelBuilder.Model.GetEntityTypes())
@@ -27,7 +41,6 @@ public class FcmsDbContext : DbContext
     private static void ApplySoftDeleteFilter<T>(ModelBuilder builder) where T : BaseEfEntity
     {
         builder.Entity<T>().HasQueryFilter(e => !e.IsDeleted);
-        // Plural snake_case table naming
         builder.Entity<T>().ToTable(typeof(T).Name.ToLowerInvariant() + "s");
     }
 

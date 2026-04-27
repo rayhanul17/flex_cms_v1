@@ -1,9 +1,19 @@
+using FlexCms.Framework.Auth;
+using FlexCms.Framework.Auth.Ef;
+using FlexCms.Framework.Auth.MongoDb;
 using FlexCms.Framework.Db;
 using FlexCms.Framework.Db.Ef;
 using FlexCms.Framework.Db.Migration;
 using FlexCms.Framework.Db.MongoDb;
+using FlexCms.Framework.Middleware;
 using FlexCms.Framework.Setup;
+using FlexCms.Framework.Validators;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using MongoDB.Driver;
@@ -31,6 +41,68 @@ public static class FcmsServiceExtensions
             return new SetupHelper(dp, options.AppDataPath);
         });
 
+        // Cookie authentication (8h sliding window)
+        services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+            .AddCookie(opts =>
+            {
+                opts.Cookie.HttpOnly = true;
+                opts.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+                opts.Cookie.SameSite = SameSiteMode.Strict;
+                opts.SlidingExpiration = true;
+                opts.ExpireTimeSpan = TimeSpan.FromHours(8);
+                opts.LoginPath = "/auth/login";
+                opts.LogoutPath = "/auth/logout";
+            });
+
+        services.AddAuthorization();
+        services.AddHttpContextAccessor();
+
+        // Identity core
+        var identityBuilder = services
+            .AddIdentityCore<FcmsUser>(opts =>
+            {
+                opts.Password.RequireDigit = true;
+                opts.Password.RequireLowercase = true;
+                opts.Password.RequireUppercase = true;
+                opts.Password.RequireNonAlphanumeric = true;
+                opts.Password.RequiredLength = 8;
+                opts.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
+                opts.Lockout.MaxFailedAccessAttempts = 5;
+                opts.Lockout.AllowedForNewUsers = true;
+                opts.User.RequireUniqueEmail = true;
+            })
+            .AddRoles<FcmsRole>()
+            .AddSignInManager<SignInManager<FcmsUser>>()
+            .AddPasswordValidator<FcmsPasswordValidator>()
+            .AddDefaultTokenProviders();
+
+        // Rate limiting
+        services.AddRateLimiter(limiter =>
+        {
+            limiter.AddFixedWindowLimiter("login", opts =>
+            {
+                opts.Window = TimeSpan.FromMinutes(1);
+                opts.PermitLimit = 10;
+                opts.QueueLimit = 0;
+                opts.AutoReplenishment = true;
+            });
+            limiter.AddFixedWindowLimiter("otp", opts =>
+            {
+                opts.Window = TimeSpan.FromMinutes(1);
+                opts.PermitLimit = 5;
+                opts.QueueLimit = 0;
+                opts.AutoReplenishment = true;
+            });
+            limiter.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+        });
+
+        // IP filter options
+        services.Configure<IpFilterOptions>(opts =>
+        {
+            opts.AllowedIps = options.AllowedIps;
+            opts.EnforceIpFilter = options.EnforceIpFilter;
+        });
+
         // Register DB provider based on options
         if (options.UseMySQL)
         {
@@ -47,6 +119,8 @@ public static class FcmsServiceExtensions
             services.AddScoped<DbContext>(sp => sp.GetRequiredService<FcmsDbContext>());
             services.AddScoped(typeof(IRepository<>), typeof(EfRepository<>));
             services.AddScoped<IFcmsUnitOfWork, EfUnitOfWork>();
+
+            identityBuilder.AddEntityFrameworkStores<FcmsDbContext>();
         }
 
         if (options.UseMongoDB)
@@ -62,12 +136,15 @@ public static class FcmsServiceExtensions
 
             if (!options.UseMySQL)
             {
-                // MongoDB-only mode: register Mongo repositories as default
+                // MongoDB-only mode: register Mongo repositories and identity stores
                 services.AddScoped(typeof(IRepository<>), typeof(MongoRepository<>));
                 services.AddScoped<IFcmsUnitOfWork>(sp =>
                     new MongoUnitOfWork(
                         sp.GetRequiredService<IMongoClient>(),
                         sp.GetRequiredService<IMongoDatabase>()));
+
+                services.AddScoped<IUserStore<FcmsUser>, MongoUserStore>();
+                services.AddScoped<IRoleStore<FcmsRole>, MongoRoleStore>();
             }
         }
 
@@ -83,4 +160,6 @@ public class FlexCmsOptions
     public bool UseMongoDB { get; set; }
     public string MongoConnectionString { get; set; } = "mongodb://localhost:27017";
     public string MongoDatabaseName { get; set; } = "flexcms";
+    public string[] AllowedIps { get; set; } = [];
+    public bool EnforceIpFilter { get; set; }
 }

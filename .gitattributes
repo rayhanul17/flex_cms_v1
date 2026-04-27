@@ -10,7 +10,8 @@
 *.cshtml    text eol=lf
 *.razor     text eol=lf
 *.csproj    text eol=lf
-*.sln       text eol=crlf   # Visual Studio expects CRLF for .sln
+# Visual Studio expects CRLF for .sln files
+*.sln       text eol=crlf
 *.json      text eol=lf
 *.yml       text eol=lf
 *.yaml      text eol=lf

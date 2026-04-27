@@ -1,0 +1,69 @@
+# ──────────────────────────────────────────────────────────────────────
+# Auto-detect text files and normalize line endings
+# ──────────────────────────────────────────────────────────────────────
+* text=auto eol=lf
+
+# ──────────────────────────────────────────────────────────────────────
+# Source files — always LF (cross-platform consistency)
+# ──────────────────────────────────────────────────────────────────────
+*.cs        text eol=lf diff=csharp
+*.cshtml    text eol=lf
+*.razor     text eol=lf
+*.csproj    text eol=lf
+*.sln       text eol=crlf   # Visual Studio expects CRLF for .sln
+*.json      text eol=lf
+*.yml       text eol=lf
+*.yaml      text eol=lf
+*.xml       text eol=lf
+*.config    text eol=lf
+*.props     text eol=lf
+*.targets   text eol=lf
+
+# Web/frontend
+*.html      text eol=lf
+*.css       text eol=lf
+*.scss      text eol=lf
+*.js        text eol=lf
+*.ts        text eol=lf
+*.md        text eol=lf
+
+# Shell / script
+*.sh        text eol=lf
+*.ps1       text eol=crlf
+
+# Docker
+Dockerfile  text eol=lf
+*.dockerfile text eol=lf
+
+# ──────────────────────────────────────────────────────────────────────
+# Binary files — never modified by line-ending normalization
+# ──────────────────────────────────────────────────────────────────────
+*.png       binary
+*.jpg       binary
+*.jpeg      binary
+*.gif       binary
+*.webp      binary
+*.ico       binary
+*.svg       text eol=lf
+*.pdf       binary
+*.ttf       binary
+*.otf       binary
+*.woff      binary
+*.woff2     binary
+*.eot       binary
+*.zip       binary
+*.tar       binary
+*.gz        binary
+*.7z        binary
+*.dll       binary
+*.exe       binary
+*.pdb       binary
+*.snk       binary
+*.pfx       binary
+
+# ──────────────────────────────────────────────────────────────────────
+# GitHub linguist overrides (so language stats are accurate)
+# ──────────────────────────────────────────────────────────────────────
+docs/*       linguist-documentation
+*.md         linguist-documentation
+themes/*/wwwroot/lib/* linguist-vendored

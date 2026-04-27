@@ -1,0 +1,115 @@
+# ──────────────────────────────────────────────────────────────────────
+# .NET
+# ──────────────────────────────────────────────────────────────────────
+bin/
+obj/
+publish/
+out/
+*.user
+*.suo
+*.userprefs
+
+# Visual Studio
+.vs/
+*.opensdf
+*.sdf
+*.cachefile
+*.VC.db
+*.VC.opendb
+
+# Rider / JetBrains
+.idea/
+*.iml
+
+# VS Code
+.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# Build artifacts
+*.dll
+*.exe
+*.pdb
+*.cache
+*.log
+
+# NuGet
+*.nupkg
+*.snupkg
+.nuget/
+packages/
+!.nuget/packages.config
+
+# Test results
+TestResults/
+[Cc]overage/
+*.coverage
+*.coveragexml
+
+# ──────────────────────────────────────────────────────────────────────
+# FlexCms — runtime data (NEVER commit)
+# ──────────────────────────────────────────────────────────────────────
+# Setup config (encrypted secrets)
+**/setup.json
+
+# Persistent data volumes
+App_Data/
+**/App_Data/
+!**/App_Data/.gitkeep
+
+# Uploaded media
+**/wwwroot/uploads/
+!**/wwwroot/uploads/.gitkeep
+
+# DataProtection keyring
+**/keys/
+!**/keys/.gitkeep
+
+# Logs
+**/logs/
+*.log
+
+# Backup archives
+backups/
+*.tar.gz
+*.zip
+!docs/**/*.zip
+!modules/**/*.zip.example
+
+# Module build outputs
+modules/*/publish/
+
+# Environment
+.env
+.env.local
+.env.production
+!.env.example
+
+# ──────────────────────────────────────────────────────────────────────
+# Docker
+# ──────────────────────────────────────────────────────────────────────
+docker/nginx/certs/
+docker/data/
+.docker-volumes/
+
+# ──────────────────────────────────────────────────────────────────────
+# OS
+# ──────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# ──────────────────────────────────────────────────────────────────────
+# Misc
+# ──────────────────────────────────────────────────────────────────────
+*.bak
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+node_modules/

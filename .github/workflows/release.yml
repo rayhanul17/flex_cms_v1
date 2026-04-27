@@ -1,0 +1,58 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*.*.*']
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Build & publish Host
+        run: |
+          dotnet publish src/FlexCms.Host -c Release -o publish/host
+          cd publish/host && zip -r ../../FlexCms.Host-${{ github.ref_name }}.zip . && cd ../..
+
+      - name: Build & publish all modules
+        run: |
+          mkdir -p publish/modules
+          for dir in modules/*/; do
+            if [ -d "$dir" ] && [ -f "$dir"/*.csproj 2>/dev/null ]; then
+              name=$(basename "$dir")
+              echo "Packaging $name..."
+              cd "$dir"
+              dotnet publish -c Release -o publish/
+              cd publish && zip -r "../../../publish/modules/$name-${{ github.ref_name }}.zip" . && cd ../..
+              cd ../..
+            fi
+          done
+
+      - name: Build & push Docker image (release tag)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./docker/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}:${{ github.ref_name }}
+            ghcr.io/${{ github.repository }}:latest
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          generate_release_notes: true
+          files: |
+            FlexCms.Host-${{ github.ref_name }}.zip
+            publish/modules/*.zip

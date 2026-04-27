@@ -1,0 +1,100 @@
+# top-most EditorConfig file
+root = true
+
+# ──────────────────────────────────────────────────────────────────────
+# All files — defaults
+# ──────────────────────────────────────────────────────────────────────
+[*]
+indent_style = space
+indent_size = 4
+end_of_line = lf
+charset = utf-8
+trim_trailing_whitespace = true
+insert_final_newline = true
+
+# ──────────────────────────────────────────────────────────────────────
+# Web / frontend — 2-space indent
+# ──────────────────────────────────────────────────────────────────────
+[*.{html,cshtml,razor,css,scss,js,ts,json,yml,yaml,xml}]
+indent_size = 2
+
+# ──────────────────────────────────────────────────────────────────────
+# Markdown — preserve trailing whitespace (line breaks)
+# ──────────────────────────────────────────────────────────────────────
+[*.md]
+trim_trailing_whitespace = false
+indent_size = 2
+
+# ──────────────────────────────────────────────────────────────────────
+# Shell / Docker
+# ──────────────────────────────────────────────────────────────────────
+[*.{sh,bash}]
+end_of_line = lf
+
+[Dockerfile]
+indent_size = 2
+
+# ──────────────────────────────────────────────────────────────────────
+# C# — Roslyn analyzer rules + style enforcement
+# ──────────────────────────────────────────────────────────────────────
+[*.cs]
+# Prefer var over explicit type for built-ins
+csharp_style_var_for_built_in_types = true:suggestion
+csharp_style_var_when_type_is_apparent = true:suggestion
+
+# Expression-bodied members
+csharp_style_expression_bodied_methods = when_on_single_line:suggestion
+csharp_style_expression_bodied_properties = true:suggestion
+
+# Pattern matching preferences
+csharp_style_pattern_matching_over_is_with_cast_check = true:suggestion
+csharp_style_pattern_matching_over_as_with_null_check = true:suggestion
+
+# Null check
+csharp_style_throw_expression = true:suggestion
+csharp_style_conditional_delegate_call = true:suggestion
+
+# Code style — using directives
+csharp_using_directive_placement = outside_namespace:suggestion
+
+# ──────────────────────────────────────────────────────────────────────
+# C# — Critical analyzers (build-blocking)
+# ──────────────────────────────────────────────────────────────────────
+# CA2016: Forward CancellationToken to methods that take one
+dotnet_diagnostic.CA2016.severity = error
+
+# CA2007: Don't ConfigureAwait — ASP.NET Core has no SyncContext (suppress this rule)
+dotnet_diagnostic.CA2007.severity = none
+
+# Async naming — Async suffix for async methods
+dotnet_diagnostic.VSTHRD200.severity = warning
+
+# Prefer interpolated string over string.Format
+dotnet_diagnostic.IDE0051.severity = warning
+
+# Disposable types
+dotnet_diagnostic.CA2000.severity = warning
+
+# ──────────────────────────────────────────────────────────────────────
+# Naming conventions
+# ──────────────────────────────────────────────────────────────────────
+# Private fields: _camelCase
+dotnet_naming_rule.private_fields_with_underscore.symbols = private_fields
+dotnet_naming_rule.private_fields_with_underscore.style = camel_case_with_underscore_prefix
+dotnet_naming_rule.private_fields_with_underscore.severity = suggestion
+
+dotnet_naming_symbols.private_fields.applicable_kinds = field
+dotnet_naming_symbols.private_fields.applicable_accessibilities = private
+
+dotnet_naming_style.camel_case_with_underscore_prefix.required_prefix = _
+dotnet_naming_style.camel_case_with_underscore_prefix.capitalization = camel_case
+
+# Interfaces: IPascalCase
+dotnet_naming_rule.interfaces_pascal_case.symbols = interfaces
+dotnet_naming_rule.interfaces_pascal_case.style = i_pascal_case
+dotnet_naming_rule.interfaces_pascal_case.severity = suggestion
+
+dotnet_naming_symbols.interfaces.applicable_kinds = interface
+
+dotnet_naming_style.i_pascal_case.required_prefix = I
+dotnet_naming_style.i_pascal_case.capitalization = pascal_case

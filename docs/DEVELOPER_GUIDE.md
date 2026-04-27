@@ -904,12 +904,505 @@ Then visit `/auth/forgot-password` and use the email reset flow.
 
 ---
 
+## 11. NuGet Package Management
+
+This section covers two things:
+- **Publishing** the FlexCms.Framework as a NuGet package (so external developers can build modules)
+- **Consuming** NuGet packages inside your modules (adding third-party libraries)
+
+---
+
+### 11.1 Why Publish FlexCms.Framework as NuGet?
+
+There are two kinds of module developers:
+
+| Developer Type | Has FlexCms source? | How they reference Framework |
+|---|---|---|
+| **Internal** (you, your team) | ✅ Yes — full clone | Project reference (`<ProjectReference>`) |
+| **External** (third parties, marketplace authors) | ❌ No — only need framework API | NuGet reference (`<PackageReference>`) |
+
+For external developers, you need to **publish FlexCms.Framework as a NuGet package** so they can do:
+
+```bash
+dotnet add package FlexCms.Framework
+```
+
+without cloning your full repo.
+
+---
+
+### 11.2 Configure FlexCms.Framework for NuGet Publishing
+
+Edit `src/FlexCms.Framework/FlexCms.Framework.csproj`:
+
+```xml
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+
+    <!-- ── NuGet package settings ────────────────────────────── -->
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <PackageId>FlexCms.Framework</PackageId>
+    <Version>1.0.0</Version>
+    <Authors>Md. Rayhanul Islam Raj</Authors>
+    <Company>FlexCms</Company>
+    <Description>FlexCms Framework — base abstractions for building plug-and-play modules. .NET 10 monolithic CMS for Bangladesh market.</Description>
+    <PackageTags>cms;flexcms;framework;modular;dotnet10</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/rayhanul17/flex_cms_v1</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/rayhanul17/flex_cms_v1</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <PackageReleaseNotes>Initial release — Phase 1-12 framework abstractions.</PackageReleaseNotes>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <!-- Your existing PackageReferences for EF Core, MongoDB.Driver, etc. -->
+</Project>
+```
+
+When you `dotnet build`, this auto-generates:
+
+- `bin/Release/FlexCms.Framework.1.0.0.nupkg` (the package)
+- `bin/Release/FlexCms.Framework.1.0.0.snupkg` (debug symbols)
+
+---
+
+### 11.3 Choose a NuGet Feed
+
+You have three options:
+
+| Feed | Best For | Cost | Public? |
+|---|---|---|---|
+| **NuGet.org** | Open-source projects, public marketplace | Free | ✅ Public to everyone |
+| **GitHub Packages** | Internal team, simple setup | Free for public repos / paid for private | Configurable |
+| **Private feed** (Sonatype Nexus, JFrog, etc.) | Enterprise — full control | Paid | ❌ Private |
+
+**Recommended for FlexCms:** Start with **GitHub Packages** (free + integrated with your existing GitHub repo). Move to NuGet.org when you want public distribution.
+
+---
+
+### 11.4 Publish to GitHub Packages (Recommended Start)
+
+#### Step 1: Generate a Personal Access Token (PAT)
+
+1. Go to GitHub → Settings → Developer settings → Personal access tokens → Tokens (classic)
+2. Click **Generate new token (classic)**
+3. Give it a name like `flexcms-nuget-publish`
+4. Select scopes:
+   - ✅ `write:packages`
+   - ✅ `read:packages`
+   - ✅ `delete:packages` (optional, for cleanup)
+5. Copy the token (you won't see it again)
+
+#### Step 2: Add NuGet source on your dev machine
+
+```bash
+dotnet nuget add source \
+    https://nuget.pkg.github.com/rayhanul17/index.json \
+    --name "github-flexcms" \
+    --username rayhanul17 \
+    --password <YOUR_PAT_TOKEN> \
+    --store-password-in-clear-text
+```
+
+(Replace `rayhanul17` with your GitHub username.)
+
+#### Step 3: Build and publish
+
+```bash
+cd src/FlexCms.Framework
+
+# Build the package
+dotnet build -c Release
+
+# Push to GitHub Packages
+dotnet nuget push \
+    bin/Release/FlexCms.Framework.1.0.0.nupkg \
+    --source "github-flexcms" \
+    --api-key <YOUR_PAT_TOKEN>
+```
+
+You should see: `Your package was pushed.`
+
+Verify: visit `https://github.com/rayhanul17?tab=packages` — your package appears.
+
+---
+
+### 11.5 Publish to NuGet.org (Public Distribution)
+
+#### Step 1: Create NuGet.org account
+
+1. Go to https://www.nuget.org → Sign in (uses Microsoft account)
+2. Profile → API Keys → **Create**
+3. Key name: `flexcms-publish`
+4. Glob pattern: `FlexCms.*` (allows publishing all FlexCms.* packages)
+5. Expiration: 365 days
+6. Copy the API key
+
+#### Step 2: Push to NuGet.org
+
+```bash
+cd src/FlexCms.Framework
+dotnet build -c Release
+
+dotnet nuget push \
+    bin/Release/FlexCms.Framework.1.0.0.nupkg \
+    --api-key <YOUR_NUGET_API_KEY> \
+    --source https://api.nuget.org/v3/index.json
+```
+
+Wait ~5 minutes — package appears at `https://www.nuget.org/packages/FlexCms.Framework`.
+
+#### Step 3: External developers use it
+
+```bash
+dotnet add package FlexCms.Framework
+```
+
+That's it. They don't need access to your source code.
+
+---
+
+### 11.6 Auto-Publish via GitHub Actions
+
+Manual publishing is tedious. Automate it via GitHub Actions.
+
+Create `.github/workflows/nuget-publish.yml`:
+
+```yaml
+name: NuGet Publish
+
+on:
+  push:
+    tags:
+      - 'framework-v*.*.*'   # Triggers on tags like framework-v1.0.0
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Extract version from tag
+        id: version
+        run: echo "version=${GITHUB_REF#refs/tags/framework-v}" >> $GITHUB_OUTPUT
+
+      - name: Build & pack
+        run: |
+          cd src/FlexCms.Framework
+          dotnet build -c Release /p:Version=${{ steps.version.outputs.version }}
+          dotnet pack -c Release --no-build /p:Version=${{ steps.version.outputs.version }} -o ./nupkg
+
+      - name: Publish to GitHub Packages
+        run: |
+          cd src/FlexCms.Framework
+          dotnet nuget push ./nupkg/*.nupkg \
+              --source "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json" \
+              --api-key ${{ secrets.GITHUB_TOKEN }} \
+              --skip-duplicate
+
+      - name: Publish to NuGet.org (optional — uncomment when ready for public release)
+        # run: |
+        #   cd src/FlexCms.Framework
+        #   dotnet nuget push ./nupkg/*.nupkg \
+        #       --source https://api.nuget.org/v3/index.json \
+        #       --api-key ${{ secrets.NUGET_API_KEY }} \
+        #       --skip-duplicate
+        run: echo "Skipping NuGet.org publish (uncomment when ready)"
+```
+
+#### Set the NuGet API key as a GitHub secret
+
+GitHub repo → Settings → Secrets and variables → Actions → New repository secret:
+
+- Name: `NUGET_API_KEY`
+- Value: Your NuGet.org API key
+
+#### Publish a new version
+
+```bash
+# Update version in csproj first:
+# <Version>1.1.0</Version>
+
+git commit -am "chore(framework): bump to 1.1.0"
+git push
+
+# Tag and push
+git tag framework-v1.1.0
+git push origin framework-v1.1.0
+
+# GitHub Actions auto-publishes
+```
+
+---
+
+### 11.7 Adding NuGet Packages to Your Module
+
+Now flipping to the **module developer** side — how do you add third-party NuGet packages to your module?
+
+#### Common packages your module might need
+
+| Package | Why | When |
+|---|---|---|
+| `Markdig` (BSD) | Markdown rendering | Blog comments, docs module |
+| `iTextSharp` (AGPL — careful!) | Advanced PDF | Use `PdfSharp 6.x` (MIT) instead |
+| `CsvHelper` (MS-PL/Apache) | CSV import/export | Bulk product/post import |
+| `Polly` (BSD) | Resilience policies | API integrations beyond standard handler |
+| `Hangfire` (LGPL) | Job scheduler | ❌ Plan rejects — use IHostedService |
+| `OpenIddict` (Apache) | OAuth server | If your module IS the OAuth provider |
+| `BouncyCastle` (MIT) | Crypto operations | Module needing PGP / advanced crypto |
+| `Quartz.NET` (Apache) | Cron-style scheduling | Beyond IHostedService capability |
+| `RestSharp` (Apache) | REST client | Alternative to HttpClient |
+| `Mapster` (MIT) | Object mapping | DTO ↔ Entity conversion |
+| `FluentValidation` (Apache) | Validation rules | Complex form validation |
+| `Bogus` (MIT) | Fake data generation | Dev seeders, testing |
+
+#### Step 1: Add the package to your module
+
+```bash
+cd modules/FlexCms.Blog
+
+# Public NuGet.org package
+dotnet add package Markdig
+
+# Specific version
+dotnet add package Markdig --version 0.37.0
+
+# From private feed (e.g., GitHub Packages)
+dotnet add package FlexCms.Framework \
+    --source "https://nuget.pkg.github.com/rayhanul17/index.json"
+```
+
+#### Step 2: Verify the package was added
+
+Check `modules/FlexCms.Blog/FlexCms.Blog.csproj`:
+
+```xml
+<ItemGroup>
+  <PackageReference Include="Markdig" Version="0.37.0" />
+  <ProjectReference Include="..\..\src\FlexCms.Framework\FlexCms.Framework.csproj" />
+</ItemGroup>
+```
+
+#### Step 3: Use it in your code
+
+```csharp
+using Markdig;
+
+namespace FlexCms.Blog.Services;
+
+public class MarkdownService
+{
+    public string Render(string markdown)
+    {
+        var pipeline = new MarkdownPipelineBuilder()
+            .UseAdvancedExtensions()
+            .Build();
+        return Markdown.ToHtml(markdown, pipeline);
+    }
+}
+```
+
+#### Step 4: Build the module — dependencies are bundled
+
+```bash
+dotnet publish -c Release -o publish/
+ls publish/
+# You'll see:
+# FlexCms.Blog.dll
+# Markdig.dll       ← bundled automatically by dotnet publish
+# (other transitive dependencies)
+# module.json
+```
+
+**Important:** Always use `dotnet publish` (not `dotnet build`) to package modules. `publish` includes ALL dependencies; `build` only puts your code in `bin/`.
+
+#### Step 5: ZIP and ship as before (Section 5)
+
+```bash
+cd publish
+zip -r ../../../FlexCms.Blog-1.0.0.zip .
+```
+
+The ZIP now contains your DLL **plus all NuGet dependencies** that the host process needs to load it.
+
+---
+
+### 11.8 Publishing a Module as NuGet (Alternative to ZIP)
+
+For module marketplace (Phase 17) or distributed teams, you can publish a module **as a NuGet package** instead of a ZIP.
+
+#### Configure the module's csproj
+
+Edit `modules/FlexCms.Blog/FlexCms.Blog.csproj`:
+
+```xml
+<PropertyGroup>
+  <TargetFramework>net10.0</TargetFramework>
+
+  <!-- NuGet package settings -->
+  <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+  <PackageId>FlexCms.Blog</PackageId>
+  <Version>1.0.0</Version>
+  <Authors>Your Name</Authors>
+  <Description>Blog module for FlexCms — posts, categories, comments.</Description>
+  <PackageTags>flexcms;module;blog</PackageTags>
+  <PackageLicenseExpression>MIT</PackageLicenseExpression>
+
+  <!-- Include Views and wwwroot in the package -->
+  <ContentTargetFolders>contentFiles\any\net10.0</ContentTargetFolders>
+</PropertyGroup>
+
+<ItemGroup>
+  <Content Include="Views\**\*.cshtml" CopyToOutputDirectory="PreserveNewest" />
+  <Content Include="wwwroot\**\*" CopyToOutputDirectory="PreserveNewest" />
+  <EmbeddedResource Include="module.json" />
+</ItemGroup>
+
+<ItemGroup>
+  <!-- Reference Framework via NuGet (NOT project ref) for distributable modules -->
+  <PackageReference Include="FlexCms.Framework" Version="1.0.0" />
+</ItemGroup>
+```
+
+#### Publish
+
+```bash
+cd modules/FlexCms.Blog
+dotnet pack -c Release -o nupkg
+
+# Push to GitHub Packages (or NuGet.org)
+dotnet nuget push nupkg/FlexCms.Blog.1.0.0.nupkg \
+    --source "github-flexcms" \
+    --api-key <YOUR_PAT>
+```
+
+#### Admin installs in production
+
+Two ways:
+
+**Option A — Admin UI (when marketplace is built):**
+- `https://mysite.com/admin/marketplace` → search "Blog" → Install
+
+**Option B — Manual via SSH:**
+```bash
+ssh flexcms@vps
+cd /opt/flexcms
+
+# Pull module from NuGet to a temp folder
+dotnet nuget restore --packages /tmp/flexcms-modules \
+    --source "https://nuget.pkg.github.com/rayhanul17/index.json"
+
+# Extract module files into Docker volume
+docker exec flexcms_flexcms_1 mkdir -p /app/modules/FlexCms.Blog
+docker cp /tmp/flexcms-modules/flexcms.blog/1.0.0/lib/net10.0/. \
+    flexcms_flexcms_1:/app/modules/FlexCms.Blog/
+
+# Restart container
+docker compose -f docker/docker-compose.prod.yml restart flexcms
+
+# Activate via admin UI
+```
+
+---
+
+### 11.9 Versioning Strategy (Semantic Versioning)
+
+Follow [SemVer](https://semver.org/): `MAJOR.MINOR.PATCH`
+
+| Change type | Bump | Example |
+|---|---|---|
+| Bug fix, no API change | PATCH | 1.0.0 → 1.0.1 |
+| New feature, backward compatible | MINOR | 1.0.1 → 1.1.0 |
+| Breaking change | MAJOR | 1.1.0 → 2.0.0 |
+
+For pre-release:
+
+```xml
+<Version>2.0.0-beta.1</Version>
+<Version>2.0.0-rc.1</Version>
+```
+
+NuGet treats these as "pre-release" — clients must opt in to install them.
+
+---
+
+### 11.10 Using the Published Framework (External Module Author Workflow)
+
+If someone outside your team wants to build a FlexCms module, here's their flow:
+
+```bash
+# 1. Create a brand-new project — no FlexCms source needed
+mkdir mycompany-flexcms-newsletter
+cd mycompany-flexcms-newsletter
+
+dotnet new classlib -n MyCompany.FlexCms.Newsletter -f net10.0
+cd MyCompany.FlexCms.Newsletter
+
+# 2. Add Framework via NuGet
+dotnet add package FlexCms.Framework --source https://nuget.pkg.github.com/rayhanul17/index.json
+# OR (when published to NuGet.org):
+dotnet add package FlexCms.Framework
+
+# 3. Add other deps
+dotnet add package Markdig
+dotnet add package MailKit
+
+# 4. Code the module — IFcmsModule, services, controllers, etc.
+# (See MODULE_DEV.md for structure)
+
+# 5. Build + publish
+dotnet publish -c Release -o publish/
+cd publish && zip -r ../MyCompany.Newsletter-1.0.0.zip . && cd ..
+
+# 6. Distribute — send the ZIP to admins, OR publish to your own NuGet feed
+```
+
+The external developer **never clones your CMS source** — they only need the published `FlexCms.Framework` NuGet.
+
+---
+
+### 11.11 Quick Reference — NuGet Commands
+
+| Task | Command |
+|---|---|
+| Add package to module | `dotnet add package <Name>` |
+| Add specific version | `dotnet add package <Name> --version 1.2.3` |
+| Add from private feed | `dotnet add package <Name> --source <URL>` |
+| List installed packages | `dotnet list package` |
+| Update all packages | `dotnet list package --outdated` then `dotnet add package <Name>` to bump |
+| Remove package | `dotnet remove package <Name>` |
+| Build NuGet package | `dotnet pack -c Release -o nupkg` |
+| Push to feed | `dotnet nuget push <file>.nupkg --source <feed> --api-key <key>` |
+| List configured sources | `dotnet nuget list source` |
+| Add a new source | `dotnet nuget add source <URL> -n <name>` |
+| Remove a source | `dotnet nuget remove source <name>` |
+
+---
+
 ## 📚 Further Reading
 
 - **Architecture details:** [`docs/plan.md`](plan.md) — full 14,500-line spec
 - **Module dev rules:** [`docs/MODULE_DEV.md`](MODULE_DEV.md)
 - **Production deploy details:** [`docs/DEPLOYMENT.md`](DEPLOYMENT.md)
 - **Contributing rules:** [`CONTRIBUTING.md`](../CONTRIBUTING.md)
+- **NuGet docs:** https://learn.microsoft.com/en-us/nuget/
+- **SemVer specification:** https://semver.org/
 
 ---
 

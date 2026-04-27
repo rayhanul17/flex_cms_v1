@@ -26,6 +26,13 @@ public class MongoTestEntity : BaseMongoEntity
     public string Name { get; set; } = string.Empty;
 }
 
+// Test-specific DbContext that knows about EfTestEntity
+public class TestDbContext : FcmsDbContext
+{
+    public TestDbContext(DbContextOptions<FcmsDbContext> options) : base(options) { }
+    public DbSet<EfTestEntity> EfTestEntities => Set<EfTestEntity>();
+}
+
 // ---------------------------------------------------------------------------
 // MySQL / EF tests
 // ---------------------------------------------------------------------------
@@ -33,7 +40,7 @@ public class MongoTestEntity : BaseMongoEntity
 public class EfPhase1Tests : IAsyncLifetime
 {
     private MySqlContainer _mysql = null!;
-    private ServiceProvider _sp = null!;
+    private TestDbContext _ctx = null!;
 
     public async Task InitializeAsync()
     {
@@ -45,49 +52,30 @@ public class EfPhase1Tests : IAsyncLifetime
 
         await _mysql.StartAsync();
 
-        var services = new ServiceCollection();
-        services.AddFlexCms(new FlexCmsOptions
-        {
-            AppDataPath = Path.Combine(Path.GetTempPath(), "flexcms_test_" + Guid.NewGuid()),
-            UseMySQL = true,
-            MySqlConnectionString = _mysql.GetConnectionString()
-        });
+        var connStr = _mysql.GetConnectionString();
+        var options = new DbContextOptionsBuilder<FcmsDbContext>()
+            .UseMySql(connStr, Microsoft.EntityFrameworkCore.ServerVersion.AutoDetect(connStr),
+                o => { o.EnableRetryOnFailure(3); o.CommandTimeout(30); })
+            .Options;
 
-        // Register test entity
-        services.AddDbContext<FcmsDbContext>(o =>
-            o.UseMySql(_mysql.GetConnectionString(),
-                Microsoft.EntityFrameworkCore.ServerVersion.AutoDetect(_mysql.GetConnectionString())));
-
-        _sp = services.BuildServiceProvider();
-
-        // Create schema
-        using var scope = _sp.CreateScope();
-        var ctx = scope.ServiceProvider.GetRequiredService<FcmsDbContext>();
-        await ctx.Database.ExecuteSqlRawAsync(
-            "CREATE TABLE IF NOT EXISTS eftestentitys (" +
-            "Id CHAR(36) NOT NULL PRIMARY KEY," +
-            "Name VARCHAR(255) NOT NULL," +
-            "CreatedAt BIGINT NOT NULL," +
-            "UpdatedAt BIGINT NOT NULL," +
-            "IsDeleted TINYINT(1) NOT NULL DEFAULT 0)");
+        _ctx = new TestDbContext(options);
+        await _ctx.Database.EnsureCreatedAsync();
     }
 
     public async Task DisposeAsync()
     {
-        await _sp.DisposeAsync();
+        await _ctx.DisposeAsync();
         await _mysql.DisposeAsync();
     }
 
     [Fact]
     public async Task EfRepository_Insert_RowExistsInDb()
     {
-        using var scope = _sp.CreateScope();
-        var ctx = scope.ServiceProvider.GetRequiredService<FcmsDbContext>();
-        var repo = new EfRepository<EfTestEntity>(ctx);
+        var repo = new EfRepository<EfTestEntity>(_ctx);
 
         var entity = new EfTestEntity { Name = "Hello EF" };
         await repo.AddAsync(entity);
-        await ctx.SaveChangesAsync();
+        await _ctx.SaveChangesAsync();
 
         var found = await repo.GetByIdAsync(entity.Id);
         Assert.NotNull(found);
@@ -97,9 +85,7 @@ public class EfPhase1Tests : IAsyncLifetime
     [Fact]
     public async Task EfUnitOfWork_RollbackOnException_BothEntitiesAbsent()
     {
-        using var scope = _sp.CreateScope();
-        var ctx = scope.ServiceProvider.GetRequiredService<FcmsDbContext>();
-        var uow = new EfUnitOfWork(ctx);
+        var uow = new EfUnitOfWork(_ctx);
 
         var id1 = Guid.NewGuid();
         var id2 = Guid.NewGuid();
@@ -118,14 +104,13 @@ public class EfPhase1Tests : IAsyncLifetime
         {
             await uow.RollbackAsync();
         }
-        finally
-        {
-            await uow.DisposeAsync();
-        }
 
-        // Both must be absent after rollback
-        using var verifyScope = _sp.CreateScope();
-        var verifyCtx = verifyScope.ServiceProvider.GetRequiredService<FcmsDbContext>();
+        // Both must be absent after rollback — fresh context to bypass EF identity cache
+        var connStr = _mysql.GetConnectionString();
+        var opts = new DbContextOptionsBuilder<FcmsDbContext>()
+            .UseMySql(connStr, Microsoft.EntityFrameworkCore.ServerVersion.AutoDetect(connStr))
+            .Options;
+        await using var verifyCtx = new TestDbContext(opts);
         var repo2 = new EfRepository<EfTestEntity>(verifyCtx);
         Assert.Null(await repo2.GetByIdAsync(id1));
         Assert.Null(await repo2.GetByIdAsync(id2));

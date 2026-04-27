@@ -1,17 +1,11 @@
-# ──────────────────────────────────────────────────────────────────────
 # Auto-detect text files and normalize line endings
-# ──────────────────────────────────────────────────────────────────────
 * text=auto eol=lf
 
-# ──────────────────────────────────────────────────────────────────────
-# Source files — always LF (cross-platform consistency)
-# ──────────────────────────────────────────────────────────────────────
+# Source files - always LF (cross-platform consistency)
 *.cs        text eol=lf diff=csharp
 *.cshtml    text eol=lf
 *.razor     text eol=lf
 *.csproj    text eol=lf
-# Visual Studio expects CRLF for .sln files
-*.sln       text eol=crlf
 *.json      text eol=lf
 *.yml       text eol=lf
 *.yaml      text eol=lf
@@ -20,7 +14,10 @@
 *.props     text eol=lf
 *.targets   text eol=lf
 
-# Web/frontend
+# Visual Studio expects CRLF for .sln files
+*.sln       text eol=crlf
+
+# Web / frontend
 *.html      text eol=lf
 *.css       text eol=lf
 *.scss      text eol=lf
@@ -33,12 +30,10 @@
 *.ps1       text eol=crlf
 
 # Docker
-Dockerfile  text eol=lf
-*.dockerfile text eol=lf
+Dockerfile      text eol=lf
+*.dockerfile    text eol=lf
 
-# ──────────────────────────────────────────────────────────────────────
-# Binary files — never modified by line-ending normalization
-# ──────────────────────────────────────────────────────────────────────
+# Binary files - never modified by line-ending normalization
 *.png       binary
 *.jpg       binary
 *.jpeg      binary
@@ -62,9 +57,7 @@ Dockerfile  text eol=lf
 *.snk       binary
 *.pfx       binary
 
-# ──────────────────────────────────────────────────────────────────────
-# GitHub linguist overrides (so language stats are accurate)
-# ──────────────────────────────────────────────────────────────────────
+# GitHub linguist overrides
 docs/*       linguist-documentation
 *.md         linguist-documentation
 themes/*/wwwroot/lib/* linguist-vendored

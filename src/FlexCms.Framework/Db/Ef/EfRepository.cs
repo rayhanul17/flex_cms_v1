@@ -1,4 +1,5 @@
 using System.Linq.Expressions;
+using FlexCms.Framework.Clock;
 using Microsoft.EntityFrameworkCore;
 
 namespace FlexCms.Framework.Db.Ef;
@@ -39,21 +40,21 @@ public class EfRepository<T> : IRepository<T> where T : BaseEfEntity
 
     public async Task AddAsync(T entity, CancellationToken ct = default)
     {
-        entity.CreatedAt = DateTime.UtcNow;
-        entity.UpdatedAt = DateTime.UtcNow;
+        entity.CreatedAt = FcmsTime.Now;
+        entity.UpdatedAt = FcmsTime.Now;
         await _set.AddAsync(entity, ct);
     }
 
     public async Task AddRangeAsync(IEnumerable<T> entities, CancellationToken ct = default)
     {
-        var now = DateTime.UtcNow;
+        var now = FcmsTime.Now;
         foreach (var e in entities) { e.CreatedAt = now; e.UpdatedAt = now; }
         await _set.AddRangeAsync(entities, ct);
     }
 
     public Task UpdateAsync(T entity, CancellationToken ct = default)
     {
-        entity.UpdatedAt = DateTime.UtcNow;
+        entity.UpdatedAt = FcmsTime.Now;
         _set.Update(entity);
         return Task.CompletedTask;
     }
@@ -67,7 +68,7 @@ public class EfRepository<T> : IRepository<T> where T : BaseEfEntity
     public Task SoftDeleteAsync(T entity, CancellationToken ct = default)
     {
         entity.IsDeleted = true;
-        entity.UpdatedAt = DateTime.UtcNow;
+        entity.UpdatedAt = FcmsTime.Now;
         _set.Update(entity);
         return Task.CompletedTask;
     }

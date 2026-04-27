@@ -11,6 +11,6 @@ public class FcmsUser : IdentityUser<Guid>
     public override Guid Id { get => base.Id; set => base.Id = value; }
 
     public bool ForcePasswordChange { get; set; }
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime CreatedAt { get; set; } = FlexCms.Framework.Clock.FcmsTime.Now;
     public List<string> Roles { get; set; } = [];
 }

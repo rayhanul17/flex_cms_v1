@@ -1,5 +1,6 @@
 using FlexCms.Framework.Auth;
 using FlexCms.Framework.Auth.Ef;
+using FlexCms.Framework.Clock;
 using FlexCms.Framework.Auth.MongoDb;
 using FlexCms.Framework.Db;
 using FlexCms.Framework.Db.Ef;
@@ -26,6 +27,9 @@ public static class FcmsServiceExtensions
         this IServiceCollection services,
         FlexCmsOptions options)
     {
+        // Clock — local time, injectable and replaceable in tests
+        services.AddSingleton<IFcmsClock, FcmsClock>();
+
         // DataProtection — keyring persisted to App_Data/keys
         services.AddDataProtection()
             .PersistKeysToFileSystem(new DirectoryInfo(Path.Combine(options.AppDataPath, "keys")))

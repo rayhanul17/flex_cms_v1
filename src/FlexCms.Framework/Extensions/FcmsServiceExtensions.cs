@@ -28,8 +28,11 @@ public static class FcmsServiceExtensions
         this IServiceCollection services,
         FlexCmsOptions options)
     {
-        // Clock — local time, injectable and replaceable in tests
-        services.AddSingleton<IFcmsClock, FcmsClock>();
+        // Clock — UTC storage, site-timezone display
+        var timeZone = ResolveTimeZone(options.TimeZoneId);
+        var clock = new FcmsClock(timeZone);
+        FcmsTime.Clock = clock;                          // update static access point too
+        services.AddSingleton<IFcmsClock>(clock);
 
         // DataProtection — keyring persisted to App_Data/keys
         services.AddDataProtection()
@@ -171,6 +174,12 @@ public static class FcmsServiceExtensions
 
         return services;
     }
+
+    private static TimeZoneInfo ResolveTimeZone(string timeZoneId)
+    {
+        try { return TimeZoneInfo.FindSystemTimeZoneById(timeZoneId); }
+        catch (TimeZoneNotFoundException) { return TimeZoneInfo.Local; }
+    }
 }
 
 public class FlexCmsOptions
@@ -183,4 +192,6 @@ public class FlexCmsOptions
     public string MongoDatabaseName { get; set; } = "flexcms";
     public string[] AllowedIps { get; set; } = [];
     public bool EnforceIpFilter { get; set; }
+    /// <summary>IANA or Windows timezone ID. Default: Asia/Dhaka (+06:00).</summary>
+    public string TimeZoneId { get; set; } = "Asia/Dhaka";
 }

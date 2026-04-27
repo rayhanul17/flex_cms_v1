@@ -178,6 +178,32 @@ public class MongoPhase1Tests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task MongoRepository_DateTime_StoredAsUtcReadBackAsUtc()
+    {
+        var repo = new MongoRepository<MongoTestEntity>(_database);
+
+        var beforeUtc = DateTime.UtcNow;
+        var entity = new MongoTestEntity { Name = "UTC Roundtrip" };
+        await repo.AddAsync(entity);
+        var afterUtc = DateTime.UtcNow;
+
+        // 1. Raw BSON: Int64 Unix ms (UTC-epoch based)
+        var collection = _database.GetCollection<BsonDocument>("mongotestentitys");
+        var doc = await collection.Find(new BsonDocument("_id", entity.Id.ToString())).FirstOrDefaultAsync();
+        Assert.NotNull(doc);
+        Assert.Equal(BsonType.Int64, doc["createdAt"].BsonType);
+
+        var storedUtc = DateTimeOffset.FromUnixTimeMilliseconds(doc["createdAt"].AsInt64).UtcDateTime;
+        Assert.InRange(storedUtc, beforeUtc.AddSeconds(-1), afterUtc.AddSeconds(1));
+
+        // 2. Read back via repository: Kind must be Utc, ticks must match stored value
+        var found = await repo.GetByIdAsync(entity.Id);
+        Assert.NotNull(found);
+        Assert.Equal(DateTimeKind.Utc, found.CreatedAt.Kind);
+        Assert.Equal(storedUtc.Ticks, found.CreatedAt.Ticks);
+    }
+
+    [Fact]
     public async Task MongoRepository_SoftDelete_NotReturnedByGetAll()
     {
         var repo = new MongoRepository<MongoTestEntity>(_database);

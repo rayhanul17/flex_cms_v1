@@ -15,4 +15,5 @@ public class SetupConfig
     public string AdminEmail { get; set; } = string.Empty;
     public string SetupVersion { get; set; } = "1.0";
     public DateTime SetupCompletedAt { get; set; }
+    public string TimeZoneId { get; set; } = "Asia/Dhaka";
 }

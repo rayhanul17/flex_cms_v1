@@ -17,8 +17,8 @@ public sealed class FcmsDateTimeSerializer : SerializerBase<DateTime>
         var type = context.Reader.GetCurrentBsonType();
         return type switch
         {
-            BsonType.Int64 => DateTimeOffset.FromUnixTimeMilliseconds(context.Reader.ReadInt64()).LocalDateTime,
-            BsonType.DateTime => BsonUtils.ToDateTimeFromMillisecondsSinceEpoch(context.Reader.ReadDateTime()).ToLocalTime(),
+            BsonType.Int64 => DateTimeOffset.FromUnixTimeMilliseconds(context.Reader.ReadInt64()).UtcDateTime,
+            BsonType.DateTime => BsonUtils.ToDateTimeFromMillisecondsSinceEpoch(context.Reader.ReadDateTime()),
             _ => throw new BsonSerializationException($"Cannot deserialize DateTime from BsonType {type}")
         };
     }

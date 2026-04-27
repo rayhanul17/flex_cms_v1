@@ -85,7 +85,7 @@ public class EfPhase1Tests : IAsyncLifetime
     [Fact]
     public async Task EfUnitOfWork_RollbackOnException_BothEntitiesAbsent()
     {
-        var uow = new EfUnitOfWork(_ctx);
+        await using var uow = new EfUnitOfWork(_ctx);
 
         var id1 = Guid.NewGuid();
         var id2 = Guid.NewGuid();

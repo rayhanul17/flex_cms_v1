@@ -30,6 +30,9 @@ jobs:
       - name: Build (Release, no warnings allowed)
         run: dotnet build FlexCms.slnx --no-restore --configuration Release
 
+      - name: Format check
+        run: dotnet format FlexCms.slnx --verify-no-changes --severity warn
+
       - name: Test (unit only — integration tests require Docker)
         run: dotnet test tests/FlexCms.Tests.Unit/ --no-build --configuration Release --verbosity normal --logger "trx;LogFileName=test-results.trx"
 

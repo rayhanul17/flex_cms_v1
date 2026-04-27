@@ -1,4 +1,4 @@
-﻿namespace FlexCms.Tests.Unit;
+namespace FlexCms.Tests.Unit;
 
 public class UnitTest1
 {

@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/FlexCms.Core/FlexCms.Core.csproj" />
+    <Project Path="src/FlexCms.Framework/FlexCms.Framework.csproj" />
+    <Project Path="src/FlexCms.Host/FlexCms.Host.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/FlexCms.Tests.Integration/FlexCms.Tests.Integration.csproj" />
+    <Project Path="tests/FlexCms.Tests.Unit/FlexCms.Tests.Unit.csproj" />
+  </Folder>
+</Solution>

@@ -3,7 +3,6 @@ using FlexCms.Host.Models.Auth;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.RateLimiting;
 
 namespace FlexCms.Host.Controllers;
 
@@ -27,7 +26,7 @@ public class AuthController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    [EnableRateLimiting("login")]
+
     public async Task<IActionResult> Login(LoginViewModel model, string? returnUrl = null)
     {
         if (!ModelState.IsValid) return View(model);
@@ -59,7 +58,7 @@ public class AuthController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    [EnableRateLimiting("otp")]
+
     public async Task<IActionResult> ForgotPassword(ForgotPasswordViewModel model)
     {
         if (!ModelState.IsValid) return View(model);
@@ -104,7 +103,7 @@ public class AuthController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    [EnableRateLimiting("otp")]
+
     public async Task<IActionResult> VerifyOtp(VerifyOtpViewModel model)
     {
         if (!ModelState.IsValid) return View(model);

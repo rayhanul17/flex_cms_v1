@@ -16,6 +16,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
+using System.Threading.RateLimiting;
 using Microsoft.Extensions.DependencyInjection;
 using MongoDB.Driver;
 
@@ -60,6 +61,8 @@ public static class FcmsServiceExtensions
 
         services.AddAuthorization();
         services.AddHttpContextAccessor();
+        services.AddAntiforgery(o => o.HeaderName = "X-FlexCms-Csrf");
+        services.AddSignalR();
 
         // Identity core
         var identityBuilder = services
@@ -80,23 +83,37 @@ public static class FcmsServiceExtensions
             .AddPasswordValidator<FcmsPasswordValidator>()
             .AddDefaultTokenProviders();
 
-        // Rate limiting
+        // Rate limiting — partitioned by IP (M19: prevents one IP from blocking others)
         services.AddRateLimiter(limiter =>
         {
-            limiter.AddFixedWindowLimiter("login", opts =>
+            limiter.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(ctx =>
             {
-                opts.Window = TimeSpan.FromMinutes(1);
-                opts.PermitLimit = 10;
-                opts.QueueLimit = 0;
-                opts.AutoReplenishment = true;
+                var ip = ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+
+                // "login" policy: 10 attempts/min per IP
+                if (ctx.Request.Path.StartsWithSegments("/auth/login"))
+                    return RateLimitPartition.GetFixedWindowLimiter($"login:{ip}", _ =>
+                        new FixedWindowRateLimiterOptions
+                        {
+                            Window = TimeSpan.FromMinutes(1),
+                            PermitLimit = 10,
+                            AutoReplenishment = true
+                        });
+
+                // "otp" policy: 5 attempts/min per IP
+                if (ctx.Request.Path.StartsWithSegments("/auth/forgot-password") ||
+                    ctx.Request.Path.StartsWithSegments("/auth/verify-otp"))
+                    return RateLimitPartition.GetFixedWindowLimiter($"otp:{ip}", _ =>
+                        new FixedWindowRateLimiterOptions
+                        {
+                            Window = TimeSpan.FromMinutes(1),
+                            PermitLimit = 5,
+                            AutoReplenishment = true
+                        });
+
+                return RateLimitPartition.GetNoLimiter("none");
             });
-            limiter.AddFixedWindowLimiter("otp", opts =>
-            {
-                opts.Window = TimeSpan.FromMinutes(1);
-                opts.PermitLimit = 5;
-                opts.QueueLimit = 0;
-                opts.AutoReplenishment = true;
-            });
+
             limiter.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
         });
 

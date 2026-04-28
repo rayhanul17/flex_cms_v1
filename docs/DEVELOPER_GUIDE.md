@@ -172,7 +172,27 @@ cd src/FlexCms.Host
 dotnet watch run    # Auto-reloads on file save
 ```
 
-### Step 4: Commit your changes
+### Step 4: Format code before committing
+
+CI runs `dotnet format --verify-no-changes` and **fails the build on any formatting violation** (extra alignment whitespace, indentation drift, missing newlines, etc.). Run the auto-fix locally before you commit so you don't get bounced by CI:
+
+```bash
+dotnet format FlexCms.slnx
+```
+
+This rewrites files in place to match the project's formatting rules. If the command modifies anything, stage those changes too.
+
+To check without modifying files (same command CI runs):
+
+```bash
+dotnet format FlexCms.slnx --verify-no-changes --severity warn
+```
+
+Empty output = clean. Non-zero exit = something to fix.
+
+> Common cause of CI format failures: aligning `=` signs across multiple lines for visual readability. The formatter collapses them to single spaces. Either accept that, or run `dotnet format` after writing the code.
+
+### Step 5: Commit your changes
 
 We use **Conventional Commits**:
 
@@ -192,7 +212,7 @@ git commit -m "chore(deps): update EF Core to 10.0.1"
 git commit -m "docs(readme): clarify module install steps"
 ```
 
-### Step 5: Push your branch
+### Step 6: Push your branch
 
 ```bash
 git push -u origin feature/blog-comments
@@ -200,7 +220,7 @@ git push -u origin feature/blog-comments
 
 The `-u` flag links your local branch to the remote one (only needed first time).
 
-### Step 6: Create a Pull Request (PR)
+### Step 7: Create a Pull Request (PR)
 
 ```bash
 gh pr create --base main --title "feat(blog): comment moderation queue" --body "Adds moderation UI for blog comments."
@@ -208,7 +228,7 @@ gh pr create --base main --title "feat(blog): comment moderation queue" --body "
 
 OR open the GitHub page that's printed in the terminal output and click "Create Pull Request".
 
-### Step 7: Wait for CI to pass
+### Step 8: Wait for CI to pass
 
 GitHub Actions runs:
 - Build (`dotnet build`)
@@ -217,11 +237,11 @@ GitHub Actions runs:
 
 If any fails — fix locally, commit, push. CI re-runs automatically.
 
-### Step 8: Merge to main
+### Step 9: Merge to main
 
 Once CI is green, click **"Merge"** on GitHub. This triggers auto-deploy to production (via the Docker workflow).
 
-### Step 9: Clean up
+### Step 10: Clean up
 
 ```bash
 git checkout main
@@ -1737,7 +1757,7 @@ The external developer **never clones your CMS source** — they only need the p
 | Open PR | `gh pr create --base main` |
 | Run dev | `cd src/FlexCms.Host && dotnet watch run` |
 | Run tests | `dotnet test` |
-| Format code | `dotnet format` |
+| Format code | `dotnet format FlexCms.slnx` (run before every commit) |
 | Start local DB | `docker compose -f docker/docker-compose.dev.yml up -d` |
 | Stop local DB | `docker compose -f docker/docker-compose.dev.yml down` |
 | Build module ZIP | `cd modules/X && dotnet publish -c Release -o publish/` |

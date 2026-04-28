@@ -47,25 +47,21 @@ public class SetupController : Controller
     {
         try
         {
-            if (model.DbProvider == "mysql")
-            {
-                var connStr = BuildMySqlConnectionString(model);
-                var opts = new DbContextOptionsBuilder<FlexCms.Framework.Db.Ef.FcmsDbContext>()
-                    .UseMySql(connStr, Microsoft.EntityFrameworkCore.ServerVersion.AutoDetect(connStr),
-                        o => o.CommandTimeout(10))
-                    .Options;
-                await using var ctx = new FlexCms.Framework.Db.Ef.FcmsDbContext(opts);
-                var canConnect = await ctx.Database.CanConnectAsync(ct);
-                if (!canConnect) return Ok(new { ok = false, error = "Cannot connect to MySQL server." });
-            }
-            else
+            if (model.DbProvider == "mongodb")
             {
                 var connStr = model.MongoConnectionString ?? "mongodb://localhost:27017";
                 using var client = new MongoDB.Driver.MongoClient(connStr);
                 var db = client.GetDatabase(model.MongoDatabase ?? "flexcms");
                 await db.RunCommandAsync<MongoDB.Bson.BsonDocument>(
-                    new MongoDB.Bson.BsonDocument("ping", 1),
-                    cancellationToken: ct);
+                    new MongoDB.Bson.BsonDocument("ping", 1), cancellationToken: ct);
+            }
+            else
+            {
+                var optBuilder = new DbContextOptionsBuilder<FlexCms.Framework.Db.Ef.FcmsDbContext>();
+                ConfigureRelationalProvider(optBuilder, model);
+                await using var ctx = new FlexCms.Framework.Db.Ef.FcmsDbContext(optBuilder.Options);
+                if (!await ctx.Database.CanConnectAsync(ct))
+                    return Ok(new { ok = false, error = "Cannot connect to the database server." });
             }
 
             return Ok(new { ok = true });
@@ -73,6 +69,31 @@ public class SetupController : Controller
         catch (Exception ex)
         {
             return Ok(new { ok = false, error = ex.Message });
+        }
+    }
+
+    private static void ConfigureRelationalProvider(
+        DbContextOptionsBuilder<FlexCms.Framework.Db.Ef.FcmsDbContext> builder,
+        SetupStep1ViewModel model)
+    {
+        switch (model.DbProvider)
+        {
+            case "mysql":
+                var mysqlCs = BuildMySqlConnectionString(model);
+                builder.UseMySql(mysqlCs,
+                    Microsoft.EntityFrameworkCore.ServerVersion.AutoDetect(mysqlCs),
+                    o => o.CommandTimeout(10));
+                break;
+
+            case "mssql":
+                builder.UseSqlServer(BuildMsSqlConnectionString(model),
+                    o => o.CommandTimeout(10));
+                break;
+
+            case "postgresql":
+                builder.UseNpgsql(BuildPostgreSqlConnectionString(model),
+                    o => o.CommandTimeout(10));
+                break;
         }
     }
 
@@ -154,11 +175,21 @@ public class SetupController : Controller
         return Ok();
     }
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
+    // ── Connection string builders ────────────────────────────────────────────
 
     private static string BuildMySqlConnectionString(SetupStep1ViewModel m)
         => $"Server={m.MySqlHost};Port={m.MySqlPort};Database={m.MySqlDatabase};" +
            $"User={m.MySqlUsername};Password={m.MySqlPassword};";
+
+    private static string BuildMsSqlConnectionString(SetupStep1ViewModel m)
+        => $"Server={m.MsSqlHost},{m.MsSqlPort};Database={m.MsSqlDatabase};" +
+           $"User Id={m.MsSqlUsername};Password={m.MsSqlPassword};TrustServerCertificate=True;";
+
+    private static string BuildPostgreSqlConnectionString(SetupStep1ViewModel m)
+        => $"Host={m.PgHost};Port={m.PgPort};Database={m.PgDatabase};" +
+           $"Username={m.PgUsername};Password={m.PgPassword};";
+
+    // ── Setup config builder ──────────────────────────────────────────────────
 
     private SetupConfig BuildSetupConfig(
         SetupStep1ViewModel s1,
@@ -176,21 +207,30 @@ public class SetupController : Controller
             TimeZoneId = s2.TimeZoneId,
             AdminEmail = s3.Email,
             AdminDisplayName = s3.DisplayName,
-            AdminPasswordEncrypted = s3.Password,   // SetupHelper.Write will encrypt this
+            AdminPasswordEncrypted = s3.Password,   // SetupHelper.Write encrypts this
             AdminSeeded = false,
             SetupVersion = "1.0",
             SetupCompletedAt = DateTime.UtcNow
         };
 
-        if (s1.DbProvider == "mysql")
+        switch (s1.DbProvider)
         {
-            config.DbConnectionString = BuildMySqlConnectionString(s1);
-            config.DbPasswordEncrypted = s1.MySqlPassword ?? "";
-        }
-        else
-        {
-            config.MongoConnectionString = s1.MongoConnectionString ?? "mongodb://localhost:27017";
-            config.MongoDatabase = s1.MongoDatabase ?? "flexcms";
+            case "mysql":
+                config.DbConnectionString = BuildMySqlConnectionString(s1);
+                config.DbPasswordEncrypted = s1.MySqlPassword ?? "";
+                break;
+            case "mssql":
+                config.DbConnectionString = BuildMsSqlConnectionString(s1);
+                config.DbPasswordEncrypted = s1.MsSqlPassword ?? "";
+                break;
+            case "postgresql":
+                config.DbConnectionString = BuildPostgreSqlConnectionString(s1);
+                config.DbPasswordEncrypted = s1.PgPassword ?? "";
+                break;
+            case "mongodb":
+                config.MongoConnectionString = s1.MongoConnectionString ?? "mongodb://localhost:27017";
+                config.MongoDatabase = s1.MongoDatabase ?? "flexcms";
+                break;
         }
 
         return config;

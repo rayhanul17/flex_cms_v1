@@ -1,0 +1,31 @@
+@{
+    var prefix = ViewData["Prefix"]?.ToString() ?? "";
+    var portName = ViewData["PortName"]?.ToString() ?? prefix + "Port";
+    var dbName = ViewData["DbName"]?.ToString() ?? prefix + "Database";
+    var userName = ViewData["UserName"]?.ToString() ?? prefix + "Username";
+    var pwdName = ViewData["PwdName"]?.ToString() ?? prefix + "Password";
+    var portDefault = ViewData["PortDefault"]?.ToString() ?? "3306";
+}
+
+<div class="row g-2 mb-2">
+    <div class="col-8">
+        <label class="form-label">Host</label>
+        <input name="@(prefix)Host" class="form-control" value="localhost" />
+    </div>
+    <div class="col-4">
+        <label class="form-label">Port</label>
+        <input name="@portName" class="form-control" type="number" value="@portDefault" />
+    </div>
+</div>
+<div class="mb-2">
+    <label class="form-label">Database Name</label>
+    <input name="@dbName" class="form-control" value="flexcms" />
+</div>
+<div class="mb-2">
+    <label class="form-label">Username</label>
+    <input name="@userName" class="form-control" />
+</div>
+<div class="mb-3">
+    <label class="form-label">Password</label>
+    <input name="@pwdName" class="form-control" type="password" />
+</div>

@@ -18,48 +18,62 @@
 
     <div class="mb-3">
         <label class="form-label fw-semibold">Database Provider</label>
-        <div class="d-flex gap-3">
+        <div class="d-flex flex-wrap gap-3">
             <div class="form-check">
                 <input class="form-check-input" type="radio" name="DbProvider" id="provMySQL" value="mysql"
-                       @(Model.DbProvider == "mysql" ? "checked" : "") onchange="toggleProvider()" />
+                       @(Model.DbProvider == "mysql" ? "checked" : "") onchange="showProvider('mysql')" />
                 <label class="form-check-label" for="provMySQL">MySQL</label>
             </div>
             <div class="form-check">
+                <input class="form-check-input" type="radio" name="DbProvider" id="provMsSql" value="mssql"
+                       @(Model.DbProvider == "mssql" ? "checked" : "") onchange="showProvider('mssql')" />
+                <label class="form-check-label" for="provMsSql">SQL Server (MSSQL)</label>
+            </div>
+            <div class="form-check">
+                <input class="form-check-input" type="radio" name="DbProvider" id="provPg" value="postgresql"
+                       @(Model.DbProvider == "postgresql" ? "checked" : "") onchange="showProvider('postgresql')" />
+                <label class="form-check-label" for="provPg">PostgreSQL</label>
+            </div>
+            <div class="form-check">
                 <input class="form-check-input" type="radio" name="DbProvider" id="provMongo" value="mongodb"
-                       @(Model.DbProvider == "mongodb" ? "checked" : "") onchange="toggleProvider()" />
+                       @(Model.DbProvider == "mongodb" ? "checked" : "") onchange="showProvider('mongodb')" />
                 <label class="form-check-label" for="provMongo">MongoDB</label>
             </div>
         </div>
     </div>
 
-    <!-- MySQL fields -->
-    <div id="mysqlFields">
-        <div class="row g-2 mb-2">
-            <div class="col-8">
-                <label class="form-label">Host</label>
-                <input asp-for="MySqlHost" class="form-control" />
-            </div>
-            <div class="col-4">
-                <label class="form-label">Port</label>
-                <input asp-for="MySqlPort" class="form-control" />
-            </div>
-        </div>
-        <div class="mb-2">
-            <label class="form-label">Database Name</label>
-            <input asp-for="MySqlDatabase" class="form-control" />
-        </div>
-        <div class="mb-2">
-            <label class="form-label">Username</label>
-            <input asp-for="MySqlUsername" class="form-control" />
-        </div>
-        <div class="mb-3">
-            <label class="form-label">Password</label>
-            <input asp-for="MySqlPassword" class="form-control" type="password" />
-        </div>
+    <!-- MySQL -->
+    <div id="fields-mysql" class="provider-fields">
+        @await Html.PartialAsync("_DbFields", new ViewDataDictionary(ViewData) {
+            ["Prefix"] = "MySql", ["HostDefault"] = "localhost",
+            ["PortName"] = "MySqlPort", ["PortDefault"] = 3306,
+            ["DbName"] = "MySqlDatabase", ["UserName"] = "MySqlUsername",
+            ["PwdName"] = "MySqlPassword"
+        })
     </div>
 
-    <!-- MongoDB fields -->
-    <div id="mongoFields" style="display:none">
+    <!-- MSSQL -->
+    <div id="fields-mssql" class="provider-fields" style="display:none">
+        @await Html.PartialAsync("_DbFields", new ViewDataDictionary(ViewData) {
+            ["Prefix"] = "MsSql", ["HostDefault"] = "localhost",
+            ["PortName"] = "MsSqlPort", ["PortDefault"] = 1433,
+            ["DbName"] = "MsSqlDatabase", ["UserName"] = "MsSqlUsername",
+            ["PwdName"] = "MsSqlPassword"
+        })
+    </div>
+
+    <!-- PostgreSQL -->
+    <div id="fields-postgresql" class="provider-fields" style="display:none">
+        @await Html.PartialAsync("_DbFields", new ViewDataDictionary(ViewData) {
+            ["Prefix"] = "Pg", ["HostDefault"] = "localhost",
+            ["PortName"] = "PgPort", ["PortDefault"] = 5432,
+            ["DbName"] = "PgDatabase", ["UserName"] = "PgUsername",
+            ["PwdName"] = "PgPassword"
+        })
+    </div>
+
+    <!-- MongoDB -->
+    <div id="fields-mongodb" class="provider-fields" style="display:none">
         <div class="mb-2">
             <label class="form-label">Connection String</label>
             <input asp-for="MongoConnectionString" class="form-control" placeholder="mongodb://localhost:27017" />
@@ -67,6 +81,10 @@
         <div class="mb-3">
             <label class="form-label">Database Name</label>
             <input asp-for="MongoDatabase" class="form-control" />
+        </div>
+        <div class="alert alert-warning small py-2">
+            MongoDB must run as a replica set for transactions.
+            Use: <code>mongod --replSet rs0</code> then <code>rs.initiate()</code>
         </div>
     </div>
 
@@ -78,42 +96,53 @@
     </div>
 
     <div asp-validation-summary="ModelOnly" class="text-danger small mb-2"></div>
-
     <button type="submit" class="btn btn-primary w-100">Next →</button>
 </form>
 
 @section Scripts {
 <script>
-    function toggleProvider() {
-        const isMysql = document.getElementById('provMySQL').checked;
-        document.getElementById('mysqlFields').style.display = isMysql ? '' : 'none';
-        document.getElementById('mongoFields').style.display = isMysql ? 'none' : '';
+    function showProvider(p) {
+        document.querySelectorAll('.provider-fields').forEach(el => el.style.display = 'none');
+        document.getElementById('fields-' + p).style.display = '';
     }
-    toggleProvider();
+    // Init on load
+    const checked = document.querySelector('input[name=DbProvider]:checked');
+    if (checked) showProvider(checked.value);
+
+    function getFormPayload() {
+        const p = document.querySelector('input[name=DbProvider]:checked').value;
+        return {
+            dbProvider: p,
+            mySqlHost: document.querySelector('[name=MySqlHost]')?.value,
+            mySqlPort: parseInt(document.querySelector('[name=MySqlPort]')?.value || '3306'),
+            mySqlDatabase: document.querySelector('[name=MySqlDatabase]')?.value,
+            mySqlUsername: document.querySelector('[name=MySqlUsername]')?.value,
+            mySqlPassword: document.querySelector('[name=MySqlPassword]')?.value,
+            msSqlHost: document.querySelector('[name=MsSqlHost]')?.value,
+            msSqlPort: parseInt(document.querySelector('[name=MsSqlPort]')?.value || '1433'),
+            msSqlDatabase: document.querySelector('[name=MsSqlDatabase]')?.value,
+            msSqlUsername: document.querySelector('[name=MsSqlUsername]')?.value,
+            msSqlPassword: document.querySelector('[name=MsSqlPassword]')?.value,
+            pgHost: document.querySelector('[name=PgHost]')?.value,
+            pgPort: parseInt(document.querySelector('[name=PgPort]')?.value || '5432'),
+            pgDatabase: document.querySelector('[name=PgDatabase]')?.value,
+            pgUsername: document.querySelector('[name=PgUsername]')?.value,
+            pgPassword: document.querySelector('[name=PgPassword]')?.value,
+            mongoConnectionString: document.querySelector('[name=MongoConnectionString]')?.value,
+            mongoDatabase: document.querySelector('[name=MongoDatabase]')?.value
+        };
+    }
 
     async function testConnection() {
         const result = document.getElementById('testResult');
         result.textContent = 'Testing…';
         result.className = 'small text-muted';
-
-        const isMysql = document.getElementById('provMySQL').checked;
-        const payload = {
-            dbProvider: isMysql ? 'mysql' : 'mongodb',
-            mySqlHost: document.querySelector('[name=MySqlHost]').value,
-            mySqlPort: parseInt(document.querySelector('[name=MySqlPort]').value),
-            mySqlDatabase: document.querySelector('[name=MySqlDatabase]').value,
-            mySqlUsername: document.querySelector('[name=MySqlUsername]').value,
-            mySqlPassword: document.querySelector('[name=MySqlPassword]').value,
-            mongoConnectionString: document.querySelector('[name=MongoConnectionString]').value,
-            mongoDatabase: document.querySelector('[name=MongoDatabase]').value
-        };
-
         const token = document.querySelector('input[name=__RequestVerificationToken]').value;
         try {
             const res = await fetch('/Setup/TestConnection', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': token },
-                body: JSON.stringify(payload)
+                body: JSON.stringify(getFormPayload())
             });
             const data = await res.json();
             result.textContent = data.ok ? '✓ Connected successfully' : '✗ ' + data.error;

@@ -1,0 +1,127 @@
+@model FlexCms.Host.Models.Setup.SetupStep1ViewModel
+@{
+    Layout = "_SetupLayout";
+    ViewData["Title"] = "Step 1 — Database";
+}
+
+@section Steps {
+    <span class="step active">1. Database</span>
+    <span class="step">2. Site Info</span>
+    <span class="step">3. Admin Account</span>
+    <span class="step">4. Done</span>
+}
+
+<h5 class="mb-3">Step 1 — Database</h5>
+
+<form asp-action="Step1Post" method="post" id="step1Form">
+    @Html.AntiForgeryToken()
+
+    <div class="mb-3">
+        <label class="form-label fw-semibold">Database Provider</label>
+        <div class="d-flex gap-3">
+            <div class="form-check">
+                <input class="form-check-input" type="radio" name="DbProvider" id="provMySQL" value="mysql"
+                       @(Model.DbProvider == "mysql" ? "checked" : "") onchange="toggleProvider()" />
+                <label class="form-check-label" for="provMySQL">MySQL</label>
+            </div>
+            <div class="form-check">
+                <input class="form-check-input" type="radio" name="DbProvider" id="provMongo" value="mongodb"
+                       @(Model.DbProvider == "mongodb" ? "checked" : "") onchange="toggleProvider()" />
+                <label class="form-check-label" for="provMongo">MongoDB</label>
+            </div>
+        </div>
+    </div>
+
+    <!-- MySQL fields -->
+    <div id="mysqlFields">
+        <div class="row g-2 mb-2">
+            <div class="col-8">
+                <label class="form-label">Host</label>
+                <input asp-for="MySqlHost" class="form-control" />
+            </div>
+            <div class="col-4">
+                <label class="form-label">Port</label>
+                <input asp-for="MySqlPort" class="form-control" />
+            </div>
+        </div>
+        <div class="mb-2">
+            <label class="form-label">Database Name</label>
+            <input asp-for="MySqlDatabase" class="form-control" />
+        </div>
+        <div class="mb-2">
+            <label class="form-label">Username</label>
+            <input asp-for="MySqlUsername" class="form-control" />
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Password</label>
+            <input asp-for="MySqlPassword" class="form-control" type="password" />
+        </div>
+    </div>
+
+    <!-- MongoDB fields -->
+    <div id="mongoFields" style="display:none">
+        <div class="mb-2">
+            <label class="form-label">Connection String</label>
+            <input asp-for="MongoConnectionString" class="form-control" placeholder="mongodb://localhost:27017" />
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Database Name</label>
+            <input asp-for="MongoDatabase" class="form-control" />
+        </div>
+    </div>
+
+    <div class="d-flex align-items-center gap-2 mb-3">
+        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="testConnection()">
+            Test Connection
+        </button>
+        <span id="testResult" class="small"></span>
+    </div>
+
+    <div asp-validation-summary="ModelOnly" class="text-danger small mb-2"></div>
+
+    <button type="submit" class="btn btn-primary w-100">Next →</button>
+</form>
+
+@section Scripts {
+<script>
+    function toggleProvider() {
+        const isMysql = document.getElementById('provMySQL').checked;
+        document.getElementById('mysqlFields').style.display = isMysql ? '' : 'none';
+        document.getElementById('mongoFields').style.display = isMysql ? 'none' : '';
+    }
+    toggleProvider();
+
+    async function testConnection() {
+        const result = document.getElementById('testResult');
+        result.textContent = 'Testing…';
+        result.className = 'small text-muted';
+
+        const isMysql = document.getElementById('provMySQL').checked;
+        const payload = {
+            dbProvider: isMysql ? 'mysql' : 'mongodb',
+            mySqlHost: document.querySelector('[name=MySqlHost]').value,
+            mySqlPort: parseInt(document.querySelector('[name=MySqlPort]').value),
+            mySqlDatabase: document.querySelector('[name=MySqlDatabase]').value,
+            mySqlUsername: document.querySelector('[name=MySqlUsername]').value,
+            mySqlPassword: document.querySelector('[name=MySqlPassword]').value,
+            mongoConnectionString: document.querySelector('[name=MongoConnectionString]').value,
+            mongoDatabase: document.querySelector('[name=MongoDatabase]').value
+        };
+
+        const token = document.querySelector('input[name=__RequestVerificationToken]').value;
+        try {
+            const res = await fetch('/Setup/TestConnection', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': token },
+                body: JSON.stringify(payload)
+            });
+            const data = await res.json();
+            result.textContent = data.ok ? '✓ Connected successfully' : '✗ ' + data.error;
+            result.className = 'small ' + (data.ok ? 'text-success' : 'text-danger');
+        } catch {
+            result.textContent = '✗ Request failed';
+            result.className = 'small text-danger';
+        }
+    }
+</script>
+}

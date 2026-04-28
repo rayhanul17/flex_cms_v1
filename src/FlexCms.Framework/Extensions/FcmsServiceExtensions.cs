@@ -6,7 +6,9 @@ using FlexCms.Framework.Db;
 using FlexCms.Framework.Db.Ef;
 using FlexCms.Framework.Db.Migration;
 using FlexCms.Framework.Db.MongoDb;
+using FlexCms.Framework.Hosting;
 using FlexCms.Framework.Middleware;
+using FlexCms.Framework.Services;
 using FlexCms.Framework.Setup;
 using FlexCms.Framework.Validators;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -48,6 +50,12 @@ public static class FcmsServiceExtensions
             var dp = sp.GetRequiredService<IDataProtectionProvider>();
             return new SetupHelper(dp, options.AppDataPath);
         });
+
+        // Settings service (DB-backed; only useful when a DB provider is configured)
+        services.AddScoped<ISettingsService, SettingsService>();
+
+        // Seed admin user + SuperAdmin role on first production-mode startup
+        services.AddHostedService<SeedService>();
 
         // Cookie authentication (8h sliding window)
         services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)

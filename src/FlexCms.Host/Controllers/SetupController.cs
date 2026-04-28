@@ -1,0 +1,198 @@
+using FlexCms.Framework.Setup;
+using FlexCms.Host.Models.Setup;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Hosting;
+
+namespace FlexCms.Host.Controllers;
+
+public class SetupController : Controller
+{
+    private readonly SetupHelper _setup;
+    private readonly IHostApplicationLifetime _lifetime;
+
+    // Session keys
+    private const string S1 = "setup_step1";
+    private const string S2 = "setup_step2";
+
+    public SetupController(SetupHelper setup, IHostApplicationLifetime lifetime)
+    {
+        _setup = setup;
+        _lifetime = lifetime;
+    }
+
+    // ── Step 1 — Database ─────────────────────────────────────────────────────
+
+    [HttpGet("/Setup")]
+    public IActionResult Index() => View(new SetupStep1ViewModel());
+
+    [HttpPost("/Setup/Step1")]
+    [ValidateAntiForgeryToken]
+    public IActionResult Step1Post(SetupStep1ViewModel model)
+    {
+        if (!ModelState.IsValid) return View("Index", model);
+
+        // Persist to session as JSON
+        HttpContext.Session.SetString(S1, System.Text.Json.JsonSerializer.Serialize(model));
+        return RedirectToAction(nameof(Step2));
+    }
+
+    // ── Test Connection (AJAX) ─────────────────────────────────────────────────
+
+    [HttpPost("/Setup/TestConnection")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> TestConnection([FromBody] SetupStep1ViewModel model, CancellationToken ct)
+    {
+        try
+        {
+            if (model.DbProvider == "mysql")
+            {
+                var connStr = BuildMySqlConnectionString(model);
+                var opts = new DbContextOptionsBuilder<FlexCms.Framework.Db.Ef.FcmsDbContext>()
+                    .UseMySql(connStr, Microsoft.EntityFrameworkCore.ServerVersion.AutoDetect(connStr),
+                        o => o.CommandTimeout(10))
+                    .Options;
+                await using var ctx = new FlexCms.Framework.Db.Ef.FcmsDbContext(opts);
+                var canConnect = await ctx.Database.CanConnectAsync(ct);
+                if (!canConnect) return Ok(new { ok = false, error = "Cannot connect to MySQL server." });
+            }
+            else
+            {
+                var connStr = model.MongoConnectionString ?? "mongodb://localhost:27017";
+                using var client = new MongoDB.Driver.MongoClient(connStr);
+                var db = client.GetDatabase(model.MongoDatabase ?? "flexcms");
+                await db.RunCommandAsync<MongoDB.Bson.BsonDocument>(
+                    new MongoDB.Bson.BsonDocument("ping", 1),
+                    cancellationToken: ct);
+            }
+
+            return Ok(new { ok = true });
+        }
+        catch (Exception ex)
+        {
+            return Ok(new { ok = false, error = ex.Message });
+        }
+    }
+
+    // ── Step 2 — Site Info ────────────────────────────────────────────────────
+
+    [HttpGet("/Setup/Step2")]
+    public IActionResult Step2()
+    {
+        if (HttpContext.Session.GetString(S1) is null)
+            return RedirectToAction(nameof(Index));
+
+        return View(new SetupStep2ViewModel());
+    }
+
+    [HttpPost("/Setup/Step2")]
+    [ValidateAntiForgeryToken]
+    public IActionResult Step2Post(SetupStep2ViewModel model)
+    {
+        if (!ModelState.IsValid) return View("Step2", model);
+
+        HttpContext.Session.SetString(S2, System.Text.Json.JsonSerializer.Serialize(model));
+        return RedirectToAction(nameof(Step3));
+    }
+
+    // ── Step 3 — Admin Account ────────────────────────────────────────────────
+
+    [HttpGet("/Setup/Step3")]
+    public IActionResult Step3()
+    {
+        if (HttpContext.Session.GetString(S2) is null)
+            return RedirectToAction(nameof(Step2));
+
+        return View(new SetupStep3ViewModel());
+    }
+
+    [HttpPost("/Setup/Step3")]
+    [ValidateAntiForgeryToken]
+    public IActionResult Step3Post(SetupStep3ViewModel model)
+    {
+        if (!ModelState.IsValid) return View("Step3", model);
+
+        // Validate password complexity (same rules as FcmsPasswordValidator)
+        var pwd = model.Password;
+        if (pwd.Length < 8 || !pwd.Any(char.IsUpper) || !pwd.Any(char.IsLower) ||
+            !pwd.Any(char.IsDigit) || !pwd.Any(c => !char.IsLetterOrDigit(c)))
+        {
+            ModelState.AddModelError(nameof(model.Password),
+                "Password must be 8+ characters with uppercase, lowercase, digit, and special character.");
+            return View("Step3", model);
+        }
+
+        var step1Json = HttpContext.Session.GetString(S1)!;
+        var step2Json = HttpContext.Session.GetString(S2)!;
+        var step1 = System.Text.Json.JsonSerializer.Deserialize<SetupStep1ViewModel>(step1Json)!;
+        var step2 = System.Text.Json.JsonSerializer.Deserialize<SetupStep2ViewModel>(step2Json)!;
+
+        var config = BuildSetupConfig(step1, step2, model);
+        _setup.Write(config);   // encrypts DB password + admin password before writing
+
+        return RedirectToAction(nameof(Complete));
+    }
+
+    // ── Step 4 — Complete ─────────────────────────────────────────────────────
+
+    [HttpGet("/Setup/Complete")]
+    public IActionResult Complete() => View();
+
+    [HttpPost("/Setup/Restart")]
+    [ValidateAntiForgeryToken]
+    public IActionResult Restart()
+    {
+        // Allow the response to reach the browser before the process exits
+        Response.OnCompleted(() =>
+        {
+            _lifetime.StopApplication();
+            return Task.CompletedTask;
+        });
+
+        return Ok();
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
+    private static string BuildMySqlConnectionString(SetupStep1ViewModel m)
+        => $"Server={m.MySqlHost};Port={m.MySqlPort};Database={m.MySqlDatabase};" +
+           $"User={m.MySqlUsername};Password={m.MySqlPassword};";
+
+    private SetupConfig BuildSetupConfig(
+        SetupStep1ViewModel s1,
+        SetupStep2ViewModel s2,
+        SetupStep3ViewModel s3)
+    {
+        var config = new SetupConfig
+        {
+            IsSetupComplete = true,
+            DbProvider = s1.DbProvider,
+            SiteName = s2.SiteName,
+            SiteTagline = s2.Tagline,
+            SiteBaseUrl = s2.BaseUrl,
+            DefaultLanguage = s2.DefaultLanguage,
+            TimeZoneId = s2.TimeZoneId,
+            AdminEmail = s3.Email,
+            AdminDisplayName = s3.DisplayName,
+            AdminPasswordEncrypted = s3.Password,   // SetupHelper.Write will encrypt this
+            AdminSeeded = false,
+            SetupVersion = "1.0",
+            SetupCompletedAt = DateTime.UtcNow
+        };
+
+        if (s1.DbProvider == "mysql")
+        {
+            config.DbConnectionString = BuildMySqlConnectionString(s1);
+            config.DbPasswordEncrypted = s1.MySqlPassword ?? "";
+        }
+        else
+        {
+            config.MongoConnectionString = s1.MongoConnectionString ?? "mongodb://localhost:27017";
+            config.MongoDatabase = s1.MongoDatabase ?? "flexcms";
+        }
+
+        return config;
+    }
+}

@@ -21,6 +21,20 @@ public class SetupHelper
         _setupFilePath = Path.Combine(appDataPath, "setup.json");
     }
 
+    // Static check — no DI required; used in Program.cs before container is built
+    public static bool IsSetupComplete(string appDataPath)
+    {
+        var path = Path.Combine(appDataPath, "setup.json");
+        if (!File.Exists(path)) return false;
+        try
+        {
+            var json = File.ReadAllText(path);
+            using var doc = JsonDocument.Parse(json);
+            return doc.RootElement.TryGetProperty("isSetupComplete", out var el) && el.GetBoolean();
+        }
+        catch { return false; }
+    }
+
     public bool IsSetupComplete()
     {
         if (!File.Exists(_setupFilePath)) return false;
@@ -40,17 +54,18 @@ public class SetupHelper
         var dir = Path.GetDirectoryName(_setupFilePath)!;
         Directory.CreateDirectory(dir);
 
-        // Encrypt password before persisting if provided in plaintext
         if (!string.IsNullOrEmpty(config.DbPasswordEncrypted) &&
             !config.DbPasswordEncrypted.StartsWith("CfDJ8", StringComparison.Ordinal))
-        {
             config.DbPasswordEncrypted = _protector.Protect(config.DbPasswordEncrypted);
-        }
+
+        if (!string.IsNullOrEmpty(config.AdminPasswordEncrypted) &&
+            !config.AdminPasswordEncrypted.StartsWith("CfDJ8", StringComparison.Ordinal))
+            config.AdminPasswordEncrypted = _protector.Protect(config.AdminPasswordEncrypted);
 
         var json = JsonSerializer.Serialize(config, JsonOpts);
         File.WriteAllText(_setupFilePath, json);
     }
 
-    public string DecryptPassword(string encrypted)
-        => _protector.Unprotect(encrypted);
+    public string EncryptValue(string plaintext) => _protector.Protect(plaintext);
+    public string DecryptPassword(string encrypted) => _protector.Unprotect(encrypted);
 }

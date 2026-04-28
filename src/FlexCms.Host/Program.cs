@@ -1,11 +1,40 @@
 using FlexCms.Framework.Extensions;
 using FlexCms.Framework.Middleware;
+using FlexCms.Framework.Setup;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddControllersWithViews();
-
 var appDataPath = Path.Combine(builder.Environment.ContentRootPath, "App_Data");
+
+// ── Two-path startup ──────────────────────────────────────────────────────────
+// Setup mode runs a minimal pipeline (SetupController only) until the wizard
+// completes and calls StopApplication(). The process then restarts under the
+// production-mode path where full DI (Identity, DB, etc.) is registered.
+// ─────────────────────────────────────────────────────────────────────────────
+
+if (!SetupHelper.IsSetupComplete(appDataPath))
+{
+    // ── SETUP MODE ────────────────────────────────────────────────────────────
+    builder.Services.AddSetupModeServices(appDataPath);
+
+    var setupApp = builder.Build();
+
+    setupApp.UseStaticFiles();
+    setupApp.UseRouting();
+    setupApp.UseSession();
+    setupApp.MapControllerRoute("default", "{controller=Setup}/{action=Index}/{id?}");
+    setupApp.MapFallback(ctx =>
+    {
+        ctx.Response.Redirect("/Setup");
+        return Task.CompletedTask;
+    });
+
+    setupApp.Run();
+    return;
+}
+
+// ── PRODUCTION MODE ───────────────────────────────────────────────────────────
+builder.Services.AddControllersWithViews();
 
 builder.Services.AddFlexCms(new FlexCmsOptions
 {
@@ -15,6 +44,7 @@ builder.Services.AddFlexCms(new FlexCmsOptions
     UseMongoDB = builder.Configuration.GetValue<bool>("FlexCms:UseMongoDB"),
     MongoConnectionString = builder.Configuration.GetConnectionString("MongoDB") ?? "mongodb://localhost:27017",
     MongoDatabaseName = builder.Configuration.GetValue<string>("FlexCms:MongoDatabaseName") ?? "flexcms",
+    TimeZoneId = builder.Configuration.GetValue<string>("FlexCms:TimeZoneId") ?? "Asia/Dhaka",
     EnforceIpFilter = builder.Configuration.GetValue<bool>("FlexCms:EnforceIpFilter"),
     AllowedIps = builder.Configuration.GetSection("FlexCms:AllowedIps").Get<string[]>() ?? []
 });
@@ -26,9 +56,7 @@ app.UseMiddleware<SecurityHeadersMiddleware>();
 app.UseMiddleware<IpFilterMiddleware>();
 
 if (!app.Environment.IsDevelopment())
-{
     app.UseHsts();
-}
 
 app.UseHttpsRedirection();
 app.UseStaticFiles();

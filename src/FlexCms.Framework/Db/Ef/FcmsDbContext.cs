@@ -1,5 +1,6 @@
 using FlexCms.Framework.Auth;
 using FlexCms.Framework.Clock;
+using FlexCms.Framework.Db;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
@@ -9,6 +10,8 @@ namespace FlexCms.Framework.Db.Ef;
 public class FcmsDbContext : IdentityDbContext<FcmsUser, FcmsRole, Guid>
 {
     public FcmsDbContext(DbContextOptions<FcmsDbContext> options) : base(options) { }
+
+    public DbSet<FcmsSettings> Settings => Set<FcmsSettings>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

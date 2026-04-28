@@ -56,7 +56,14 @@ if (!SetupHelper.IsSetupComplete(appDataPath))
 // DB config comes from setup.json (written by setup wizard).
 // appsettings.json values are used as fallback for non-DB options (IP filter, etc.)
 // and for developer overrides during local development.
-builder.Services.AddControllersWithViews();
+builder.Services.AddControllersWithViews()
+    .AddRazorOptions(o =>
+    {
+        // Admin controllers live under Controllers/Admin/ but Razor only looks
+        // at /Views/{Controller}/{Action} by default. Add /Views/Admin/{...}
+        // so admin views can be grouped alongside their controllers.
+        o.ViewLocationFormats.Add("/Views/Admin/{1}/{0}.cshtml");
+    });
 
 var setup = SetupHelper.ReadStatic(appDataPath);
 var cfg = builder.Configuration;

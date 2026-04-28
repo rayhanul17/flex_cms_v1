@@ -10,6 +10,8 @@
     <span class="step active">4. Done</span>
 }
 
+<form id="csrf" style="display:none">@Html.AntiForgeryToken()</form>
+
 <div class="text-center py-3">
     <div class="mb-3">
         <svg xmlns="http://www.w3.org/2000/svg" width="56" height="56" fill="#198754" viewBox="0 0 16 16">
@@ -30,10 +32,10 @@
 @section Scripts {
 <script>
     // Trigger app restart
-    const token = '@Html.AntiForgeryToken()';
+    const csrfToken = document.querySelector('#csrf input[name=__RequestVerificationToken]').value;
     fetch('/Setup/Restart', {
         method: 'POST',
-        headers: { 'RequestVerificationToken': document.querySelector('input[name=__RequestVerificationToken]')?.value ?? '' }
+        headers: { 'RequestVerificationToken': csrfToken }
     }).catch(() => {});
 
     // Countdown + redirect

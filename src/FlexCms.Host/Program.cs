@@ -39,7 +39,9 @@ if (!SetupHelper.IsSetupComplete(appDataPath))
     setupApp.UseStaticFiles();
     setupApp.UseRouting();
     setupApp.UseSession();
-    setupApp.MapControllerRoute("default", "{controller=Setup}/{action=Index}/{id?}");
+    // All Setup routes use attribute routing — no conventional route needed.
+    // MapFallback catches everything else (e.g. /auth/login) and sends it to /Setup.
+    setupApp.MapControllers();
     setupApp.MapFallback(ctx =>
     {
         ctx.Response.Redirect("/Setup");

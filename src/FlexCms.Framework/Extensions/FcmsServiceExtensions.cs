@@ -65,20 +65,18 @@ public static class FcmsServiceExtensions
         // Seed admin user + SuperAdmin role on first production-mode startup
         services.AddHostedService<SeedService>();
 
-        // ── Module discovery ─────────────────────────────────────────────────
-        // Loader + manager are always registered so admin UI can show "no
-        // modules found" rather than fail. Actual scan happens in UseFlexCms()
-        // (or app startup) — this PR provides discovery only; activation is
-        // handled in a follow-up Phase 4 sub-PR.
+        // ── Module discovery + wiring ────────────────────────────────────────
+        // The registry is built once at startup; each loaded module gets:
+        //   1. RegisterServices(services) called
+        //   2. AttributeScanner runs over its assembly for [FcmsScoped]/etc
+        //   3. Its assembly added as an MVC ApplicationPart so its controllers
+        //      and Razor views become routable
         services.AddSingleton<ModuleLoader>();
         services.AddSingleton<ModuleManager>();
-        services.AddSingleton<ModuleRegistry>(sp =>
-        {
-            var manager = sp.GetRequiredService<ModuleManager>();
-            var modulesRoot = Path.Combine(options.AppDataPath, "..", "modules");
-            var loaded = manager.ScanAndLoad(modulesRoot);
-            return new ModuleRegistry(loaded);
-        });
+
+        var modulesRoot = Path.Combine(options.AppDataPath, "..", "modules");
+        var loadedModules = BuildModuleRegistry(services, modulesRoot);
+        services.AddSingleton(loadedModules);
 
         // Cookie authentication (8h sliding window).
         // Scheme name MUST be IdentityConstants.ApplicationScheme so that
@@ -235,6 +233,33 @@ public static class FcmsServiceExtensions
     {
         try { return TimeZoneInfo.FindSystemTimeZoneById(timeZoneId); }
         catch (TimeZoneNotFoundException) { return TimeZoneInfo.Local; }
+    }
+
+    /// <summary>
+    /// Scan the modules root, instantiate each loaded module, and wire it
+    /// into the host: call its <c>RegisterServices</c>, scan its assembly
+    /// for attribute-marked types, and add it as an MVC ApplicationPart.
+    /// </summary>
+    private static ModuleRegistry BuildModuleRegistry(IServiceCollection services, string modulesRoot)
+    {
+        // We can't pull a logger from DI here (container isn't built yet);
+        // the manager / loader log via NullLogger when invoked statically.
+        var loaderLog = Microsoft.Extensions.Logging.Abstractions.NullLogger<ModuleLoader>.Instance;
+        var managerLog = Microsoft.Extensions.Logging.Abstractions.NullLogger<ModuleManager>.Instance;
+        var loader = new ModuleLoader(loaderLog);
+        var manager = new ModuleManager(loader, managerLog);
+
+        var loaded = manager.ScanAndLoad(modulesRoot);
+        var mvcBuilder = services.AddMvcCore();   // idempotent — returns existing builder if already added
+
+        foreach (var module in loaded)
+        {
+            module.Instance.RegisterServices(services);
+            AttributeScanner.RegisterAttributedTypes(services, module.Assembly);
+            mvcBuilder.AddApplicationPart(module.Assembly);
+        }
+
+        return new ModuleRegistry(loaded);
     }
 }
 

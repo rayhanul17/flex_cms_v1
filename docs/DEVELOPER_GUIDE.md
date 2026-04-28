@@ -525,6 +525,12 @@ return FcmsOk("User activated.", data: new { id = user.Id });
 return FcmsFail("User not found.", errors: new[] { "ID invalid" });
 ```
 
+**Login URL after setup:** `http://localhost:5000/auth/login` — use the admin email and password you set in the Setup Wizard.
+
+**Admin view location convention** — admin controllers live under `Controllers/Admin/` (e.g. `UserController`, `RoleController`), and their views live under `Views/Admin/{Controller}/{Action}.cshtml`. Razor's default search only checks `/Views/{Controller}/`, so `Program.cs` adds `/Views/Admin/{Controller}/{Action}.cshtml` to `ViewLocationFormats`. When adding a new admin controller, just put its views in the matching `Views/Admin/{Controller}/` folder — no extra config needed.
+
+**Cookie auth scheme** — registered under `IdentityConstants.ApplicationScheme` (`"Identity.Application"`), not the default `"Cookies"`. This is required because we use `AddIdentityCore()` (lighter than `AddIdentity()`), which does not auto-register Identity's cookie schemes. `SignInManager.PasswordSignInAsync` targets that exact scheme name.
+
 ---
 
 ### Phase 4 — Module System ❌ Not Implemented Yet

@@ -11,7 +11,6 @@ using FlexCms.Framework.Middleware;
 using FlexCms.Framework.Services;
 using FlexCms.Framework.Setup;
 using FlexCms.Framework.Validators;
-using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http;
@@ -65,9 +64,12 @@ public static class FcmsServiceExtensions
         // Seed admin user + SuperAdmin role on first production-mode startup
         services.AddHostedService<SeedService>();
 
-        // Cookie authentication (8h sliding window)
-        services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
-            .AddCookie(opts =>
+        // Cookie authentication (8h sliding window).
+        // Scheme name MUST be IdentityConstants.ApplicationScheme so that
+        // SignInManager.PasswordSignInAsync (which targets that scheme) works
+        // with AddIdentityCore (which does NOT auto-register Identity cookies).
+        services.AddAuthentication(IdentityConstants.ApplicationScheme)
+            .AddCookie(IdentityConstants.ApplicationScheme, opts =>
             {
                 opts.Cookie.HttpOnly = true;
                 opts.Cookie.SecurePolicy = CookieSecurePolicy.Always;

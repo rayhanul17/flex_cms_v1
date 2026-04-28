@@ -1,6 +1,7 @@
 using FlexCms.Framework.Auth;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace FlexCms.Framework.Middleware;
 
@@ -10,9 +11,10 @@ public class ForcePasswordChangeMiddleware
 
     public ForcePasswordChangeMiddleware(RequestDelegate next) => _next = next;
 
-    public async Task InvokeAsync(HttpContext context, UserManager<FcmsUser> userManager)
+    public async Task InvokeAsync(HttpContext context, IServiceProvider services)
     {
-        if (context.User.Identity?.IsAuthenticated == true)
+        var userManager = services.GetService<UserManager<FcmsUser>>();
+        if (userManager is not null && context.User.Identity?.IsAuthenticated == true)
         {
             var user = await userManager.GetUserAsync(context.User);
             if (user?.ForcePasswordChange == true &&

@@ -8,6 +8,7 @@ using FlexCms.Framework.Db.Migration;
 using FlexCms.Framework.Db.MongoDb;
 using FlexCms.Framework.Hosting;
 using FlexCms.Framework.Middleware;
+using FlexCms.Framework.Modules;
 using FlexCms.Framework.Services;
 using FlexCms.Framework.Setup;
 using FlexCms.Framework.Validators;
@@ -63,6 +64,21 @@ public static class FcmsServiceExtensions
 
         // Seed admin user + SuperAdmin role on first production-mode startup
         services.AddHostedService<SeedService>();
+
+        // ── Module discovery ─────────────────────────────────────────────────
+        // Loader + manager are always registered so admin UI can show "no
+        // modules found" rather than fail. Actual scan happens in UseFlexCms()
+        // (or app startup) — this PR provides discovery only; activation is
+        // handled in a follow-up Phase 4 sub-PR.
+        services.AddSingleton<ModuleLoader>();
+        services.AddSingleton<ModuleManager>();
+        services.AddSingleton<ModuleRegistry>(sp =>
+        {
+            var manager = sp.GetRequiredService<ModuleManager>();
+            var modulesRoot = Path.Combine(options.AppDataPath, "..", "modules");
+            var loaded = manager.ScanAndLoad(modulesRoot);
+            return new ModuleRegistry(loaded);
+        });
 
         // Cookie authentication (8h sliding window).
         // Scheme name MUST be IdentityConstants.ApplicationScheme so that

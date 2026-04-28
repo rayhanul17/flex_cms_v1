@@ -2,6 +2,7 @@ using FlexCms.Framework.Auth;
 using FlexCms.Framework.Clock;
 using FlexCms.Framework.Db;
 using FlexCms.Framework.Helpers;
+using FlexCms.Framework.Modules;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
@@ -18,6 +19,7 @@ public class FcmsDbContext : IdentityDbContext<FcmsUser, FcmsRole, Guid>
     public DbSet<FcmsSettings> Settings => Set<FcmsSettings>();
     public DbSet<FcmsPermission> Permissions => Set<FcmsPermission>();
     public DbSet<FcmsRolePermission> RolePermissions => Set<FcmsRolePermission>();
+    public DbSet<FcmsModuleRecord> ModuleRecords => Set<FcmsModuleRecord>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -52,6 +54,11 @@ public class FcmsDbContext : IdentityDbContext<FcmsUser, FcmsRole, Guid>
         // Unique index: permission key must be unique globally
         modelBuilder.Entity<FcmsPermission>()
             .HasIndex(p => p.Key)
+            .IsUnique();
+
+        // Unique index: one record per module ID
+        modelBuilder.Entity<FcmsModuleRecord>()
+            .HasIndex(m => m.ModuleId)
             .IsUnique();
 
         // Apply soft-delete filter + auto-name table for every BaseEfEntity.

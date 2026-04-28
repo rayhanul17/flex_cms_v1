@@ -29,12 +29,20 @@
     <div class="alert alert-info text-start small mt-3 mb-3">
         <strong>Manual restart required:</strong>
         <ol class="mb-0 mt-2">
-            <li>Stop the running app: <kbd>Ctrl</kbd> + <kbd>C</kbd> in the terminal</li>
-            <li>Start it again: <code>dotnet watch run</code> (or <code>dotnet run</code>)</li>
-            <li>Then click the button below</li>
+            <li>Stop the running app: <kbd>Ctrl</kbd> + <kbd>C</kbd> (or stop button in Visual Studio)</li>
+            <li>Start it again: <code>dotnet watch run</code> (or run/debug from Visual Studio)</li>
+            <li>Wait for the indicator below to turn green, then click the button</li>
         </ol>
     </div>
-    <a href="/auth/login" class="btn btn-success">Go to Login</a>
+
+    <div id="readiness" class="alert alert-warning small mb-3">
+        <span id="readinessIcon">⏳</span>
+        <span id="readinessText">Waiting for app restart… (still in setup mode)</span>
+    </div>
+
+    <a id="loginLink" href="/auth/login" class="btn btn-success disabled" aria-disabled="true">
+        Go to Login
+    </a>
 }
 else
 {
@@ -49,9 +57,39 @@ else
 }
 </div>
 
-@if (!isDev)
-{
-    @section Scripts {
+@section Scripts {
+    @if (isDev)
+    {
+        <script>
+            // Poll the login endpoint. While the app is in setup mode, /auth/login
+            // is caught by MapFallback and 302-redirects to /Setup. Once production
+            // mode is up, the response is the actual login page (200 + login form).
+            // We follow redirects (default fetch behavior) and check the final URL.
+            const link = document.getElementById('loginLink');
+            const icon = document.getElementById('readinessIcon');
+            const text = document.getElementById('readinessText');
+            const banner = document.getElementById('readiness');
+
+            async function probe() {
+                try {
+                    const r = await fetch('/auth/login', { redirect: 'follow', cache: 'no-store' });
+                    if (r.ok && !r.url.includes('/Setup')) {
+                        banner.classList.remove('alert-warning');
+                        banner.classList.add('alert-success');
+                        icon.textContent = '✅';
+                        text.textContent = 'App restarted — ready to log in.';
+                        link.classList.remove('disabled');
+                        link.removeAttribute('aria-disabled');
+                        return;
+                    }
+                } catch { /* connection refused → app is restarting; keep polling */ }
+                setTimeout(probe, 1500);
+            }
+            probe();
+        </script>
+    }
+    else
+    {
         <script>
             // Trigger app restart (production only — relies on process manager to bring it back up)
             const csrfToken = document.querySelector('#csrf input[name=__RequestVerificationToken]').value;

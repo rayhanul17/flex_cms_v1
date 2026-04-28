@@ -184,8 +184,29 @@ public class SetupController : Controller
         }
 
         await using var ctx = new FcmsDbContext(optBuilder.Options);
-        // EnsureCreatedAsync: creates all tables if they don't exist (idempotent)
-        await ctx.Database.EnsureCreatedAsync(ct);
+
+        // EnsureCreatedAsync is a no-op when the database already exists, so
+        // an empty pre-existing DB (e.g. from a failed earlier setup) would
+        // skip table creation. Detect that and rebuild from scratch.
+        var created = await ctx.Database.EnsureCreatedAsync(ct);
+        if (created) return;
+
+        bool hasSchema;
+        try
+        {
+            await ctx.Roles.AnyAsync(ct);
+            hasSchema = true;
+        }
+        catch
+        {
+            hasSchema = false;
+        }
+
+        if (!hasSchema)
+        {
+            await ctx.Database.EnsureDeletedAsync(ct);
+            await ctx.Database.EnsureCreatedAsync(ct);
+        }
     }
 
     // ── Connection string builders ────────────────────────────────────────────

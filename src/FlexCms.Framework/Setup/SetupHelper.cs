@@ -23,17 +23,7 @@ public class SetupHelper
 
     // Static check — no DI required; used in Program.cs before container is built
     public static bool IsSetupComplete(string appDataPath)
-    {
-        var path = Path.Combine(appDataPath, "setup.json");
-        if (!File.Exists(path)) return false;
-        try
-        {
-            var json = File.ReadAllText(path);
-            using var doc = JsonDocument.Parse(json);
-            return doc.RootElement.TryGetProperty("isSetupComplete", out var el) && el.GetBoolean();
-        }
-        catch { return false; }
-    }
+        => ReadStatic(appDataPath)?.IsSetupComplete == true;
 
     // Static read — no DI required; used in Program.cs to build FlexCmsOptions from setup.json
     public static SetupConfig? ReadStatic(string appDataPath)

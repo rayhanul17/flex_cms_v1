@@ -1,6 +1,8 @@
+@inject Microsoft.AspNetCore.Hosting.IWebHostEnvironment Env
 @{
     Layout = "_SetupLayout";
     ViewData["Title"] = "Setup Complete";
+    var isDev = Env.IsDevelopment();
 }
 
 @section Steps {
@@ -20,6 +22,22 @@
         </svg>
     </div>
     <h5 class="fw-bold text-success">Setup complete!</h5>
+
+@if (isDev)
+{
+    <p class="text-muted mb-2">Development mode — auto-restart is not available with <code>dotnet watch run</code>.</p>
+    <div class="alert alert-info text-start small mt-3 mb-3">
+        <strong>Manual restart required:</strong>
+        <ol class="mb-0 mt-2">
+            <li>Stop the running app: <kbd>Ctrl</kbd> + <kbd>C</kbd> in the terminal</li>
+            <li>Start it again: <code>dotnet watch run</code> (or <code>dotnet run</code>)</li>
+            <li>Then click the button below</li>
+        </ol>
+    </div>
+    <a href="/auth/login" class="btn btn-success">Go to Login</a>
+}
+else
+{
     <p class="text-muted mb-1">Restarting the application…</p>
     <p class="text-muted small">Redirecting to login in <strong id="countdown">15</strong> seconds.<br/>
     If the page doesn't load, wait a moment and
@@ -28,28 +46,32 @@
     <div class="progress mt-3" style="height: 6px;">
         <div id="progressBar" class="progress-bar bg-success" style="width:0%;transition:width 5s linear"></div>
     </div>
+}
 </div>
 
-@section Scripts {
-<script>
-    // Trigger app restart
-    const csrfToken = document.querySelector('#csrf input[name=__RequestVerificationToken]').value;
-    fetch('/Setup/Restart', {
-        method: 'POST',
-        headers: { 'RequestVerificationToken': csrfToken }
-    }).catch(() => {});
+@if (!isDev)
+{
+    @section Scripts {
+        <script>
+            // Trigger app restart (production only — relies on process manager to bring it back up)
+            const csrfToken = document.querySelector('#csrf input[name=__RequestVerificationToken]').value;
+            fetch('/Setup/Restart', {
+                method: 'POST',
+                headers: { 'RequestVerificationToken': csrfToken }
+            }).catch(() => {});
 
-    // Countdown + redirect
-    let secs = 15;
-    document.getElementById('progressBar').style.width = '100%';
-    const timer = setInterval(() => {
-        secs--;
-        document.getElementById('countdown').textContent = secs;
-        if (secs <= 0) {
-            clearInterval(timer);
-            document.getElementById('loginLink').removeAttribute('style');
-            window.location.href = '/auth/login';
-        }
-    }, 1000);
-</script>
+            // Countdown + redirect
+            let secs = 15;
+            document.getElementById('progressBar').style.width = '100%';
+            const timer = setInterval(() => {
+                secs--;
+                document.getElementById('countdown').textContent = secs;
+                if (secs <= 0) {
+                    clearInterval(timer);
+                    document.getElementById('loginLink').removeAttribute('style');
+                    window.location.href = '/auth/login';
+                }
+            }, 1000);
+        </script>
+    }
 }

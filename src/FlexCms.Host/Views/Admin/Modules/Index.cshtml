@@ -19,6 +19,12 @@
 }
 else
 {
+    <div id="restartBanner" class="alert alert-warning d-none">
+        <strong>Restart required.</strong>
+        Module state changes take effect after the app restarts.
+        <button type="button" id="restartBtn" class="btn btn-sm btn-warning ms-2">Restart now</button>
+    </div>
+
     <table class="table table-hover align-middle">
         <thead class="table-light">
             <tr>
@@ -28,12 +34,13 @@ else
                 <th>Depends on</th>
                 <th>Status</th>
                 <th>Activated</th>
+                <th class="text-end">Actions</th>
             </tr>
         </thead>
         <tbody>
         @foreach (var m in Model.Modules)
         {
-            <tr>
+            <tr data-module-id="@m.ModuleId" data-module-name="@m.ModuleName">
                 <td>
                     <div class="fw-semibold">@m.ModuleName <span class="text-muted small">@m.ModuleId</span></div>
                     @if (!string.IsNullOrEmpty(m.Description))
@@ -77,12 +84,87 @@ else
                 <td class="small text-muted">
                     @(m.ActivatedAt?.ToString("yyyy-MM-dd HH:mm") ?? "—")
                 </td>
+                <td class="text-end">
+                    @if (m.Status == "Inactive")
+                    {
+                        <button class="btn btn-sm btn-outline-success js-activate">Activate</button>
+                    }
+                    else
+                    {
+                        <button class="btn btn-sm btn-outline-secondary js-deactivate">Deactivate</button>
+                    }
+                    <button class="btn btn-sm btn-outline-danger js-uninstall">Uninstall</button>
+                </td>
             </tr>
         }
         </tbody>
     </table>
+}
 
-    <p class="text-muted small">
-        Activate / deactivate / uninstall actions land in a follow-up Phase 4 PR.
-    </p>
+@section Scripts {
+<script>
+(function () {
+    const csrf = document.querySelector('input[name=__RequestVerificationToken]')?.value
+        || document.cookie.match(/(?:^|;\s*)\.AspNetCore\.Antiforgery\.[^=]+=([^;]+)/)?.[1]
+        || '';
+
+    // Antiforgery token from a hidden form
+    const form = document.createElement('form');
+    form.style.display = 'none';
+    form.innerHTML = '@Html.AntiForgeryToken()';
+    document.body.appendChild(form);
+    const token = form.querySelector('input[name=__RequestVerificationToken]').value;
+
+    async function post(url, extra) {
+        const body = new URLSearchParams({ __RequestVerificationToken: token, ...(extra || {}) });
+        const r = await fetch(url, {
+            method: 'POST',
+            headers: { 'RequestVerificationToken': token },
+            body
+        });
+        return r.json();
+    }
+
+    function rowFor(btn) { return btn.closest('tr'); }
+    function showRestart() { document.getElementById('restartBanner').classList.remove('d-none'); }
+
+    document.querySelectorAll('.js-activate').forEach(btn => btn.addEventListener('click', async () => {
+        const row = rowFor(btn);
+        const id = row.dataset.moduleId;
+        const res = await post(`/admin/modules/activate/${encodeURIComponent(id)}`);
+        if (res.isSuccess) showRestart();
+        else alert(res.message);
+    }));
+
+    document.querySelectorAll('.js-deactivate').forEach(btn => btn.addEventListener('click', async () => {
+        const row = rowFor(btn);
+        const id = row.dataset.moduleId;
+        if (!confirm(`Deactivate "${row.dataset.moduleName}"? Its routes and services will be skipped after restart.`)) return;
+        const res = await post(`/admin/modules/deactivate/${encodeURIComponent(id)}`);
+        if (res.isSuccess) showRestart();
+        else alert(res.message);
+    }));
+
+    document.querySelectorAll('.js-uninstall').forEach(btn => btn.addEventListener('click', async () => {
+        const row = rowFor(btn);
+        const id = row.dataset.moduleId;
+        const name = row.dataset.moduleName;
+        const confirmName = prompt(`Uninstall will delete the module folder on next restart.\n\nType the module name to confirm:\n  ${name}`);
+        if (confirmName !== name) {
+            if (confirmName !== null) alert('Name did not match — uninstall cancelled.');
+            return;
+        }
+        const res = await post(`/admin/modules/uninstall/${encodeURIComponent(id)}`, { confirmName });
+        if (res.isSuccess) showRestart();
+        else alert(res.message);
+    }));
+
+    document.getElementById('restartBtn')?.addEventListener('click', async () => {
+        await post('/admin/modules/restart');
+        document.getElementById('restartBanner').innerHTML =
+            '<strong>Restarting…</strong> The page will be available again in a moment.';
+        setTimeout(() => location.reload(), 5000);
+    });
+})();
+</script>
 }

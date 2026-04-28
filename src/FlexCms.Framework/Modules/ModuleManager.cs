@@ -9,6 +9,12 @@ namespace FlexCms.Framework.Modules;
 /// </summary>
 public class ModuleManager
 {
+    /// <summary>Marker file name placed in a module folder to disable the module.</summary>
+    public const string DisabledMarker = ".disabled";
+
+    /// <summary>Marker file name that schedules folder deletion on next startup.</summary>
+    public const string UninstallMarker = ".uninstall-pending";
+
     private readonly ModuleLoader _loader;
     private readonly ILogger<ModuleManager> _logger;
 
@@ -23,6 +29,13 @@ public class ModuleManager
     /// one module — the loader picks up the first DLL inside it that carries
     /// a <c>module.json</c>. A missing root folder is treated as "no modules".
     /// </summary>
+    /// <remarks>
+    /// Two file-based markers control lifecycle:
+    /// <list type="bullet">
+    ///   <item><c>.uninstall-pending</c> in a module folder → folder is deleted before scanning. Used to bypass Windows DLL locks.</item>
+    ///   <item><c>.disabled</c> in a module folder → module is loaded but flagged as deactivated. The host skips its service registration and route mapping.</item>
+    /// </list>
+    /// </remarks>
     public IReadOnlyList<LoadedModule> ScanAndLoad(string modulesRoot)
     {
         if (!Directory.Exists(modulesRoot))
@@ -31,21 +44,43 @@ public class ModuleManager
             return [];
         }
 
+        ProcessPendingUninstalls(modulesRoot);
+
         var loaded = new List<LoadedModule>();
         foreach (var moduleFolder in Directory.GetDirectories(modulesRoot))
         {
+            var disabled = File.Exists(Path.Combine(moduleFolder, DisabledMarker));
+
             foreach (var dll in Directory.GetFiles(moduleFolder, "*.dll"))
             {
-                var module = _loader.LoadFromPath(dll);
+                var module = _loader.LoadFromPath(dll, moduleFolder, disabled);
                 if (module is null) continue;
                 loaded.Add(module);
-                _logger.LogInformation("Loaded module {Id} v{Version} from {Path}",
-                    module.ModuleId, module.Manifest.Version, dll);
+                _logger.LogInformation("Loaded module {Id} v{Version} (deactivated={Off}) from {Path}",
+                    module.ModuleId, module.Manifest.Version, disabled, dll);
                 break; // one module per subfolder
             }
         }
 
         return SortByDependencies(loaded);
+    }
+
+    private void ProcessPendingUninstalls(string modulesRoot)
+    {
+        foreach (var moduleFolder in Directory.GetDirectories(modulesRoot))
+        {
+            if (!File.Exists(Path.Combine(moduleFolder, UninstallMarker))) continue;
+
+            try
+            {
+                Directory.Delete(moduleFolder, recursive: true);
+                _logger.LogInformation("Uninstalled module folder: {Path}", moduleFolder);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to delete module folder during uninstall: {Path}", moduleFolder);
+            }
+        }
     }
 
     /// <summary>

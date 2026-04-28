@@ -22,7 +22,8 @@
     <h5 class="fw-bold text-success">Setup complete!</h5>
     <p class="text-muted mb-1">Restarting the application…</p>
     <p class="text-muted small">Redirecting to login in <strong id="countdown">15</strong> seconds.<br/>
-    If the page doesn't load, wait a moment and <a href="/auth/login">click here</a>.</p>
+    If the page doesn't load, wait a moment and
+    <a id="loginLink" href="/auth/login" style="pointer-events:none;opacity:0.4;">click here</a>.</p>
 
     <div class="progress mt-3" style="height: 6px;">
         <div id="progressBar" class="progress-bar bg-success" style="width:0%;transition:width 5s linear"></div>
@@ -46,6 +47,7 @@
         document.getElementById('countdown').textContent = secs;
         if (secs <= 0) {
             clearInterval(timer);
+            document.getElementById('loginLink').removeAttribute('style');
             window.location.href = '/auth/login';
         }
     }, 1000);

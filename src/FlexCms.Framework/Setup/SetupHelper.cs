@@ -35,6 +35,19 @@ public class SetupHelper
         catch { return false; }
     }
 
+    // Static read — no DI required; used in Program.cs to build FlexCmsOptions from setup.json
+    public static SetupConfig? ReadStatic(string appDataPath)
+    {
+        var path = Path.Combine(appDataPath, "setup.json");
+        if (!File.Exists(path)) return null;
+        try
+        {
+            var json = File.ReadAllText(path);
+            return JsonSerializer.Deserialize<SetupConfig>(json, JsonOpts);
+        }
+        catch { return null; }
+    }
+
     public bool IsSetupComplete()
     {
         if (!File.Exists(_setupFilePath)) return false;

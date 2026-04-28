@@ -51,23 +51,36 @@ if (!SetupHelper.IsSetupComplete(appDataPath))
 }
 
 // ── PRODUCTION MODE ───────────────────────────────────────────────────────────
+// DB config comes from setup.json (written by setup wizard).
+// appsettings.json values are used as fallback for non-DB options (IP filter, etc.)
+// and for developer overrides during local development.
 builder.Services.AddControllersWithViews();
+
+var setup = SetupHelper.ReadStatic(appDataPath);
+var cfg = builder.Configuration;
 
 builder.Services.AddFlexCms(new FlexCmsOptions
 {
     AppDataPath = appDataPath,
-    UseMySQL = builder.Configuration.GetValue<bool>("FlexCms:UseMySQL"),
-    MySqlConnectionString = builder.Configuration.GetConnectionString("MySQL") ?? string.Empty,
-    UseMsSql = builder.Configuration.GetValue<bool>("FlexCms:UseMsSql"),
-    MsSqlConnectionString = builder.Configuration.GetConnectionString("MsSQL") ?? string.Empty,
-    UsePostgreSQL = builder.Configuration.GetValue<bool>("FlexCms:UsePostgreSQL"),
-    PostgreSqlConnectionString = builder.Configuration.GetConnectionString("PostgreSQL") ?? string.Empty,
-    UseMongoDB = builder.Configuration.GetValue<bool>("FlexCms:UseMongoDB"),
-    MongoConnectionString = builder.Configuration.GetConnectionString("MongoDB") ?? "mongodb://localhost:27017",
-    MongoDatabaseName = builder.Configuration.GetValue<string>("FlexCms:MongoDatabaseName") ?? "flexcms",
-    TimeZoneId = builder.Configuration.GetValue<string>("FlexCms:TimeZoneId") ?? "Asia/Dhaka",
-    EnforceIpFilter = builder.Configuration.GetValue<bool>("FlexCms:EnforceIpFilter"),
-    AllowedIps = builder.Configuration.GetSection("FlexCms:AllowedIps").Get<string[]>() ?? []
+
+    // Relational provider — setup.json is authoritative; appsettings.json as dev fallback
+    UseMySQL      = setup?.DbProvider == "mysql"      || cfg.GetValue<bool>("FlexCms:UseMySQL"),
+    UseMsSql      = setup?.DbProvider == "mssql"      || cfg.GetValue<bool>("FlexCms:UseMsSql"),
+    UsePostgreSQL = setup?.DbProvider == "postgresql"  || cfg.GetValue<bool>("FlexCms:UsePostgreSQL"),
+
+    MySqlConnectionString      = setup?.DbProvider == "mysql"       ? (setup.DbConnectionString) : cfg.GetConnectionString("MySQL")      ?? string.Empty,
+    MsSqlConnectionString      = setup?.DbProvider == "mssql"       ? (setup.DbConnectionString) : cfg.GetConnectionString("MsSQL")      ?? string.Empty,
+    PostgreSqlConnectionString = setup?.DbProvider == "postgresql"  ? (setup.DbConnectionString) : cfg.GetConnectionString("PostgreSQL") ?? string.Empty,
+
+    // MongoDB
+    UseMongoDB         = setup?.DbProvider == "mongodb" || cfg.GetValue<bool>("FlexCms:UseMongoDB"),
+    MongoConnectionString = setup?.DbProvider == "mongodb" ? (setup.MongoConnectionString) : cfg.GetConnectionString("MongoDB") ?? "mongodb://localhost:27017",
+    MongoDatabaseName  = setup?.DbProvider == "mongodb" ? (setup.MongoDatabase ?? "flexcms") : cfg.GetValue<string>("FlexCms:MongoDatabaseName") ?? "flexcms",
+
+    // Site options — setup.json first, appsettings.json fallback
+    TimeZoneId    = setup?.TimeZoneId ?? cfg.GetValue<string>("FlexCms:TimeZoneId") ?? "Asia/Dhaka",
+    EnforceIpFilter = cfg.GetValue<bool>("FlexCms:EnforceIpFilter"),
+    AllowedIps    = cfg.GetSection("FlexCms:AllowedIps").Get<string[]>() ?? []
 });
 
 var app = builder.Build();

@@ -553,21 +553,29 @@ return FcmsFail("User not found.", errors: new[] { "ID invalid" });
 
 ---
 
-### Phase 4 — Module System ❌ Not Implemented Yet
+### Phase 4 — Module System 🔄 ~70% Done
 
-Phase 4 has not been built. The "Creating a New Module" section in this guide describes the **target state** based on the plan — not current reality.
+Phase 4 is being shipped as a series of small sub-PRs. The discovery and wiring layers are in place; the lifecycle operations (activate/deactivate/uninstall) and the scaffold template are still TODO.
 
-**What is missing:**
-- `IFcmsModule`, `BaseModule` interfaces
-- `module.json` manifest + `ModuleLoader`
-- `ModuleManager` — scan, load, dependency order, `AddApplicationPart()`
-- `FcmsModuleRecord` entity
-- Module activate/deactivate/uninstall flow
-- `[FcmsScoped]`, `[FcmsSingleton]`, `[FcmsHostedService]` auto-scan attributes
-- `dotnet new flexcms-module` template
-- Admin UI for module management
+**Done:**
+- **Naming convention** — `FcmsHelper.GetEntityName<T>(modulePrefix)` produces snake_case + plural + prefix. Used by every framework, core, and module entity. The prefix is only prepended when the snake-cased name does not already start with it. `[FcmsTable("custom_name")]` overrides the default.
+- **Module abstractions** — `IFcmsModule`, `BaseModule`, `ModuleManifest` (the deserialized `module.json`).
+- **Discovery pipeline** — `ModuleLoader` reads a DLL + embedded `module.json` and instantiates the module type; `ModuleManager` scans the `modules/` folder, topologically orders by `DependsOn`, and detects cyclic dependencies; `ModuleRegistry` is the singleton snapshot you inject when you want to enumerate modules.
+- **Persistence** — `FcmsModuleRecord` entity → table `fcms_module_records`. `SeedService` creates a row for each loaded module on every startup (idempotent, version-aware).
+- **DI auto-scan attributes** — `[FcmsScoped]`, `[FcmsSingleton]`, `[FcmsHostedService]`. Each accepts an optional service-type for interface mapping. `AttributeScanner` runs over each module's assembly.
+- **Wiring** — `AddFlexCms()` for every loaded module: calls `module.RegisterServices(services)`, runs `AttributeScanner`, and adds the assembly as an MVC `ApplicationPart` so its controllers and views are routable.
+- **Admin UI** — `/admin/modules` read-only list (name, version, prefix, dependencies, status, activation date). Empty state explains where to drop module folders.
 
-**Until Phase 4 is built:** all features go directly into `FlexCms.Host` as regular controllers and views. There is no module system to plug into yet.
+**Still TODO (Phase 4 Sub-PR 4):**
+- Module **activate** flow — run module migrations, call `SeedDataAsync`, copy `wwwroot`, trigger restart
+- Module **deactivate** flow — wwwroot delete + restart
+- Module **uninstall** — Keep/Drop tables dialog (type module name to confirm)
+- Activate / Deactivate / Uninstall buttons on `/admin/modules`
+- `dotnet new flexcms-module -n Name` project template
+
+**Practical impact today:** if you drop a module folder under `modules/` in the repo root, on the next app start the framework will discover it, register its services, route its controllers, and list it in the admin UI. The module behaves as if it were always part of the host — there is no opt-in toggle yet, and there is no migration runner. Use module entities only when you can run their migrations manually for now.
+
+**The "Creating a New Module" section below describes the target state.** Most of the workflow already works; the parts that don't (admin upload, activate button, scaffold template) are called out section-by-section.
 
 ---
 

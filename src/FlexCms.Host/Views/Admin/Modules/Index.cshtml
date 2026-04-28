@@ -1,0 +1,88 @@
+@model FlexCms.Host.Models.Admin.ModuleListViewModel
+@{
+    ViewData["Title"] = "Modules";
+}
+
+<h4 class="mb-3">Installed Modules</h4>
+
+@if (!Model.Modules.Any())
+{
+    <div class="alert alert-info">
+        <strong>No modules installed.</strong>
+        <p class="mb-0 small mt-2">
+            Drop a module's published folder under <code>modules/</code> at the
+            repo root. Each module folder should contain its DLL and an embedded
+            <code>module.json</code>. Restart the app — the module will be
+            discovered and listed here.
+        </p>
+    </div>
+}
+else
+{
+    <table class="table table-hover align-middle">
+        <thead class="table-light">
+            <tr>
+                <th>Module</th>
+                <th>Version</th>
+                <th>Table prefix</th>
+                <th>Depends on</th>
+                <th>Status</th>
+                <th>Activated</th>
+            </tr>
+        </thead>
+        <tbody>
+        @foreach (var m in Model.Modules)
+        {
+            <tr>
+                <td>
+                    <div class="fw-semibold">@m.ModuleName <span class="text-muted small">@m.ModuleId</span></div>
+                    @if (!string.IsNullOrEmpty(m.Description))
+                    {
+                        <div class="text-muted small">@m.Description</div>
+                    }
+                    @if (!string.IsNullOrEmpty(m.Author))
+                    {
+                        <div class="text-muted small">By @m.Author</div>
+                    }
+                </td>
+                <td><code>@m.Version</code></td>
+                <td><code>@m.TablePrefix</code></td>
+                <td>
+                    @if (m.DependsOn.Length == 0)
+                    {
+                        <span class="text-muted small">—</span>
+                    }
+                    else
+                    {
+                        @foreach (var dep in m.DependsOn)
+                        {
+                            <span class="badge text-bg-light me-1">@dep</span>
+                        }
+                    }
+                </td>
+                <td>
+                    @if (m.Status == "Active")
+                    {
+                        <span class="badge text-bg-success">Active</span>
+                    }
+                    else if (m.Status == "Inactive")
+                    {
+                        <span class="badge text-bg-secondary">Inactive</span>
+                    }
+                    else
+                    {
+                        <span class="badge text-bg-warning">@m.Status</span>
+                    }
+                </td>
+                <td class="small text-muted">
+                    @(m.ActivatedAt?.ToString("yyyy-MM-dd HH:mm") ?? "—")
+                </td>
+            </tr>
+        }
+        </tbody>
+    </table>
+
+    <p class="text-muted small">
+        Activate / deactivate / uninstall actions land in a follow-up Phase 4 PR.
+    </p>
+}

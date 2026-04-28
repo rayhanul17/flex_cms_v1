@@ -18,7 +18,7 @@ public static class SetupModeExtensions
             .PersistKeysToFileSystem(new DirectoryInfo(Path.Combine(appDataPath, "keys")))
             .SetApplicationName("FlexCms");
 
-        services.AddScoped<SetupHelper>(sp =>
+        services.AddSingleton<SetupHelper>(sp =>
         {
             var dp = sp.GetRequiredService<IDataProtectionProvider>();
             return new SetupHelper(dp, appDataPath);

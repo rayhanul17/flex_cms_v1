@@ -44,8 +44,9 @@ public static class FcmsServiceExtensions
         // Migration coordinator (NoOp for single-instance)
         services.AddSingleton<IFcmsMigrationCoordinator, NoOpMigrationCoordinator>();
 
-        // Setup helper
-        services.AddScoped<SetupHelper>(sp =>
+        // Setup helper — Singleton: no scoped state, safe to share (also lets
+        // SeedService consume it directly without a scope wrapper).
+        services.AddSingleton<SetupHelper>(sp =>
         {
             var dp = sp.GetRequiredService<IDataProtectionProvider>();
             return new SetupHelper(dp, options.AppDataPath);

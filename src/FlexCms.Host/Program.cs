@@ -1,10 +1,27 @@
 using FlexCms.Framework.Extensions;
 using FlexCms.Framework.Middleware;
 using FlexCms.Framework.Setup;
+using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
 
 var appDataPath = Path.Combine(builder.Environment.ContentRootPath, "App_Data");
+
+// ── Logging (Serilog) ─────────────────────────────────────────────────────────
+var logPath = Path.Combine(appDataPath, "logs", "flexcms-.log");
+var logConfig = new LoggerConfiguration()
+    .MinimumLevel.Information()
+    .Enrich.FromLogContext()
+    .WriteTo.File(logPath,
+        rollingInterval: RollingInterval.Day,
+        retainedFileCountLimit: 30,
+        outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss} [{Level:u3}] {Message:lj}{NewLine}{Exception}");
+
+if (builder.Environment.IsDevelopment())
+    logConfig.WriteTo.Console();
+
+Log.Logger = logConfig.CreateLogger();
+builder.Host.UseSerilog();
 
 // ── Two-path startup ──────────────────────────────────────────────────────────
 // Setup mode runs a minimal pipeline (SetupController only) until the wizard
@@ -55,7 +72,10 @@ builder.Services.AddFlexCms(new FlexCmsOptions
 
 var app = builder.Build();
 
-app.UseMiddleware<FcmsExceptionMiddleware>();
+if (app.Environment.IsDevelopment())
+    app.UseDeveloperExceptionPage();   // full stack trace in browser
+
+app.UseMiddleware<FcmsExceptionMiddleware>();   // logs + generic page in production
 app.UseMiddleware<SecurityHeadersMiddleware>();
 app.UseMiddleware<IpFilterMiddleware>();
 

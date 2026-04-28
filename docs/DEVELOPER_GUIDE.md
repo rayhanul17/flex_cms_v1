@@ -7,21 +7,23 @@ This guide takes you from **zero to production**. Follow each step in order. Exa
 ## 📋 Table of Contents
 
 1. [Prerequisites](#1-prerequisites)
-2. [First Time Setup (Clone & Run)](#2-first-time-setup)
+2. [First Time Setup](#2-first-time-setup)
 3. [Daily Development Workflow](#3-daily-development-workflow)
-4. [Creating a New Module](#4-creating-a-new-module)
-5. [Building & Packaging](#5-building--packaging)
-6. [Local Testing with Docker](#6-local-testing-with-docker)
-7. [Deploying to Production](#7-deploying-to-production)
-8. [Updating an Existing Production Server](#8-updating-an-existing-production-server)
-9. [Module Deployment to Production](#9-module-deployment-to-production)
-10. [Troubleshooting](#10-troubleshooting)
+4. [Running Tests](#4-running-tests)
+5. [What Is Built — Phases 1 to 4 Status](#5-what-is-built--phases-1-to-4-status)
+6. [Creating a New Module](#6-creating-a-new-module)
+7. [Building and Packaging](#7-building-and-packaging)
+8. [Local Testing with Docker](#8-local-testing-with-docker)
+9. [Deploying to Production](#9-deploying-to-production)
+10. [Updating an Existing Production Server](#10-updating-an-existing-production-server)
+11. [Module Deployment to Production](#11-module-deployment-to-production)
+12. [Troubleshooting](#12-troubleshooting)
 
 ---
 
 ## 1. Prerequisites
 
-### Install on your development machine:
+### Install on your development machine
 
 | Tool | Why | Where to get |
 |---|---|---|
@@ -231,7 +233,319 @@ The remote branch is deleted automatically by GitHub when you click "Delete bran
 
 ---
 
-## 4. Creating a New Module
+## 4. Running Tests
+
+The project has two test projects. Understanding when each needs Docker saves a lot of confusion.
+
+---
+
+### Test Projects at a Glance
+
+| Project | Location | What it tests | Needs Docker? |
+|---|---|---|---|
+| `FlexCms.Tests.Unit` | `tests/FlexCms.Tests.Unit/` | Pure logic — no DB, no HTTP | ❌ No |
+| `FlexCms.Tests.Integration` | `tests/FlexCms.Tests.Integration/` | Some tests use EF InMemory (no Docker); some use real MySQL + MongoDB | ⚠️ Only some |
+
+---
+
+### Which integration tests need Docker?
+
+| Phase folder | DB used | Needs Docker? |
+|---|---|---|
+| `Phase1/` (`Phase1VerificationTests.cs`) | Real MySQL + real MongoDB via Testcontainers | ✅ Yes — Docker must be running |
+| `Phase3/` (`PermissionServiceTests.cs`) | EF InMemory (in-process, no container) | ❌ No |
+
+Testcontainers automatically starts and stops Docker containers for you. You will see log lines like:
+
+```
+[testcontainers.org] Delete Docker container 1f07e5c085d1
+```
+
+This is **normal and expected** — Testcontainers spins up a fresh MySQL/MongoDB container per test class, then deletes it when done. It is not an error.
+
+---
+
+### Commands
+
+#### Run all unit tests (no Docker needed)
+
+```bash
+dotnet test tests/FlexCms.Tests.Unit/FlexCms.Tests.Unit.csproj
+```
+
+#### Run only Phase 3 unit tests
+
+```bash
+dotnet test tests/FlexCms.Tests.Unit/FlexCms.Tests.Unit.csproj --filter "Phase3"
+```
+
+#### Run all integration tests (Docker must be running for Phase 1)
+
+```bash
+dotnet test tests/FlexCms.Tests.Integration/FlexCms.Tests.Integration.csproj
+```
+
+#### Run only Phase 3 integration tests (no Docker needed)
+
+```bash
+dotnet test tests/FlexCms.Tests.Integration/FlexCms.Tests.Integration.csproj --filter "Phase3"
+```
+
+#### Run everything — all projects at once
+
+```bash
+dotnet test FlexCms.sln
+```
+
+This runs all tests. Phase 1 integration tests will start Docker containers automatically.
+
+#### Run a single specific test by name
+
+```bash
+dotnet test tests/FlexCms.Tests.Unit/FlexCms.Tests.Unit.csproj --filter "DisplayName~HasPermission"
+```
+
+---
+
+### Setting up Docker for integration tests (Phase 1)
+
+Testcontainers pulls MySQL and MongoDB images from Docker Hub on first run. This takes a few minutes once, then the images are cached locally.
+
+**Prerequisites:**
+- Docker Desktop installed and running
+- You are logged in to Docker (`docker login`)
+
+**Verify Docker is ready:**
+
+```bash
+docker ps
+# Should print a list (even if empty). If it errors — Docker is not running.
+```
+
+**First run** (images download automatically — takes ~2-5 minutes):
+
+```bash
+dotnet test tests/FlexCms.Tests.Integration/FlexCms.Tests.Integration.csproj --filter "Phase1"
+```
+
+**Subsequent runs** are fast (~30 seconds) because images are cached.
+
+---
+
+### Why Phase 3 tests do not need Docker
+
+Phase 3 tests (`PermissionServiceTests.cs`) use the **EF Core InMemory provider** — a fake in-memory database that lives entirely inside the test process. No containers, no ports, no network. This is intentional:
+
+- Permission logic does not depend on any DB-specific SQL features
+- Tests run fast (~500 ms for all 14)
+- Any developer can run them with zero setup
+
+Phase 1 tests verify that the EF + MongoDB repositories work correctly against real databases, which is why they need real containers.
+
+---
+
+### Quick reference
+
+| Goal | Command |
+|---|---|
+| Run all unit tests | `dotnet test tests/FlexCms.Tests.Unit/FlexCms.Tests.Unit.csproj` |
+| Run all integration tests | `dotnet test tests/FlexCms.Tests.Integration/FlexCms.Tests.Integration.csproj` |
+| Run Phase 3 only (no Docker) | `dotnet test tests/FlexCms.Tests.Integration/FlexCms.Tests.Integration.csproj --filter "Phase3"` |
+| Run Phase 1 only (needs Docker) | `dotnet test tests/FlexCms.Tests.Integration/FlexCms.Tests.Integration.csproj --filter "Phase1"` |
+| Run everything | `dotnet test FlexCms.sln` |
+| Run by test name pattern | `dotnet test FlexCms.sln --filter "DisplayName~<keyword>"` |
+
+---
+
+## 5. What Is Built — Phases 1 to 4 Status
+
+This section tells you exactly what is done, what is not done yet, and what patterns to follow when working in the existing code.
+
+---
+
+### Phase 1 — Project Scaffold + DB Layer ✅ Done
+
+Everything in the DB layer is implemented and tested.
+
+**What exists:**
+- `IBaseEntity`, `BaseEfEntity`, `BaseMongoEntity` — all entity base classes
+- `IRepository<T>`, `EfRepository<T>`, `MongoRepository<T>` — generic CRUD
+- `IFcmsUnitOfWork`, `EfUnitOfWork`, `MongoUnitOfWork` — transaction + save coordination
+- `FcmsDbContext` — EF Core context with Identity tables + soft-delete filters
+- `MongoDbSerializerSetup` — GUID as subtype 4, DateTime as Unix milliseconds
+- `SetupHelper`, `SetupConfig` — reads/writes `App_Data/setup.json`
+- `FcmsServiceExtensions.AddFlexCms()` — single call registers everything
+- Phase 1 integration tests pass (uses TestContainers — Docker required)
+
+**EF Migrations — how to run them for this project:**
+
+The `FcmsDbContext` lives in `FlexCms.Framework`. Run migrations from there:
+
+```bash
+# Add a new migration (run from repo root)
+dotnet ef migrations add <MigrationName> \
+    --project src/FlexCms.Framework \
+    --startup-project src/FlexCms.Host
+
+# Apply migrations to DB (dev)
+dotnet ef database update \
+    --project src/FlexCms.Framework \
+    --startup-project src/FlexCms.Host
+
+# Generate SQL script for review before applying to prod
+dotnet ef migrations script \
+    --project src/FlexCms.Framework \
+    --startup-project src/FlexCms.Host \
+    --idempotent \
+    --output migrations.sql
+```
+
+You need the EF CLI tool installed:
+
+```bash
+dotnet tool install --global dotnet-ef
+```
+
+**App_Data folder** — created automatically on first run, never commit to git:
+
+```
+App_Data/
+├── setup.json      # DB config + site settings from Setup Wizard
+├── keys/           # DataProtection keyring (encrypted at rest)
+└── logs/           # Serilog rolling daily logs (kept 30 days)
+```
+
+---
+
+### Phase 2 — Auth + Security Core ✅ Done
+
+Everything is implemented. No test suite written yet for Phase 2 specifically (manual testing covers it via the Setup Wizard flow).
+
+**What exists:**
+- `FcmsUser`, `FcmsRole` — Identity entities (Guid primary key)
+- `EfUserStore`, `EfRoleStore` — EF Identity stores
+- `MongoUserStore`, `MongoRoleStore` — MongoDB Identity stores (full feature parity including 2FA token stores)
+- Cookie auth — 8-hour sliding window, HttpOnly, Secure, SameSite=Strict
+- `FcmsPasswordValidator` — reads password policy from `SiteSettings` at runtime
+- `FcmsExceptionMiddleware` — catches all unhandled exceptions, logs via Serilog, shows friendly error page
+- `SecurityHeadersMiddleware` — CSP, X-Frame-Options, X-Content-Type-Options
+- `ForcePasswordChangeMiddleware` — redirects to `/auth/change-password` if flag set on user
+- `IpFilterMiddleware` — admin whitelist + global blacklist with wildcard support
+- Rate limiting — IP-partitioned: `login` policy (10/min/IP), `otp` policy (5/min/IP)
+- `AuthController` — Login, Logout, ForgotPassword, ResetPassword, VerifyOtp, ChangePassword
+- `FcmsValidator` — BD mobile regex, email regex, normalization to `+8801XXXXXXXXX`
+- `FcmsPasswordValidator`, `FcmsValidator` — in `FlexCms.Framework/Validators/`
+
+**Important: rate limit policies are named.** Use these exact names when adding `[EnableRateLimiting]` to controllers:
+
+```csharp
+[EnableRateLimiting("login")]   // 10 requests/min/IP
+[EnableRateLimiting("otp")]     // 5 requests/min/IP
+```
+
+---
+
+### Phase 3 — User / Role / Permission ✅ Done
+
+Fully implemented and tested (25 unit tests + 14 integration tests, all passing).
+
+**What exists:**
+- `FcmsPermission`, `FcmsRolePermission` entities (in `FlexCms.Framework/Auth/`)
+- `IPermissionService`, `PermissionService` — 15-min cache per role, DB fallback
+- `PermissionExpression.Evaluate()` — parses `"a&b"` (AND), `"a|b"` (OR), single key
+- `FcmsAuthorizeAttribute` + `FcmsAuthorizeFilter` — async authorization filter
+- `FcmsAuthorizeTagHelper` — `fcms-authorize="key"` hides HTML elements
+- `IFcmsContextService`, `FcmsContextService` — current user info + browser/OS via UAParser
+- `BaseAdminController` — all admin controllers extend this
+- `UserController`, `RoleController`, `PermissionController` under `/admin`
+- Admin views for User and Role management
+
+**How to protect a controller or action:**
+
+```csharp
+[FcmsAuthorize]                          // login required only
+[FcmsAuthorize("posts.create")]          // login + has permission
+[FcmsAuthorize("posts.create&posts.edit")] // login + has BOTH
+[FcmsAuthorize("posts.create|posts.edit")] // login + has either one
+```
+
+**How to hide a button or element in a view:**
+
+```html
+<button fcms-authorize="posts.delete">Delete</button>
+<!-- hidden if user lacks "posts.delete" permission -->
+
+<a fcms-authorize="users.create|users.edit" asp-action="Manage">Manage Users</a>
+```
+
+**How to get the current user in a controller:**
+
+```csharp
+// In any controller that extends BaseAdminController:
+var userId   = FcmsContext.UserId;       // Guid?
+var username = FcmsContext.Username;     // string
+var isSuper  = FcmsContext.IsSuperAdmin; // bool
+var ip       = FcmsContext.IpAddress;    // string
+```
+
+**How to seed permissions for a new feature:**
+
+Call `SeedPermissionsAsync` from `SeedService` or your module's `SeedDataAsync`. Pass a list of `FcmsPermission` objects — the service skips keys that already exist (idempotent):
+
+```csharp
+await _permissionService.SeedPermissionsAsync(new[]
+{
+    new FcmsPermission { Key = "posts.create", Group = "Posts", DisplayName = "Create Post" },
+    new FcmsPermission { Key = "posts.edit",   Group = "Posts", DisplayName = "Edit Post"   },
+    new FcmsPermission { Key = "posts.delete", Group = "Posts", DisplayName = "Delete Post" },
+});
+```
+
+**BaseAdminController helpers — what's available:**
+
+```csharp
+// Cache
+GetCache<T>("key")
+SetCache("key", value, TimeSpan.FromMinutes(5))
+RemoveCache("key")
+
+// Session (JSON-serialized)
+GetSession<T>("key")
+SetSession("key", value)
+RemoveSession("key")
+
+// Toast messages (survive redirect via TempData)
+ShowSuccess("Saved successfully.");
+ShowError("Something went wrong.");
+ShowWarning("Check your input.");
+ShowInfo("FYI: this will take a moment.");
+
+// AJAX JSON responses
+return FcmsOk("User activated.", data: new { id = user.Id });
+return FcmsFail("User not found.", errors: new[] { "ID invalid" });
+```
+
+---
+
+### Phase 4 — Module System ❌ Not Implemented Yet
+
+Phase 4 has not been built. The "Creating a New Module" section in this guide describes the **target state** based on the plan — not current reality.
+
+**What is missing:**
+- `IFcmsModule`, `BaseModule` interfaces
+- `module.json` manifest + `ModuleLoader`
+- `ModuleManager` — scan, load, dependency order, `AddApplicationPart()`
+- `FcmsModuleRecord` entity
+- Module activate/deactivate/uninstall flow
+- `[FcmsScoped]`, `[FcmsSingleton]`, `[FcmsHostedService]` auto-scan attributes
+- `dotnet new flexcms-module` template
+- Admin UI for module management
+
+**Until Phase 4 is built:** all features go directly into `FlexCms.Host` as regular controllers and views. There is no module system to plug into yet.
+
+---
+
+## 6. Creating a New Module
 
 Modules are how you add features without touching the CMS core.
 
@@ -397,7 +711,7 @@ gh pr create --base main --title "feat: Blog module v1"
 
 ---
 
-## 5. Building & Packaging
+## 7. Building and Packaging
 
 When your module is ready, you need to **package it as a ZIP** so admins can upload it.
 
@@ -466,7 +780,7 @@ You now have `FlexCms.Blog-1.0.0.zip` in the repo root — this is what you uplo
 
 ---
 
-## 6. Local Testing with Docker
+## 8. Local Testing with Docker
 
 Sometimes you need to test the **full Docker setup** locally before deploying.
 
@@ -514,7 +828,7 @@ docker compose -f docker/docker-compose.prod.yml down -v
 
 ---
 
-## 7. Deploying to Production
+## 9. Deploying to Production
 
 This is the **first-time** production deployment. Once done, see [Section 8](#8-updating-an-existing-production-server) for updates.
 
@@ -691,7 +1005,7 @@ sudo crontab -e
 
 ---
 
-## 8. Updating an Existing Production Server
+## 10. Updating an Existing Production Server
 
 ### Option A: Automatic (via GitHub Actions — recommended)
 
@@ -733,7 +1047,7 @@ curl https://mysite.com/health/ready
 
 ---
 
-## 9. Module Deployment to Production
+## 11. Module Deployment to Production
 
 ### Step 1: Build the module ZIP locally (see Section 5)
 
@@ -790,7 +1104,7 @@ docker compose -f /opt/flexcms/docker/docker-compose.prod.yml \
 
 ---
 
-## 10. Troubleshooting
+## 12. Troubleshooting
 
 ### Build errors
 
@@ -904,7 +1218,7 @@ Then visit `/auth/forgot-password` and use the email reset flow.
 
 ---
 
-## 11. NuGet Package Management
+## 13. NuGet Package Management
 
 This section covers two things:
 - **Publishing** the FlexCms.Framework as a NuGet package (so external developers can build modules)

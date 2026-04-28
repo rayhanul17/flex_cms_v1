@@ -1,0 +1,158 @@
+@model FlexCms.Host.Models.Admin.RoleDetailViewModel
+@{
+    ViewData["Title"] = $"Role: {Model.Name}";
+}
+
+<div class="d-flex align-items-center mb-3 gap-2">
+    <a asp-action="Index" class="btn btn-sm btn-outline-secondary">← Back</a>
+    <h4 class="mb-0">@Model.Name</h4>
+    @if (Model.Name == "SuperAdmin")
+    {
+        <span class="badge text-bg-danger">System — bypasses all permission checks</span>
+    }
+</div>
+
+<ul class="nav nav-tabs mb-3" id="roleTabs">
+    <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#tab-perms">Permissions (@Model.AssignedPermissionKeys.Count)</a></li>
+    <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-users">Users (@Model.Users.Count)</a></li>
+</ul>
+
+<div class="tab-content">
+
+    @* ── Permissions tab ────────────────────────────────────────────────── *@
+    <div class="tab-pane fade show active" id="tab-perms">
+        @if (Model.Name == "SuperAdmin")
+        {
+            <div class="alert alert-info">SuperAdmin has access to everything — no permissions need to be assigned.</div>
+        }
+        else if (!Model.PermissionGroups.Any())
+        {
+            <p class="text-muted">No permissions seeded yet. Permissions are discovered from <code>[FcmsAuthorize("key")]</code> attributes at startup.</p>
+        }
+        else
+        {
+            <div class="mb-2">
+                <input type="search" id="permSearch" class="form-control form-control-sm w-auto d-inline-block"
+                       placeholder="Search permissions…" />
+            </div>
+
+            <div id="permAccordion" class="accordion">
+                @foreach (var group in Model.PermissionGroups)
+                {
+                    var groupId = $"group_{group.Group.Replace(" ", "_")}";
+                    <div class="accordion-item perm-group" data-group="@group.Group">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed py-2" type="button"
+                                    data-bs-toggle="collapse" data-bs-target="#@groupId">
+                                <strong>@group.Group</strong>
+                                <span class="badge text-bg-secondary ms-2">
+                                    @group.Permissions.Count(p => p.IsAssigned) / @group.Permissions.Count
+                                </span>
+                            </button>
+                        </h2>
+                        <div id="@groupId" class="accordion-collapse collapse">
+                            <div class="accordion-body py-2">
+                                <div class="mb-2">
+                                    <button class="btn btn-xs btn-outline-secondary select-all-btn"
+                                            data-group="@group.Group">Select All</button>
+                                </div>
+                                @foreach (var perm in group.Permissions)
+                                {
+                                    <div class="form-check perm-item" data-key="@perm.Key" data-group="@group.Group">
+                                        <input class="form-check-input perm-toggle" type="checkbox"
+                                               id="perm_@perm.Key.Replace(".", "_")"
+                                               data-key="@perm.Key"
+                                               data-role-id="@Model.Id"
+                                               @(perm.IsAssigned ? "checked" : "") />
+                                        <label class="form-check-label" for="perm_@perm.Key.Replace(".", "_")">
+                                            @perm.DisplayName
+                                            <code class="text-muted small ms-1">@perm.Key</code>
+                                        </label>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+
+    @* ── Users tab ──────────────────────────────────────────────────────── *@
+    <div class="tab-pane fade" id="tab-users">
+        @if (!Model.Users.Any())
+        {
+            <p class="text-muted">No users assigned to this role.</p>
+        }
+        else
+        {
+            <table class="table table-sm">
+                <thead class="table-light">
+                    <tr><th>Email</th><th></th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var u in Model.Users)
+                    {
+                        <tr>
+                            <td>@u.Email</td>
+                            <td><a asp-controller="User" asp-action="Edit" asp-route-id="@u.Id" class="btn btn-xs btn-outline-secondary">Edit</a></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
+
+</div>
+
+@section Scripts {
+<script>
+    const token = document.querySelector('meta[name="csrf-token"]')?.content ?? '';
+
+    // Permission toggle AJAX
+    document.querySelectorAll('.perm-toggle').forEach(cb => {
+        cb.addEventListener('change', async function () {
+            const key = this.dataset.key;
+            const roleId = this.dataset.roleId;
+            const action = this.checked ? 'assign' : 'revoke';
+            const res = await fetch(`/admin/permissions/${action}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-FlexCms-Csrf': token,
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: JSON.stringify({ roleId, permissionKey: key })
+            });
+            const data = await res.json();
+            if (!data.isSuccess) {
+                this.checked = !this.checked;
+                alert(data.message);
+            }
+        });
+    });
+
+    // Select All per group
+    document.querySelectorAll('.select-all-btn').forEach(btn => {
+        btn.addEventListener('click', async function () {
+            const group = this.dataset.group;
+            const checkboxes = document.querySelectorAll(`.perm-item[data-group="${group}"] .perm-toggle`);
+            const allChecked = [...checkboxes].every(c => c.checked);
+            checkboxes.forEach(c => {
+                if (c.checked !== !allChecked) c.click();
+            });
+            this.textContent = allChecked ? 'Select All' : 'Deselect All';
+        });
+    });
+
+    // Search
+    document.getElementById('permSearch')?.addEventListener('input', function () {
+        const q = this.value.toLowerCase();
+        document.querySelectorAll('.perm-item').forEach(item => {
+            const match = item.dataset.key.includes(q) ||
+                item.querySelector('label')?.textContent.toLowerCase().includes(q);
+            item.style.display = match ? '' : 'none';
+        });
+    });
+</script>
+}

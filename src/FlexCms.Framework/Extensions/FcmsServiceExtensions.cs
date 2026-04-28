@@ -54,6 +54,13 @@ public static class FcmsServiceExtensions
         // Settings service (DB-backed; only useful when a DB provider is configured)
         services.AddScoped<ISettingsService, SettingsService>();
 
+        // Permission service (15min IMemoryCache — requires IRepository<> to be registered)
+        services.AddMemoryCache();
+        services.AddScoped<IPermissionService, PermissionService>();
+
+        // Context service — current user + IP + browser/OS via UAParser
+        services.AddScoped<IFcmsContextService, FcmsContextService>();
+
         // Seed admin user + SuperAdmin role on first production-mode startup
         services.AddHostedService<SeedService>();
 

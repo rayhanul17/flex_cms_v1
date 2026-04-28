@@ -42,9 +42,9 @@ public class SeedService : IHostedService
         var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<FcmsRole>>();
 
         // 1. Ensure SuperAdmin role exists
-        if (!await roleManager.RoleExistsAsync("SuperAdmin"))
+        if (!await roleManager.RoleExistsAsync(FcmsRoles.SuperAdmin))
         {
-            var roleResult = await roleManager.CreateAsync(new FcmsRole { Name = "SuperAdmin" });
+            var roleResult = await roleManager.CreateAsync(new FcmsRole { Name = FcmsRoles.SuperAdmin });
             if (!roleResult.Succeeded)
             {
                 _logger.LogError("SeedService: failed to create SuperAdmin role — {Errors}",
@@ -81,7 +81,7 @@ public class SeedService : IHostedService
                 return;
             }
 
-            await userManager.AddToRoleAsync(user, "SuperAdmin");
+            await userManager.AddToRoleAsync(user, FcmsRoles.SuperAdmin);
             _logger.LogInformation("SeedService: admin user {Email} created and added to SuperAdmin.", config.AdminEmail);
         }
 

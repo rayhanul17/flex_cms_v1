@@ -12,6 +12,8 @@ public class FcmsDbContext : IdentityDbContext<FcmsUser, FcmsRole, Guid>
     public FcmsDbContext(DbContextOptions<FcmsDbContext> options) : base(options) { }
 
     public DbSet<FcmsSettings> Settings => Set<FcmsSettings>();
+    public DbSet<FcmsPermission> Permissions => Set<FcmsPermission>();
+    public DbSet<FcmsRolePermission> RolePermissions => Set<FcmsRolePermission>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -27,6 +29,16 @@ public class FcmsDbContext : IdentityDbContext<FcmsUser, FcmsRole, Guid>
 
         // Roles list is embedded in Mongo only; ignore in EF
         modelBuilder.Entity<FcmsUser>().Ignore(u => u.Roles);
+
+        // Unique index: one permission key per role
+        modelBuilder.Entity<FcmsRolePermission>()
+            .HasIndex(rp => new { rp.RoleId, rp.PermissionKey })
+            .IsUnique();
+
+        // Unique index: permission key must be unique globally
+        modelBuilder.Entity<FcmsPermission>()
+            .HasIndex(p => p.Key)
+            .IsUnique();
 
         // Apply global soft-delete query filter for all BaseEfEntity types
         foreach (var entityType in modelBuilder.Model.GetEntityTypes())

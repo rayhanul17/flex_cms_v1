@@ -118,14 +118,22 @@ public class SeedService : IHostedService
         var existing = (await repo.GetAllAsync(ct))
             .ToDictionary(r => r.ModuleId, StringComparer.OrdinalIgnoreCase);
 
+        var presentIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var anyChange = false;
+
         foreach (var module in registry.Modules)
         {
+            presentIds.Add(module.ModuleId);
+            var expectedStatus = module.IsDeactivated ? "Inactive" : "Active";
+
             if (existing.TryGetValue(module.ModuleId, out var record))
             {
-                if (record.Version != module.Manifest.Version)
+                if (record.Version != module.Manifest.Version || record.Status != expectedStatus)
                 {
                     record.Version = module.Manifest.Version;
+                    record.Status = expectedStatus;
+                    if (expectedStatus == "Active" && record.ActivatedAt is null)
+                        record.ActivatedAt = DateTime.UtcNow;
                     await repo.UpdateAsync(record, ct);
                     anyChange = true;
                 }
@@ -136,12 +144,25 @@ public class SeedService : IHostedService
             {
                 ModuleId = module.ModuleId,
                 Version = module.Manifest.Version,
-                Status = "Active",
-                ActivatedAt = DateTime.UtcNow
+                Status = expectedStatus,
+                ActivatedAt = expectedStatus == "Active" ? DateTime.UtcNow : null
             }, ct);
             anyChange = true;
-            _logger.LogInformation("SeedService: registered module {Id} v{Version}.",
-                module.ModuleId, module.Manifest.Version);
+            _logger.LogInformation("SeedService: registered module {Id} v{Version} ({Status}).",
+                module.ModuleId, module.Manifest.Version, expectedStatus);
+        }
+
+        // Soft-delete records for modules whose folder no longer exists
+        // (admin removed via Uninstall — folder + DLL gone before scan).
+        foreach (var record in existing.Values)
+        {
+            if (presentIds.Contains(record.ModuleId)) continue;
+            if (record.IsDeleted) continue;
+            record.IsDeleted = true;
+            await repo.UpdateAsync(record, ct);
+            anyChange = true;
+            _logger.LogInformation("SeedService: marked module record {Id} as removed (folder gone).",
+                record.ModuleId);
         }
 
         if (anyChange) await uow.SaveChangesAsync(ct);

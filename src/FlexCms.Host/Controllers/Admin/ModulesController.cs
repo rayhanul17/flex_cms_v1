@@ -3,6 +3,7 @@ using FlexCms.Framework.Db;
 using FlexCms.Framework.Modules;
 using FlexCms.Host.Models.Admin;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Hosting;
 
 namespace FlexCms.Host.Controllers.Admin;
 
@@ -11,12 +12,23 @@ namespace FlexCms.Host.Controllers.Admin;
 public class ModulesController : BaseAdminController
 {
     private readonly ModuleRegistry _registry;
+    private readonly ModuleStateService _state;
     private readonly IRepository<FcmsModuleRecord> _records;
+    private readonly IFcmsUnitOfWork _uow;
+    private readonly IHostApplicationLifetime _lifetime;
 
-    public ModulesController(ModuleRegistry registry, IRepository<FcmsModuleRecord> records)
+    public ModulesController(
+        ModuleRegistry registry,
+        ModuleStateService state,
+        IRepository<FcmsModuleRecord> records,
+        IFcmsUnitOfWork uow,
+        IHostApplicationLifetime lifetime)
     {
         _registry = registry;
+        _state = state;
         _records = records;
+        _uow = uow;
+        _lifetime = lifetime;
     }
 
     [HttpGet("")]
@@ -38,7 +50,7 @@ public class ModulesController : BaseAdminController
                     Author = m.Manifest.Author,
                     Description = m.Manifest.Description,
                     TablePrefix = m.Manifest.TablePrefix,
-                    Status = rec?.Status ?? "Pending",
+                    Status = m.IsDeactivated ? "Inactive" : (rec?.Status ?? "Active"),
                     ActivatedAt = rec?.ActivatedAt,
                     DependsOn = m.Manifest.DependsOn
                 };
@@ -46,5 +58,71 @@ public class ModulesController : BaseAdminController
         };
 
         return View(vm);
+    }
+
+    [HttpPost("activate/{id}")]
+    [ValidateAntiForgeryToken]
+    public IActionResult Activate(string id)
+    {
+        var module = _registry.FindById(id);
+        if (module is null) return FcmsFail("Module not found.");
+
+        if (!_state.Activate(module.FolderPath))
+            return FcmsFail("Could not activate module — folder missing.");
+
+        return FcmsOk("Module activated. Restart the app to apply.");
+    }
+
+    [HttpPost("deactivate/{id}")]
+    [ValidateAntiForgeryToken]
+    public IActionResult Deactivate(string id)
+    {
+        var module = _registry.FindById(id);
+        if (module is null) return FcmsFail("Module not found.");
+
+        if (!_state.Deactivate(module.FolderPath))
+            return FcmsFail("Could not deactivate module — folder missing.");
+
+        return FcmsOk("Module deactivated. Restart the app to apply.");
+    }
+
+    [HttpPost("uninstall/{id}")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Uninstall(string id, [FromForm] string confirmName, CancellationToken ct)
+    {
+        var module = _registry.FindById(id);
+        if (module is null) return FcmsFail("Module not found.");
+
+        // Safety check — admin must type the module name to confirm
+        if (!string.Equals(confirmName, module.Manifest.ModuleName, StringComparison.Ordinal))
+            return FcmsFail($"Confirmation does not match. Type exactly: {module.Manifest.ModuleName}");
+
+        if (!_state.Uninstall(module.FolderPath))
+            return FcmsFail("Could not schedule uninstall — folder missing.");
+
+        // Soft-delete the DB record now (folder will be removed on next startup
+        // by ModuleManager.ProcessPendingUninstalls)
+        var record = (await _records.GetAllAsync(ct))
+            .FirstOrDefault(r => string.Equals(r.ModuleId, id, StringComparison.OrdinalIgnoreCase));
+        if (record is not null)
+        {
+            record.IsDeleted = true;
+            await _records.UpdateAsync(record, ct);
+            await _uow.SaveChangesAsync(ct);
+        }
+
+        return FcmsOk("Module marked for uninstall. Restart the app to remove its files.");
+    }
+
+    [HttpPost("restart")]
+    [ValidateAntiForgeryToken]
+    public IActionResult Restart()
+    {
+        Response.OnCompleted(() =>
+        {
+            _lifetime.StopApplication();
+            return Task.CompletedTask;
+        });
+        return FcmsOk("Restart triggered.");
     }
 }

@@ -28,12 +28,12 @@ public class ModuleLoader
     /// type, or fails to instantiate. Errors are logged but never thrown — a
     /// broken module must not crash the host.
     /// </summary>
-    public LoadedModule? LoadFromPath(string dllPath)
+    public LoadedModule? LoadFromPath(string dllPath, string folderPath, bool isDeactivated)
     {
         try
         {
             var assembly = Assembly.LoadFrom(dllPath);
-            return LoadFromAssembly(assembly);
+            return LoadFromAssembly(assembly, folderPath, isDeactivated);
         }
         catch (Exception ex)
         {
@@ -46,7 +46,7 @@ public class ModuleLoader
     /// Load a module from an already-loaded assembly. Lets tests construct
     /// modules in-memory without writing DLLs to disk.
     /// </summary>
-    public LoadedModule? LoadFromAssembly(Assembly assembly)
+    public LoadedModule? LoadFromAssembly(Assembly assembly, string folderPath = "", bool isDeactivated = false)
     {
         var manifest = ReadManifest(assembly);
         if (manifest is null)
@@ -67,7 +67,7 @@ public class ModuleLoader
         try
         {
             var instance = (IFcmsModule)Activator.CreateInstance(moduleType)!;
-            return new LoadedModule(assembly, manifest, instance);
+            return new LoadedModule(assembly, manifest, instance, folderPath, isDeactivated);
         }
         catch (Exception ex)
         {

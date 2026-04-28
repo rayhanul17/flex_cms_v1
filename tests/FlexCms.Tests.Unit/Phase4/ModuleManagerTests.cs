@@ -98,7 +98,8 @@ public class ModuleManagerTests
             TablePrefix = id.ToLowerInvariant(),
             DependsOn = dependsOn ?? []
         };
-        return new LoadedModule(typeof(ModuleManagerTests).Assembly, manifest, new FakeModule(id));
+        return new LoadedModule(typeof(ModuleManagerTests).Assembly, manifest, new FakeModule(id),
+            folderPath: "", isDeactivated: false);
     }
 
     private sealed class FakeModule : BaseModule

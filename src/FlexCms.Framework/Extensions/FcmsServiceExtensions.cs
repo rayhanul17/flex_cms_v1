@@ -73,6 +73,7 @@ public static class FcmsServiceExtensions
         //      and Razor views become routable
         services.AddSingleton<ModuleLoader>();
         services.AddSingleton<ModuleManager>();
+        services.AddSingleton<ModuleStateService>();
 
         var modulesRoot = Path.Combine(options.AppDataPath, "..", "modules");
         var loadedModules = BuildModuleRegistry(services, modulesRoot);
@@ -254,6 +255,10 @@ public static class FcmsServiceExtensions
 
         foreach (var module in loaded)
         {
+            // Deactivated modules stay in the registry (so admin UI can list
+            // them) but their services and routes are never registered.
+            if (module.IsDeactivated) continue;
+
             module.Instance.RegisterServices(services);
             AttributeScanner.RegisterAttributedTypes(services, module.Assembly);
             mvcBuilder.AddApplicationPart(module.Assembly);

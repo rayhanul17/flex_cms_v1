@@ -36,7 +36,8 @@ public class ModuleRegistryTests
     private static LoadedModule Module(string id)
     {
         var manifest = new ModuleManifest { ModuleId = id, ModuleName = id, Version = "1.0.0" };
-        return new LoadedModule(typeof(ModuleRegistryTests).Assembly, manifest, new Fake(id));
+        return new LoadedModule(typeof(ModuleRegistryTests).Assembly, manifest, new Fake(id),
+            folderPath: "", isDeactivated: false);
     }
 
     private sealed class Fake : BaseModule

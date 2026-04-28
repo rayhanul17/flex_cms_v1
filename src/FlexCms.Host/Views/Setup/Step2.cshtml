@@ -24,14 +24,18 @@
     </div>
 
     <div class="mb-3">
-        <label asp-for="Tagline" class="form-label">Tagline</label>
+        <label asp-for="Tagline" class="form-label">
+            Tagline <span class="badge text-bg-secondary fw-normal" style="font-size:.7rem">optional</span>
+        </label>
         <input asp-for="Tagline" class="form-control" placeholder="Just another great website" />
     </div>
 
     <div class="mb-3">
-        <label asp-for="BaseUrl" class="form-label">Base URL</label>
+        <label asp-for="BaseUrl" class="form-label">
+            Base URL <span class="badge text-bg-secondary fw-normal" style="font-size:.7rem">optional</span>
+        </label>
         <input asp-for="BaseUrl" class="form-control" placeholder="https://mysite.com" />
-        <div class="form-text">Leave blank to auto-detect. Required for correct email links.</div>
+        <div class="form-text">Leave blank to auto-detect. Needed for correct email links.</div>
     </div>
 
     <div class="mb-3">

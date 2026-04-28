@@ -8,10 +8,10 @@ public class SetupStep2ViewModel
     public string SiteName { get; set; } = "";
 
     [MaxLength(400)]
-    public string Tagline { get; set; } = "";
+    public string? Tagline { get; set; }
 
     [MaxLength(500)]
-    public string BaseUrl { get; set; } = "";
+    public string? BaseUrl { get; set; }
 
     [Required]
     public string TimeZoneId { get; set; } = "Asia/Dhaka";

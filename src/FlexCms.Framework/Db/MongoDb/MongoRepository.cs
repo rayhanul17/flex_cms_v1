@@ -1,4 +1,5 @@
 using System.Linq.Expressions;
+using FlexCms.Framework.Clock;
 using MongoDB.Driver;
 
 namespace FlexCms.Framework.Db.MongoDb;
@@ -60,14 +61,14 @@ public class MongoRepository<T> : IRepository<T> where T : BaseMongoEntity
 
     public async Task AddAsync(T entity, CancellationToken ct = default)
     {
-        entity.CreatedAt = DateTime.UtcNow;
-        entity.UpdatedAt = DateTime.UtcNow;
+        entity.CreatedAt = FcmsTime.Now;
+        entity.UpdatedAt = FcmsTime.Now;
         await _collection.InsertOneAsync(entity, cancellationToken: ct);
     }
 
     public async Task AddRangeAsync(IEnumerable<T> entities, CancellationToken ct = default)
     {
-        var now = DateTime.UtcNow;
+        var now = FcmsTime.Now;
         var list = entities.ToList();
         foreach (var e in list) { e.CreatedAt = now; e.UpdatedAt = now; }
         await _collection.InsertManyAsync(list, cancellationToken: ct);
@@ -75,7 +76,7 @@ public class MongoRepository<T> : IRepository<T> where T : BaseMongoEntity
 
     public async Task UpdateAsync(T entity, CancellationToken ct = default)
     {
-        entity.UpdatedAt = DateTime.UtcNow;
+        entity.UpdatedAt = FcmsTime.Now;
         await _collection.ReplaceOneAsync(
             Filter.Eq(e => e.Id, entity.Id), entity, cancellationToken: ct);
     }
@@ -88,7 +89,7 @@ public class MongoRepository<T> : IRepository<T> where T : BaseMongoEntity
     public async Task SoftDeleteAsync(T entity, CancellationToken ct = default)
     {
         entity.IsDeleted = true;
-        entity.UpdatedAt = DateTime.UtcNow;
+        entity.UpdatedAt = FcmsTime.Now;
         await _collection.ReplaceOneAsync(
             Filter.Eq(e => e.Id, entity.Id), entity, cancellationToken: ct);
     }

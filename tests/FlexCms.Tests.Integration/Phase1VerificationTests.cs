@@ -274,4 +274,65 @@ public class SetupHelperTests
         Directory.Delete(tempDir, recursive: true);
         sp.Dispose();
     }
+
+    // Regression: SetupHelper.IsSetupComplete (static) used to look for a camelCase
+    // property name while JsonSerializer wrote it as PascalCase, so it always
+    // returned false — making the app loop back to setup mode on every restart.
+    [Fact]
+    public void IsSetupComplete_static_returns_true_after_Write_with_complete_flag()
+    {
+        var tempDir = Path.Combine(Path.GetTempPath(), "flexcms_iscomplete_test_" + Guid.NewGuid());
+        Directory.CreateDirectory(tempDir);
+
+        var services = new ServiceCollection();
+        services.AddDataProtection()
+            .PersistKeysToFileSystem(new DirectoryInfo(Path.Combine(tempDir, "keys")))
+            .SetApplicationName("FlexCms");
+        var sp = services.BuildServiceProvider();
+
+        var helper = new SetupHelper(sp.GetRequiredService<IDataProtectionProvider>(), tempDir);
+        helper.Write(new SetupConfig
+        {
+            IsSetupComplete = true,
+            DbProvider = "mysql",
+            AdminEmail = "admin@test.com"
+        });
+
+        Assert.True(SetupHelper.IsSetupComplete(tempDir));
+
+        Directory.Delete(tempDir, recursive: true);
+        sp.Dispose();
+    }
+
+    [Fact]
+    public void IsSetupComplete_static_returns_false_when_file_missing()
+    {
+        var tempDir = Path.Combine(Path.GetTempPath(), "flexcms_iscomplete_missing_" + Guid.NewGuid());
+        Directory.CreateDirectory(tempDir);
+
+        Assert.False(SetupHelper.IsSetupComplete(tempDir));
+
+        Directory.Delete(tempDir, recursive: true);
+    }
+
+    [Fact]
+    public void IsSetupComplete_static_returns_false_when_flag_false()
+    {
+        var tempDir = Path.Combine(Path.GetTempPath(), "flexcms_iscomplete_false_" + Guid.NewGuid());
+        Directory.CreateDirectory(tempDir);
+
+        var services = new ServiceCollection();
+        services.AddDataProtection()
+            .PersistKeysToFileSystem(new DirectoryInfo(Path.Combine(tempDir, "keys")))
+            .SetApplicationName("FlexCms");
+        var sp = services.BuildServiceProvider();
+
+        var helper = new SetupHelper(sp.GetRequiredService<IDataProtectionProvider>(), tempDir);
+        helper.Write(new SetupConfig { IsSetupComplete = false });
+
+        Assert.False(SetupHelper.IsSetupComplete(tempDir));
+
+        Directory.Delete(tempDir, recursive: true);
+        sp.Dispose();
+    }
 }

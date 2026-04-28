@@ -41,6 +41,14 @@ public class FcmsDbContext : IdentityDbContext<FcmsUser, FcmsRole, Guid>
             .HasIndex(rp => new { rp.RoleId, rp.PermissionKey })
             .IsUnique();
 
+        // FK: deleting a role hard-removes its permission rows. Soft-delete
+        // (IsDeleted=true) is a column update and does NOT trigger this cascade.
+        modelBuilder.Entity<FcmsRolePermission>()
+            .HasOne<FcmsRole>()
+            .WithMany()
+            .HasForeignKey(rp => rp.RoleId)
+            .OnDelete(DeleteBehavior.Cascade);
+
         // Unique index: permission key must be unique globally
         modelBuilder.Entity<FcmsPermission>()
             .HasIndex(p => p.Key)

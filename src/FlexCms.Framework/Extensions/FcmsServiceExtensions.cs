@@ -67,25 +67,6 @@ public static class FcmsServiceExtensions
         services.AddAntiforgery(o => o.HeaderName = "X-FlexCms-Csrf");
         services.AddSignalR();
 
-        // Identity core
-        var identityBuilder = services
-            .AddIdentityCore<FcmsUser>(opts =>
-            {
-                opts.Password.RequireDigit = true;
-                opts.Password.RequireLowercase = true;
-                opts.Password.RequireUppercase = true;
-                opts.Password.RequireNonAlphanumeric = true;
-                opts.Password.RequiredLength = 8;
-                opts.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
-                opts.Lockout.MaxFailedAccessAttempts = 5;
-                opts.Lockout.AllowedForNewUsers = true;
-                opts.User.RequireUniqueEmail = true;
-            })
-            .AddRoles<FcmsRole>()
-            .AddSignInManager<SignInManager<FcmsUser>>()
-            .AddPasswordValidator<FcmsPasswordValidator>()
-            .AddDefaultTokenProviders();
-
         // Rate limiting — partitioned by IP (M19: prevents one IP from blocking others)
         services.AddRateLimiter(limiter =>
         {
@@ -127,48 +108,69 @@ public static class FcmsServiceExtensions
             opts.EnforceIpFilter = options.EnforceIpFilter;
         });
 
-        // Register DB provider based on options
-        if (options.UseMySQL)
+        // Register DB provider + Identity stores (only when a provider is configured)
+        if (options.UseMySQL || options.UseMongoDB)
         {
-            services.AddDbContext<FcmsDbContext>(o =>
-                o.UseMySql(
-                    options.MySqlConnectionString,
-                    Microsoft.EntityFrameworkCore.ServerVersion.AutoDetect(options.MySqlConnectionString),
-                    m =>
-                    {
-                        m.EnableRetryOnFailure(3);
-                        m.CommandTimeout(30);
-                    }));
+            var identityBuilder = services
+                .AddIdentityCore<FcmsUser>(opts =>
+                {
+                    opts.Password.RequireDigit = true;
+                    opts.Password.RequireLowercase = true;
+                    opts.Password.RequireUppercase = true;
+                    opts.Password.RequireNonAlphanumeric = true;
+                    opts.Password.RequiredLength = 8;
+                    opts.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
+                    opts.Lockout.MaxFailedAccessAttempts = 5;
+                    opts.Lockout.AllowedForNewUsers = true;
+                    opts.User.RequireUniqueEmail = true;
+                })
+                .AddRoles<FcmsRole>()
+                .AddSignInManager<SignInManager<FcmsUser>>()
+                .AddPasswordValidator<FcmsPasswordValidator>()
+                .AddDefaultTokenProviders();
 
-            services.AddScoped<DbContext>(sp => sp.GetRequiredService<FcmsDbContext>());
-            services.AddScoped(typeof(IRepository<>), typeof(EfRepository<>));
-            services.AddScoped<IFcmsUnitOfWork, EfUnitOfWork>();
-
-            identityBuilder.AddEntityFrameworkStores<FcmsDbContext>();
-        }
-
-        if (options.UseMongoDB)
-        {
-            MongoDbSerializerSetup.Register();
-
-            services.AddSingleton<IMongoClient>(_ => new MongoClient(options.MongoConnectionString));
-            services.AddSingleton<IMongoDatabase>(sp =>
+            if (options.UseMySQL)
             {
-                var client = sp.GetRequiredService<IMongoClient>();
-                return client.GetDatabase(options.MongoDatabaseName);
-            });
+                services.AddDbContext<FcmsDbContext>(o =>
+                    o.UseMySql(
+                        options.MySqlConnectionString,
+                        Microsoft.EntityFrameworkCore.ServerVersion.AutoDetect(options.MySqlConnectionString),
+                        m =>
+                        {
+                            m.EnableRetryOnFailure(3);
+                            m.CommandTimeout(30);
+                        }));
 
-            if (!options.UseMySQL)
+                services.AddScoped<DbContext>(sp => sp.GetRequiredService<FcmsDbContext>());
+                services.AddScoped(typeof(IRepository<>), typeof(EfRepository<>));
+                services.AddScoped<IFcmsUnitOfWork, EfUnitOfWork>();
+
+                identityBuilder.AddEntityFrameworkStores<FcmsDbContext>();
+            }
+
+            if (options.UseMongoDB)
             {
-                // MongoDB-only mode: register Mongo repositories and identity stores
-                services.AddScoped(typeof(IRepository<>), typeof(MongoRepository<>));
-                services.AddScoped<IFcmsUnitOfWork>(sp =>
-                    new MongoUnitOfWork(
-                        sp.GetRequiredService<IMongoClient>(),
-                        sp.GetRequiredService<IMongoDatabase>()));
+                MongoDbSerializerSetup.Register();
 
-                services.AddScoped<IUserStore<FcmsUser>, MongoUserStore>();
-                services.AddScoped<IRoleStore<FcmsRole>, MongoRoleStore>();
+                services.AddSingleton<IMongoClient>(_ => new MongoClient(options.MongoConnectionString));
+                services.AddSingleton<IMongoDatabase>(sp =>
+                {
+                    var client = sp.GetRequiredService<IMongoClient>();
+                    return client.GetDatabase(options.MongoDatabaseName);
+                });
+
+                if (!options.UseMySQL)
+                {
+                    // MongoDB-only mode: register Mongo repositories and identity stores
+                    services.AddScoped(typeof(IRepository<>), typeof(MongoRepository<>));
+                    services.AddScoped<IFcmsUnitOfWork>(sp =>
+                        new MongoUnitOfWork(
+                            sp.GetRequiredService<IMongoClient>(),
+                            sp.GetRequiredService<IMongoDatabase>()));
+
+                    services.AddScoped<IUserStore<FcmsUser>, MongoUserStore>();
+                    services.AddScoped<IRoleStore<FcmsRole>, MongoRoleStore>();
+                }
             }
         }
 

@@ -19,7 +19,8 @@
     </div>
     <h5 class="fw-bold text-success">Setup complete!</h5>
     <p class="text-muted mb-1">Restarting the application…</p>
-    <p class="text-muted small">You will be redirected to the login page in <strong id="countdown">5</strong> seconds.</p>
+    <p class="text-muted small">Redirecting to login in <strong id="countdown">15</strong> seconds.<br/>
+    If the page doesn't load, wait a moment and <a href="/auth/login">click here</a>.</p>
 
     <div class="progress mt-3" style="height: 6px;">
         <div id="progressBar" class="progress-bar bg-success" style="width:0%;transition:width 5s linear"></div>
@@ -36,7 +37,7 @@
     }).catch(() => {});
 
     // Countdown + redirect
-    let secs = 5;
+    let secs = 15;
     document.getElementById('progressBar').style.width = '100%';
     const timer = setInterval(() => {
         secs--;

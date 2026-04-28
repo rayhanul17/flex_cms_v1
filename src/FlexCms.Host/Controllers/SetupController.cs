@@ -1,7 +1,6 @@
+using FlexCms.Framework.Db.Ef;
 using FlexCms.Framework.Setup;
 using FlexCms.Host.Models.Setup;
-using Microsoft.AspNetCore.DataProtection;
-using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
@@ -13,7 +12,6 @@ public class SetupController : Controller
     private readonly SetupHelper _setup;
     private readonly IHostApplicationLifetime _lifetime;
 
-    // Session keys
     private const string S1 = "setup_step1";
     private const string S2 = "setup_step2";
 
@@ -33,13 +31,11 @@ public class SetupController : Controller
     public IActionResult Step1Post(SetupStep1ViewModel model)
     {
         if (!ModelState.IsValid) return View("Index", model);
-
-        // Persist to session as JSON
         HttpContext.Session.SetString(S1, System.Text.Json.JsonSerializer.Serialize(model));
         return RedirectToAction(nameof(Step2));
     }
 
-    // ── Test Connection (AJAX) ─────────────────────────────────────────────────
+    // ── Test Connection (AJAX) ────────────────────────────────────────────────
 
     [HttpPost("/Setup/TestConnection")]
     [ValidateAntiForgeryToken]
@@ -57,9 +53,9 @@ public class SetupController : Controller
             }
             else
             {
-                var optBuilder = new DbContextOptionsBuilder<FlexCms.Framework.Db.Ef.FcmsDbContext>();
+                var optBuilder = new DbContextOptionsBuilder<FcmsDbContext>();
                 ConfigureRelationalProvider(optBuilder, model);
-                await using var ctx = new FlexCms.Framework.Db.Ef.FcmsDbContext(optBuilder.Options);
+                await using var ctx = new FcmsDbContext(optBuilder.Options);
                 if (!await ctx.Database.CanConnectAsync(ct))
                     return Ok(new { ok = false, error = "Cannot connect to the database server." });
             }
@@ -72,31 +68,6 @@ public class SetupController : Controller
         }
     }
 
-    private static void ConfigureRelationalProvider(
-        DbContextOptionsBuilder<FlexCms.Framework.Db.Ef.FcmsDbContext> builder,
-        SetupStep1ViewModel model)
-    {
-        switch (model.DbProvider)
-        {
-            case "mysql":
-                var mysqlCs = BuildMySqlConnectionString(model);
-                builder.UseMySql(mysqlCs,
-                    Microsoft.EntityFrameworkCore.ServerVersion.AutoDetect(mysqlCs),
-                    o => o.CommandTimeout(10));
-                break;
-
-            case "mssql":
-                builder.UseSqlServer(BuildMsSqlConnectionString(model),
-                    o => o.CommandTimeout(10));
-                break;
-
-            case "postgresql":
-                builder.UseNpgsql(BuildPostgreSqlConnectionString(model),
-                    o => o.CommandTimeout(10));
-                break;
-        }
-    }
-
     // ── Step 2 — Site Info ────────────────────────────────────────────────────
 
     [HttpGet("/Setup/Step2")]
@@ -104,7 +75,6 @@ public class SetupController : Controller
     {
         if (HttpContext.Session.GetString(S1) is null)
             return RedirectToAction(nameof(Index));
-
         return View(new SetupStep2ViewModel());
     }
 
@@ -113,7 +83,6 @@ public class SetupController : Controller
     public IActionResult Step2Post(SetupStep2ViewModel model)
     {
         if (!ModelState.IsValid) return View("Step2", model);
-
         HttpContext.Session.SetString(S2, System.Text.Json.JsonSerializer.Serialize(model));
         return RedirectToAction(nameof(Step3));
     }
@@ -125,17 +94,15 @@ public class SetupController : Controller
     {
         if (HttpContext.Session.GetString(S2) is null)
             return RedirectToAction(nameof(Step2));
-
         return View(new SetupStep3ViewModel());
     }
 
     [HttpPost("/Setup/Step3")]
     [ValidateAntiForgeryToken]
-    public IActionResult Step3Post(SetupStep3ViewModel model)
+    public async Task<IActionResult> Step3Post(SetupStep3ViewModel model, CancellationToken ct)
     {
         if (!ModelState.IsValid) return View("Step3", model);
 
-        // Validate password complexity (same rules as FcmsPasswordValidator)
         var pwd = model.Password;
         if (pwd.Length < 8 || !pwd.Any(char.IsUpper) || !pwd.Any(char.IsLower) ||
             !pwd.Any(char.IsDigit) || !pwd.Any(c => !char.IsLetterOrDigit(c)))
@@ -145,14 +112,25 @@ public class SetupController : Controller
             return View("Step3", model);
         }
 
-        var step1Json = HttpContext.Session.GetString(S1)!;
-        var step2Json = HttpContext.Session.GetString(S2)!;
-        var step1 = System.Text.Json.JsonSerializer.Deserialize<SetupStep1ViewModel>(step1Json)!;
-        var step2 = System.Text.Json.JsonSerializer.Deserialize<SetupStep2ViewModel>(step2Json)!;
+        var step1 = System.Text.Json.JsonSerializer.Deserialize<SetupStep1ViewModel>(
+            HttpContext.Session.GetString(S1)!)!;
+        var step2 = System.Text.Json.JsonSerializer.Deserialize<SetupStep2ViewModel>(
+            HttpContext.Session.GetString(S2)!)!;
 
         var config = BuildSetupConfig(step1, step2, model);
-        _setup.Write(config);   // encrypts DB password + admin password before writing
 
+        // Run DB migration before writing setup.json (so tables exist on restart)
+        try
+        {
+            await MigrateDatabaseAsync(config, ct);
+        }
+        catch (Exception ex)
+        {
+            ModelState.AddModelError("", $"Database setup failed: {ex.Message}");
+            return View("Step3", model);
+        }
+
+        _setup.Write(config);   // encrypts passwords + persists setup.json
         return RedirectToAction(nameof(Complete));
     }
 
@@ -165,14 +143,49 @@ public class SetupController : Controller
     [ValidateAntiForgeryToken]
     public IActionResult Restart()
     {
-        // Allow the response to reach the browser before the process exits
         Response.OnCompleted(() =>
         {
             _lifetime.StopApplication();
             return Task.CompletedTask;
         });
-
         return Ok();
+    }
+
+    // ── DB Migration ──────────────────────────────────────────────────────────
+
+    private static async Task MigrateDatabaseAsync(SetupConfig config, CancellationToken ct)
+    {
+        if (config.DbProvider == "mongodb")
+        {
+            // MongoDB: just verify the connection; collections are created on first write
+            using var client = new MongoDB.Driver.MongoClient(config.MongoConnectionString);
+            await client.GetDatabase(config.MongoDatabase ?? "flexcms")
+                .RunCommandAsync<MongoDB.Bson.BsonDocument>(
+                    new MongoDB.Bson.BsonDocument("ping", 1), cancellationToken: ct);
+            return;
+        }
+
+        var optBuilder = new DbContextOptionsBuilder<FcmsDbContext>();
+        switch (config.DbProvider)
+        {
+            case "mysql":
+                optBuilder.UseMySql(config.DbConnectionString,
+                    Microsoft.EntityFrameworkCore.ServerVersion.AutoDetect(config.DbConnectionString),
+                    o => o.CommandTimeout(60));
+                break;
+            case "mssql":
+                optBuilder.UseSqlServer(config.DbConnectionString,
+                    o => o.CommandTimeout(60));
+                break;
+            case "postgresql":
+                optBuilder.UseNpgsql(config.DbConnectionString,
+                    o => o.CommandTimeout(60));
+                break;
+        }
+
+        await using var ctx = new FcmsDbContext(optBuilder.Options);
+        // EnsureCreatedAsync: creates all tables if they don't exist (idempotent)
+        await ctx.Database.EnsureCreatedAsync(ct);
     }
 
     // ── Connection string builders ────────────────────────────────────────────
@@ -188,6 +201,29 @@ public class SetupController : Controller
     private static string BuildPostgreSqlConnectionString(SetupStep1ViewModel m)
         => $"Host={m.PgHost};Port={m.PgPort};Database={m.PgDatabase};" +
            $"Username={m.PgUsername};Password={m.PgPassword};";
+
+    private static void ConfigureRelationalProvider(
+        DbContextOptionsBuilder<FcmsDbContext> builder,
+        SetupStep1ViewModel model)
+    {
+        switch (model.DbProvider)
+        {
+            case "mysql":
+                var cs = BuildMySqlConnectionString(model);
+                builder.UseMySql(cs,
+                    Microsoft.EntityFrameworkCore.ServerVersion.AutoDetect(cs),
+                    o => o.CommandTimeout(10));
+                break;
+            case "mssql":
+                builder.UseSqlServer(BuildMsSqlConnectionString(model),
+                    o => o.CommandTimeout(10));
+                break;
+            case "postgresql":
+                builder.UseNpgsql(BuildPostgreSqlConnectionString(model),
+                    o => o.CommandTimeout(10));
+                break;
+        }
+    }
 
     // ── Setup config builder ──────────────────────────────────────────────────
 
@@ -207,7 +243,7 @@ public class SetupController : Controller
             TimeZoneId = s2.TimeZoneId,
             AdminEmail = s3.Email,
             AdminDisplayName = s3.DisplayName,
-            AdminPasswordEncrypted = s3.Password,   // SetupHelper.Write encrypts this
+            AdminPasswordEncrypted = s3.Password,
             AdminSeeded = false,
             SetupVersion = "1.0",
             SetupCompletedAt = DateTime.UtcNow

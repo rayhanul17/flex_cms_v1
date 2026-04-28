@@ -6,10 +6,11 @@ using FlexCms.Framework.Db;
 using FlexCms.Framework.Db.Ef;
 using FlexCms.Framework.Db.Migration;
 using FlexCms.Framework.Db.MongoDb;
+using FlexCms.Framework.Hosting;
 using FlexCms.Framework.Middleware;
+using FlexCms.Framework.Services;
 using FlexCms.Framework.Setup;
 using FlexCms.Framework.Validators;
-using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http;
@@ -42,16 +43,33 @@ public static class FcmsServiceExtensions
         // Migration coordinator (NoOp for single-instance)
         services.AddSingleton<IFcmsMigrationCoordinator, NoOpMigrationCoordinator>();
 
-        // Setup helper
-        services.AddScoped<SetupHelper>(sp =>
+        // Setup helper — Singleton: no scoped state, safe to share (also lets
+        // SeedService consume it directly without a scope wrapper).
+        services.AddSingleton<SetupHelper>(sp =>
         {
             var dp = sp.GetRequiredService<IDataProtectionProvider>();
             return new SetupHelper(dp, options.AppDataPath);
         });
 
-        // Cookie authentication (8h sliding window)
-        services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
-            .AddCookie(opts =>
+        // Settings service (DB-backed; only useful when a DB provider is configured)
+        services.AddScoped<ISettingsService, SettingsService>();
+
+        // Permission service (15min IMemoryCache — requires IRepository<> to be registered)
+        services.AddMemoryCache();
+        services.AddScoped<IPermissionService, PermissionService>();
+
+        // Context service — current user + IP + browser/OS via UAParser
+        services.AddScoped<IFcmsContextService, FcmsContextService>();
+
+        // Seed admin user + SuperAdmin role on first production-mode startup
+        services.AddHostedService<SeedService>();
+
+        // Cookie authentication (8h sliding window).
+        // Scheme name MUST be IdentityConstants.ApplicationScheme so that
+        // SignInManager.PasswordSignInAsync (which targets that scheme) works
+        // with AddIdentityCore (which does NOT auto-register Identity cookies).
+        services.AddAuthentication(IdentityConstants.ApplicationScheme)
+            .AddCookie(IdentityConstants.ApplicationScheme, opts =>
             {
                 opts.Cookie.HttpOnly = true;
                 opts.Cookie.SecurePolicy = CookieSecurePolicy.Always;
@@ -109,7 +127,7 @@ public static class FcmsServiceExtensions
         });
 
         // Register DB provider + Identity stores (only when a provider is configured)
-        if (options.UseMySQL || options.UseMongoDB)
+        if (options.UsesRelationalDb || options.UseMongoDB)
         {
             var identityBuilder = services
                 .AddIdentityCore<FcmsUser>(opts =>
@@ -135,17 +153,27 @@ public static class FcmsServiceExtensions
                     o.UseMySql(
                         options.MySqlConnectionString,
                         Microsoft.EntityFrameworkCore.ServerVersion.AutoDetect(options.MySqlConnectionString),
-                        m =>
-                        {
-                            m.EnableRetryOnFailure(3);
-                            m.CommandTimeout(30);
-                        }));
+                        m => { m.EnableRetryOnFailure(3); m.CommandTimeout(30); }));
 
-                services.AddScoped<DbContext>(sp => sp.GetRequiredService<FcmsDbContext>());
-                services.AddScoped(typeof(IRepository<>), typeof(EfRepository<>));
-                services.AddScoped<IFcmsUnitOfWork, EfUnitOfWork>();
+                RegisterEfServices(services, identityBuilder);
+            }
+            else if (options.UseMsSql)
+            {
+                services.AddDbContext<FcmsDbContext>(o =>
+                    o.UseSqlServer(
+                        options.MsSqlConnectionString,
+                        m => { m.EnableRetryOnFailure(3); m.CommandTimeout(30); }));
 
-                identityBuilder.AddEntityFrameworkStores<FcmsDbContext>();
+                RegisterEfServices(services, identityBuilder);
+            }
+            else if (options.UsePostgreSQL)
+            {
+                services.AddDbContext<FcmsDbContext>(o =>
+                    o.UseNpgsql(
+                        options.PostgreSqlConnectionString,
+                        m => { m.EnableRetryOnFailure(3); m.CommandTimeout(30); }));
+
+                RegisterEfServices(services, identityBuilder);
             }
 
             if (options.UseMongoDB)
@@ -159,7 +187,7 @@ public static class FcmsServiceExtensions
                     return client.GetDatabase(options.MongoDatabaseName);
                 });
 
-                if (!options.UseMySQL)
+                if (!options.UsesRelationalDb)
                 {
                     // MongoDB-only mode: register Mongo repositories and identity stores
                     services.AddScoped(typeof(IRepository<>), typeof(MongoRepository<>));
@@ -177,6 +205,16 @@ public static class FcmsServiceExtensions
         return services;
     }
 
+    private static void RegisterEfServices(
+        IServiceCollection services,
+        IdentityBuilder identityBuilder)
+    {
+        services.AddScoped<DbContext>(sp => sp.GetRequiredService<FcmsDbContext>());
+        services.AddScoped(typeof(IRepository<>), typeof(EfRepository<>));
+        services.AddScoped<IFcmsUnitOfWork, EfUnitOfWork>();
+        identityBuilder.AddEntityFrameworkStores<FcmsDbContext>();
+    }
+
     private static TimeZoneInfo ResolveTimeZone(string timeZoneId)
     {
         try { return TimeZoneInfo.FindSystemTimeZoneById(timeZoneId); }
@@ -187,13 +225,26 @@ public static class FcmsServiceExtensions
 public class FlexCmsOptions
 {
     public string AppDataPath { get; set; } = "App_Data";
+
+    // ── Relational providers (mutually exclusive — only one active at a time) ──
     public bool UseMySQL { get; set; }
     public string MySqlConnectionString { get; set; } = string.Empty;
+
+    public bool UseMsSql { get; set; }
+    public string MsSqlConnectionString { get; set; } = string.Empty;
+
+    public bool UsePostgreSQL { get; set; }
+    public string PostgreSqlConnectionString { get; set; } = string.Empty;
+
+    // ── MongoDB (can run alongside a relational provider for Mongo-specific data) ──
     public bool UseMongoDB { get; set; }
     public string MongoConnectionString { get; set; } = "mongodb://localhost:27017";
     public string MongoDatabaseName { get; set; } = "flexcms";
+
     public string[] AllowedIps { get; set; } = [];
     public bool EnforceIpFilter { get; set; }
     /// <summary>IANA or Windows timezone ID. Default: Asia/Dhaka (+06:00).</summary>
     public string TimeZoneId { get; set; } = "Asia/Dhaka";
+
+    public bool UsesRelationalDb => UseMySQL || UseMsSql || UsePostgreSQL;
 }

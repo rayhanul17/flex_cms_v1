@@ -1,0 +1,60 @@
+@model FlexCms.Host.Models.Admin.EditUserViewModel
+@{
+    ViewData["Title"] = "Edit User";
+}
+
+<div class="d-flex align-items-center mb-3 gap-2">
+    <a asp-action="Index" class="btn btn-sm btn-outline-secondary">← Back</a>
+    <h4 class="mb-0">Edit User</h4>
+</div>
+
+<form asp-action="Edit" asp-route-id="@Model.Id" method="post">
+    @Html.AntiForgeryToken()
+    <div class="row g-3">
+        <div class="col-md-6">
+            <div class="card shadow-sm">
+                <div class="card-header fw-semibold">Account Details</div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label asp-for="Email" class="form-label">Email <span class="text-danger">*</span></label>
+                        <input asp-for="Email" class="form-control" />
+                        <span asp-validation-for="Email" class="text-danger small"></span>
+                    </div>
+                    <div class="mb-3">
+                        <label asp-for="DisplayName" class="form-label">Display Name</label>
+                        <input asp-for="DisplayName" class="form-control" />
+                    </div>
+                    <div class="form-check">
+                        <input asp-for="ForcePasswordChange" class="form-check-input" type="checkbox" />
+                        <label asp-for="ForcePasswordChange" class="form-check-label">Force password change on next login</label>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card shadow-sm">
+                <div class="card-header fw-semibold">Roles</div>
+                <div class="card-body">
+                    @foreach (var role in Model.AvailableRoles)
+                    {
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox"
+                                   name="SelectedRoleIds" value="@role.Id"
+                                   id="role_@role.Id"
+                                   @(Model.SelectedRoleIds.Contains(role.Id) ? "checked" : "") />
+                            <label class="form-check-label" for="role_@role.Id">@role.Name</label>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div asp-validation-summary="ModelOnly" class="text-danger small mt-3"></div>
+
+    <div class="mt-3">
+        <button type="submit" class="btn btn-primary">Save Changes</button>
+        <a asp-action="Index" class="btn btn-outline-secondary ms-2">Cancel</a>
+    </div>
+</form>

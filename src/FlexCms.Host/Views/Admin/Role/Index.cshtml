@@ -1,0 +1,71 @@
+@model List<FlexCms.Host.Models.Admin.RoleListItemViewModel>
+@{
+    ViewData["Title"] = "Roles";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="mb-0">Roles</h4>
+    <a asp-action="Create" class="btn btn-primary btn-sm" fcms-authorize="roles.create">
+        <i class="bi bi-plus-lg"></i> Add Role
+    </a>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-body p-0">
+        <table class="table table-hover mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Name</th>
+                    <th>Users</th>
+                    <th>Permissions</th>
+                    <th class="text-end">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var r in Model)
+                {
+                    <tr>
+                        <td>
+                            <a asp-action="Detail" asp-route-id="@r.Id">@r.Name</a>
+                            @if (r.Name == "SuperAdmin")
+                            {
+                                <span class="badge text-bg-danger ms-1">System</span>
+                            }
+                        </td>
+                        <td>@r.UserCount</td>
+                        <td>@r.PermissionCount</td>
+                        <td class="text-end">
+                            <a asp-action="Detail" asp-route-id="@r.Id" class="btn btn-sm btn-outline-secondary">
+                                Permissions
+                            </a>
+                            @if (r.Name != "SuperAdmin")
+                            {
+                                <button class="btn btn-sm btn-outline-danger delete-btn"
+                                        data-id="@r.Id" data-name="@r.Name"
+                                        fcms-authorize="roles.delete">Delete</button>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    document.querySelectorAll('.delete-btn').forEach(btn => {
+        btn.addEventListener('click', async function () {
+            if (!confirm(`Delete role "${this.dataset.name}"?`)) return;
+            const token = document.querySelector('meta[name="csrf-token"]')?.content ?? '';
+            const res = await fetch(`/admin/roles/${this.dataset.id}/delete`, {
+                method: 'POST',
+                headers: { 'X-FlexCms-Csrf': token, 'X-Requested-With': 'XMLHttpRequest' }
+            });
+            const data = await res.json();
+            if (data.isSuccess) this.closest('tr').remove();
+            else alert(data.message);
+        });
+    });
+</script>
+}

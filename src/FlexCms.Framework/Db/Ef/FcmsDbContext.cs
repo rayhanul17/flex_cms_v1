@@ -4,9 +4,11 @@ using FlexCms.Framework.Clock;
 using FlexCms.Framework.Db;
 using FlexCms.Framework.Helpers;
 using FlexCms.Framework.Modules;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 
 namespace FlexCms.Framework.Db.Ef;
 
@@ -16,16 +18,25 @@ public class FcmsDbContext : IdentityDbContext<FcmsUser, FcmsRole, Guid>
     public const string FrameworkPrefix = "fcms";
 
     private readonly IEnumerable<IFcmsModelBuilder> _moduleBuilders;
+    private readonly IHttpContextAccessor? _httpContextAccessor;
 
-    /// <summary>Used by tests — no module builders.</summary>
+    /// <summary>Used by tests — no module builders, no HttpContext.</summary>
     public FcmsDbContext(DbContextOptions<FcmsDbContext> options)
-        : this(options, []) { }
+        : this(options, [], null) { }
 
     /// <summary>Used by DI — module builders injected for OnModelCreating.</summary>
-    public FcmsDbContext(DbContextOptions<FcmsDbContext> options, IEnumerable<IFcmsModelBuilder> moduleBuilders)
+    public FcmsDbContext(DbContextOptions<FcmsDbContext> options, IEnumerable<IFcmsModelBuilder> moduleBuilders,
+        IHttpContextAccessor? httpContextAccessor = null)
         : base(options)
     {
         _moduleBuilders = moduleBuilders;
+        _httpContextAccessor = httpContextAccessor;
+    }
+
+    private Guid? CurrentUserId()
+    {
+        var claim = _httpContextAccessor?.HttpContext?.User?.FindFirstValue(ClaimTypes.NameIdentifier);
+        return Guid.TryParse(claim, out var id) ? id : null;
     }
 
     public DbSet<FcmsSettings> Settings => Set<FcmsSettings>();
@@ -174,10 +185,23 @@ public class FcmsDbContext : IdentityDbContext<FcmsUser, FcmsRole, Guid>
 
     public override async Task<int> SaveChangesAsync(CancellationToken ct = default)
     {
+        var userId = CurrentUserId();
+        var now = FcmsTime.Now;
+
         foreach (var entry in ChangeTracker.Entries<BaseEfEntity>())
         {
-            if (entry.State == EntityState.Modified)
-                entry.Entity.UpdatedAt = FcmsTime.Now;
+            if (entry.State == EntityState.Added)
+            {
+                entry.Entity.CreatedAt = now;
+                entry.Entity.CreatedBy ??= userId;
+                entry.Entity.UpdatedAt = now;
+                entry.Entity.UpdatedBy = userId;
+            }
+            else if (entry.State == EntityState.Modified)
+            {
+                entry.Entity.UpdatedAt = now;
+                entry.Entity.UpdatedBy = userId;
+            }
         }
         return await base.SaveChangesAsync(ct);
     }

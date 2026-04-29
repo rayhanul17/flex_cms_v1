@@ -27,4 +27,29 @@ public interface IRepository<T> where T : class, IBaseEntity
         int pageSize,
         bool descending = false,
         CancellationToken ct = default);
+
+    // --- Batch fetch ---
+    Task<List<T>> GetByIdsAsync(IEnumerable<Guid> ids, CancellationToken ct = default);
+
+    // --- Bulk write ---
+    Task UpdateRangeAsync(IEnumerable<T> entities, CancellationToken ct = default);
+    Task SoftDeleteRangeAsync(IEnumerable<T> entities, CancellationToken ct = default);
+
+    // --- QueryFilter overloads ---
+
+    /// <summary>
+    /// Returns all matching entities. If <paramref name="filter"/> has pagination set, applies skip/take.
+    /// </summary>
+    Task<List<T>> FindAsync(QueryFilter<T> filter, CancellationToken ct = default);
+
+    /// <summary>
+    /// Returns a <see cref="PagedResponse{T}"/> using the pagination settings in <paramref name="filter"/>.
+    /// </summary>
+    Task<PagedResponse<T>> FindPagedAsync(QueryFilter<T> filter, CancellationToken ct = default);
+
+    /// <summary>
+    /// Full-text regex search across all string properties of <typeparamref name="T"/>.
+    /// Only supported by <c>MongoRepository</c>; EF implementation throws <see cref="NotSupportedException"/>.
+    /// </summary>
+    Task<List<T>> FindByTextAsync(string searchTerm, CancellationToken ct = default);
 }

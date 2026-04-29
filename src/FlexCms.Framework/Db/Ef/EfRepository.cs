@@ -97,4 +97,82 @@ public class EfRepository<T> : IRepository<T> where T : BaseEfEntity
 
         return PagedResponse<T>.Create(items, total, page, pageSize);
     }
+
+    // --- New: Batch fetch ---
+
+    public async Task<List<T>> GetByIdsAsync(IEnumerable<Guid> ids, CancellationToken ct = default)
+    {
+        var idList = ids.ToList();
+        return await _set.Where(e => idList.Contains(e.Id) && !e.IsDeleted).ToListAsync(ct);
+    }
+
+    // --- New: Bulk write ---
+
+    public Task UpdateRangeAsync(IEnumerable<T> entities, CancellationToken ct = default)
+    {
+        var now = FcmsTime.Now;
+        foreach (var e in entities) e.UpdatedAt = now;
+        _set.UpdateRange(entities);
+        return Task.CompletedTask;
+    }
+
+    public Task SoftDeleteRangeAsync(IEnumerable<T> entities, CancellationToken ct = default)
+    {
+        var now = FcmsTime.Now;
+        foreach (var e in entities) { e.IsDeleted = true; e.UpdatedAt = now; }
+        _set.UpdateRange(entities);
+        return Task.CompletedTask;
+    }
+
+    // --- New: QueryFilter overloads ---
+
+    public async Task<List<T>> FindAsync(QueryFilter<T> filter, CancellationToken ct = default)
+    {
+        IQueryable<T> query = _set.Where(e => !e.IsDeleted);
+
+        foreach (var cond in filter.Conditions)
+            query = query.Where(cond);
+
+        if (filter.OrderByExpr != null)
+            query = filter.IsDescending
+                ? query.OrderByDescending(filter.OrderByExpr)
+                : query.OrderBy(filter.OrderByExpr);
+
+        if (filter.IsPaged)
+            query = query
+                .Skip((filter.PageNumber!.Value - 1) * filter.PageSize!.Value)
+                .Take(filter.PageSize.Value);
+
+        return await query.ToListAsync(ct);
+    }
+
+    public async Task<PagedResponse<T>> FindPagedAsync(QueryFilter<T> filter, CancellationToken ct = default)
+    {
+        IQueryable<T> query = _set.Where(e => !e.IsDeleted);
+
+        foreach (var cond in filter.Conditions)
+            query = query.Where(cond);
+
+        var total = await query.CountAsync(ct);
+
+        if (filter.OrderByExpr != null)
+            query = filter.IsDescending
+                ? query.OrderByDescending(filter.OrderByExpr)
+                : query.OrderBy(filter.OrderByExpr);
+        else
+            query = query.OrderByDescending(e => e.CreatedAt);
+
+        var page = filter.PageNumber ?? 1;
+        var pageSize = filter.PageSize ?? total;
+
+        var items = await query
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(ct);
+
+        return PagedResponse<T>.Create(items, total, page, pageSize > 0 ? pageSize : total);
+    }
+
+    public Task<List<T>> FindByTextAsync(string searchTerm, CancellationToken ct = default)
+        => throw new NotSupportedException("Text search is only supported with MongoDB.");
 }

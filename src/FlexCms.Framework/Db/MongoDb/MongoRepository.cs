@@ -1,8 +1,12 @@
 using System.Linq.Expressions;
+using System.Reflection;
 using System.Security.Claims;
+using System.Text.RegularExpressions;
 using FlexCms.Framework.Clock;
 using FlexCms.Framework.Db;
 using Microsoft.AspNetCore.Http;
+using MongoDB.Bson;
+using MongoDB.Bson.Serialization.Attributes;
 using MongoDB.Driver;
 
 namespace FlexCms.Framework.Db.MongoDb;
@@ -138,5 +142,125 @@ public class MongoRepository<T> : IRepository<T> where T : BaseMongoEntity
             .ToListAsync(ct);
 
         return PagedResponse<T>.Create(items, total, page, pageSize);
+    }
+
+    // --- New: Batch fetch ---
+
+    public async Task<List<T>> GetByIdsAsync(IEnumerable<Guid> ids, CancellationToken ct = default)
+    {
+        var idList = ids.ToList();
+        var result = await _collection.FindAsync(
+            Filter.And(NotDeleted, Filter.In(e => e.Id, idList)), cancellationToken: ct);
+        return await result.ToListAsync(ct);
+    }
+
+    // --- New: Bulk write ---
+
+    public async Task UpdateRangeAsync(IEnumerable<T> entities, CancellationToken ct = default)
+    {
+        var now = FcmsTime.Now;
+        var userId = CurrentUserId();
+        var models = entities.Select(e =>
+        {
+            e.UpdatedAt = now;
+            e.UpdatedBy = userId;
+            return new ReplaceOneModel<T>(Filter.Eq(x => x.Id, e.Id), e);
+        }).ToList<WriteModel<T>>();
+
+        if (models.Count > 0)
+            await _collection.BulkWriteAsync(models, cancellationToken: ct);
+    }
+
+    public async Task SoftDeleteRangeAsync(IEnumerable<T> entities, CancellationToken ct = default)
+    {
+        var now = FcmsTime.Now;
+        var userId = CurrentUserId();
+        var models = entities.Select(e =>
+        {
+            e.IsDeleted = true;
+            e.UpdatedAt = now;
+            e.UpdatedBy = userId;
+            return new ReplaceOneModel<T>(Filter.Eq(x => x.Id, e.Id), e);
+        }).ToList<WriteModel<T>>();
+
+        if (models.Count > 0)
+            await _collection.BulkWriteAsync(models, cancellationToken: ct);
+    }
+
+    // --- New: QueryFilter overloads ---
+
+    public async Task<List<T>> FindAsync(QueryFilter<T> filter, CancellationToken ct = default)
+    {
+        var combined = NotDeleted;
+        foreach (var cond in filter.Conditions)
+            combined = Filter.And(combined, Filter.Where(cond));
+
+        var findOptions = new FindOptions<T>();
+
+        if (filter.OrderByExpr != null)
+            findOptions.Sort = filter.IsDescending
+                ? Builders<T>.Sort.Descending(filter.OrderByExpr)
+                : Builders<T>.Sort.Ascending(filter.OrderByExpr);
+
+        if (filter.IsPaged)
+        {
+            findOptions.Skip = (filter.PageNumber!.Value - 1) * filter.PageSize!.Value;
+            findOptions.Limit = filter.PageSize.Value;
+        }
+
+        var cursor = await _collection.FindAsync(combined, findOptions, ct);
+        return await cursor.ToListAsync(ct);
+    }
+
+    public async Task<PagedResponse<T>> FindPagedAsync(QueryFilter<T> filter, CancellationToken ct = default)
+    {
+        var combined = NotDeleted;
+        foreach (var cond in filter.Conditions)
+            combined = Filter.And(combined, Filter.Where(cond));
+
+        var total = (int)await _collection.CountDocumentsAsync(combined, cancellationToken: ct);
+
+        var findOptions = new FindOptions<T>();
+
+        if (filter.OrderByExpr != null)
+            findOptions.Sort = filter.IsDescending
+                ? Builders<T>.Sort.Descending(filter.OrderByExpr)
+                : Builders<T>.Sort.Ascending(filter.OrderByExpr);
+        else
+            findOptions.Sort = Builders<T>.Sort.Descending(e => e.CreatedAt);
+
+        var page = filter.PageNumber ?? 1;
+        var pageSize = filter.PageSize ?? total;
+
+        findOptions.Skip = (page - 1) * pageSize;
+        findOptions.Limit = pageSize > 0 ? pageSize : total;
+
+        var cursor = await _collection.FindAsync(combined, findOptions, ct);
+        var items = await cursor.ToListAsync(ct);
+
+        return PagedResponse<T>.Create(items, total, page, pageSize > 0 ? pageSize : total);
+    }
+
+    public async Task<List<T>> FindByTextAsync(string searchTerm, CancellationToken ct = default)
+    {
+        var regex = new BsonRegularExpression(Regex.Escape(searchTerm), "i");
+
+        var stringProps = typeof(T).GetProperties()
+            .Where(p => p.PropertyType == typeof(string))
+            .Select(p =>
+            {
+                var attr = p.GetCustomAttribute<BsonElementAttribute>();
+                return attr?.ElementName ?? char.ToLower(p.Name[0]) + p.Name[1..];
+            });
+
+        var orFilters = stringProps
+            .Select(field => Builders<T>.Filter.Regex(field, regex))
+            .ToList();
+
+        if (!orFilters.Any()) return new List<T>();
+
+        var textFilter = Filter.And(NotDeleted, Filter.Or(orFilters));
+        var result = await _collection.FindAsync(textFilter, cancellationToken: ct);
+        return await result.ToListAsync(ct);
     }
 }

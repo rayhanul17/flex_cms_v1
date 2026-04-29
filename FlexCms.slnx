@@ -8,4 +8,7 @@
     <Project Path="tests/FlexCms.Tests.Integration/FlexCms.Tests.Integration.csproj" />
     <Project Path="tests/FlexCms.Tests.Unit/FlexCms.Tests.Unit.csproj" />
   </Folder>
+  <Folder Name="/samples/">
+    <Project Path="samples/FlexCms.Sample.Hello/FlexCms.Sample.Hello.csproj" />
+  </Folder>
 </Solution>

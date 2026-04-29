@@ -1,0 +1,11 @@
+{
+  "ModuleId": "FlexCms.Sample.Hello",
+  "ModuleName": "Hello",
+  "Version": "1.0.0",
+  "Author": "FlexCms Team",
+  "Description": "Minimal sample module — verifies the Phase 4 lifecycle end-to-end.",
+  "MinFrameworkVersion": "1.0.0",
+  "TablePrefix": "hello",
+  "DependsOn": [],
+  "RequestedPermissions": []
+}

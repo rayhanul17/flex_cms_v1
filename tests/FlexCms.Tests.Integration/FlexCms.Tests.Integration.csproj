@@ -26,6 +26,15 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\FlexCms.Framework\FlexCms.Framework.csproj" />
     <ProjectReference Include="..\..\src\FlexCms.Host\FlexCms.Host.csproj" />
+    <!-- The sample module's DLL is needed in the test output so the lifecycle
+         tests can copy it into a temp 'modules/' folder. We DO want it copied,
+         but we do NOT want to bind to its types directly in test code (the
+         tests use Assembly.LoadFrom + reflection to mirror the real loader). -->
+    <ProjectReference Include="..\..\samples\FlexCms.Sample.Hello\FlexCms.Sample.Hello.csproj"
+                      ReferenceOutputAssembly="false">
+      <OutputItemType>Content</OutputItemType>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </ProjectReference>
   </ItemGroup>
 
 </Project>

@@ -63,6 +63,7 @@ public class ModulesController : BaseAdminController
             }).ToList()
         };
 
+        ViewBag.IsDevelopment = _env.IsDevelopment();
         return View(vm);
     }
 
@@ -150,5 +151,67 @@ public class ModulesController : BaseAdminController
             return Task.CompletedTask;
         });
         return FcmsOk("Restart triggered.");
+    }
+
+    // ── Dev-mode scaffold ─────────────────────────────────────────────────────
+
+    [HttpGet("scaffold")]
+    public IActionResult Scaffold()
+    {
+        if (!_env.IsDevelopment()) return NotFound();
+        return View(new ScaffoldModuleViewModel());
+    }
+
+    [HttpPost("scaffold")]
+    [ValidateAntiForgeryToken]
+    public IActionResult ScaffoldPost(ScaffoldModuleViewModel model)
+    {
+        if (!_env.IsDevelopment()) return NotFound();
+        if (!ModelState.IsValid) return View("Scaffold", model);
+
+        var modulesRoot = Path.Combine(_env.ContentRootPath, "..", "modules");
+        var dest = Path.Combine(modulesRoot, model.ModuleId);
+
+        if (Directory.Exists(dest))
+        {
+            ModelState.AddModelError(nameof(model.ModuleId), "A module folder with this ID already exists.");
+            return View("Scaffold", model);
+        }
+
+        // Find template source relative to solution root
+        var templateSrc = Path.Combine(_env.ContentRootPath, "..", "templates",
+            "flexcms-module", "content", "FlexCms.Module.Name");
+
+        if (!Directory.Exists(templateSrc))
+            return FcmsFail("Template source not found. Run from the repository root.");
+
+        CopyAndReplace(templateSrc, dest, model.ModuleId, model.TablePrefix);
+        return FcmsOk($"Module '{model.ModuleId}' scaffolded to modules/{model.ModuleId}/. Open the project, implement your module, build, and restart.");
+    }
+
+    private static void CopyAndReplace(string src, string dest, string moduleId, string tablePrefix)
+    {
+        Directory.CreateDirectory(dest);
+        var shortName = moduleId.Split('.').Last();
+
+        foreach (var file in Directory.GetFiles(src, "*", SearchOption.AllDirectories))
+        {
+            var rel = Path.GetRelativePath(src, file);
+            var destRel = rel
+                .Replace("FlexCms.Module.Name", moduleId)
+                .Replace("FlexCms_Module_Name", moduleId.Replace(".", "_"))
+                .Replace("Name", shortName);
+
+            var destFile = Path.Combine(dest, destRel);
+            Directory.CreateDirectory(Path.GetDirectoryName(destFile)!);
+
+            var content = System.IO.File.ReadAllText(file)
+                .Replace("FlexCms.Module.Name", moduleId)
+                .Replace("FlexCms_Module_Name", moduleId.Replace(".", "_"))
+                .Replace("mod_prefix", tablePrefix)
+                .Replace("Name", shortName);
+
+            System.IO.File.WriteAllText(destFile, content);
+        }
     }
 }

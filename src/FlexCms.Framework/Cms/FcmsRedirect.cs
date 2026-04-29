@@ -14,4 +14,5 @@ public class FcmsRedirect : BaseEfEntity
     public int StatusCode { get; set; } = 301;
 
     public bool IsActive { get; set; } = true;
+    public int HitCount { get; set; }
 }

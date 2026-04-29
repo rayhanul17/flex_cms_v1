@@ -1,0 +1,9 @@
+{
+  "moduleId": "FlexCms.Module.Name",
+  "moduleName": "Name",
+  "version": "1.0.0",
+  "author": "",
+  "description": "",
+  "tablePrefix": "mod_prefix",
+  "dependsOn": []
+}

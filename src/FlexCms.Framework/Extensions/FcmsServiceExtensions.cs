@@ -61,6 +61,7 @@ public static class FcmsServiceExtensions
         services.AddScoped<ICategoryService, CategoryService>();
         services.AddScoped<IPostService, PostService>();
         services.AddHostedService<ScheduledPublishService>();
+        services.AddSingleton(new TrashCleanupOptions { RetentionDays = options.TrashRetentionDays });
         services.AddHostedService<TrashCleanupService>();
 
         // Permission service (15min IMemoryCache — requires IRepository<> to be registered)
@@ -313,6 +314,8 @@ public class FlexCmsOptions
 
     public string[] AllowedIps { get; set; } = [];
     public bool EnforceIpFilter { get; set; }
+    /// <summary>Days before trashed items are permanently deleted. Default: 30.</summary>
+    public int TrashRetentionDays { get; set; } = 30;
     /// <summary>IANA or Windows timezone ID. Default: Asia/Dhaka (+06:00).</summary>
     public string TimeZoneId { get; set; } = "Asia/Dhaka";
 

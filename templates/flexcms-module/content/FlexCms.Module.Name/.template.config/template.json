@@ -1,0 +1,31 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "FlexCms",
+  "classifications": ["FlexCms", "Module"],
+  "identity": "FlexCms.Module",
+  "name": "FlexCms Module",
+  "shortName": "flexcms-module",
+  "description": "Scaffold a new FlexCms module with manifest, module class, DbContext, and migration stub.",
+  "tags": {
+    "language": "C#",
+    "type": "project"
+  },
+  "sourceName": "FlexCms.Module.Name",
+  "preferNameDirectory": true,
+  "symbols": {
+    "ModuleId": {
+      "type": "parameter",
+      "datatype": "string",
+      "defaultValue": "FlexCms.Module.Name",
+      "replaces": "FlexCms.Module.Name",
+      "description": "Globally unique module identifier (usually the assembly name)."
+    },
+    "TablePrefix": {
+      "type": "parameter",
+      "datatype": "string",
+      "defaultValue": "mod",
+      "replaces": "mod_prefix",
+      "description": "DB table prefix for this module (e.g. 'blog' → 'blog_posts')."
+    }
+  }
+}

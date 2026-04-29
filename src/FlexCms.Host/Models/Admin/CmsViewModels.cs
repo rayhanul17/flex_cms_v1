@@ -154,6 +154,7 @@ public class RedirectListItemViewModel
     public string ToPath { get; set; } = "";
     public int StatusCode { get; set; }
     public bool IsActive { get; set; }
+    public int HitCount { get; set; }
 }
 
 public class CreateEditRedirectViewModel

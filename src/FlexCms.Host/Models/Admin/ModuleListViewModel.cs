@@ -1,8 +1,21 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace FlexCms.Host.Models.Admin;
 
 public class ModuleListViewModel
 {
     public List<ModuleListItem> Modules { get; set; } = [];
+}
+
+public class ScaffoldModuleViewModel
+{
+    [Required, RegularExpression(@"^[A-Za-z][A-Za-z0-9]*(\.[A-Za-z][A-Za-z0-9]*)+$",
+        ErrorMessage = "Must be a dot-separated identifier, e.g. FlexCms.Blog")]
+    public string ModuleId { get; set; } = "";
+
+    [Required, RegularExpression(@"^[a-z][a-z0-9_]*$",
+        ErrorMessage = "Lowercase letters, digits, underscores only.")]
+    public string TablePrefix { get; set; } = "";
 }
 
 public class ModuleListItem

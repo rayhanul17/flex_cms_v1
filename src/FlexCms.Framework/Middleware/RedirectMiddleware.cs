@@ -2,6 +2,7 @@ using FlexCms.Framework.Db.Ef;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace FlexCms.Framework.Middleware;
 
@@ -12,8 +13,13 @@ namespace FlexCms.Framework.Middleware;
 public class RedirectMiddleware
 {
     private readonly RequestDelegate _next;
+    private readonly ILogger<RedirectMiddleware> _logger;
 
-    public RedirectMiddleware(RequestDelegate next) => _next = next;
+    public RedirectMiddleware(RequestDelegate next, ILogger<RedirectMiddleware> logger)
+    {
+        _next = next;
+        _logger = logger;
+    }
 
     public async Task InvokeAsync(HttpContext ctx)
     {
@@ -31,11 +37,31 @@ public class RedirectMiddleware
                 {
                     ctx.Response.StatusCode = redirect.StatusCode;
                     ctx.Response.Headers.Location = redirect.ToPath;
+
+                    // fire-and-forget HitCount increment — don't block the redirect response
+                    _ = IncrementHitCountAsync(ctx.RequestServices, redirect.Id);
+
                     return;
                 }
             }
         }
 
         await _next(ctx);
+    }
+
+    private async Task IncrementHitCountAsync(IServiceProvider services, Guid redirectId)
+    {
+        try
+        {
+            await using var scope = services.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<FcmsDbContext>();
+            await db.Redirects
+                .Where(r => r.Id == redirectId)
+                .ExecuteUpdateAsync(s => s.SetProperty(r => r.HitCount, r => r.HitCount + 1));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "RedirectMiddleware: failed to increment HitCount for {Id}.", redirectId);
+        }
     }
 }

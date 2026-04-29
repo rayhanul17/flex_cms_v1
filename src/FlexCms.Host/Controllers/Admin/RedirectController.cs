@@ -30,7 +30,8 @@ public class RedirectController : BaseAdminController
             FromPath = r.FromPath,
             ToPath = r.ToPath,
             StatusCode = r.StatusCode,
-            IsActive = r.IsActive
+            IsActive = r.IsActive,
+            HitCount = r.HitCount
         }).ToList());
     }
 

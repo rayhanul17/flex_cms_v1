@@ -7,18 +7,25 @@ using Microsoft.Extensions.Logging;
 
 namespace FlexCms.Framework.Cms;
 
+public class TrashCleanupOptions
+{
+    public int RetentionDays { get; init; } = 30;
+}
+
 /// <summary>
-/// Permanently deletes pages and posts that have been in the trash for more than 30 days.
-/// Runs once every 24 hours.
+/// Permanently deletes pages and posts that have been in the trash longer than
+/// <see cref="TrashCleanupOptions.RetentionDays"/> days. Runs once every 24 hours.
 /// </summary>
 public class TrashCleanupService : BackgroundService
 {
     private readonly IServiceScopeFactory _scopes;
+    private readonly TrashCleanupOptions _opts;
     private readonly ILogger<TrashCleanupService> _logger;
 
-    public TrashCleanupService(IServiceScopeFactory scopes, ILogger<TrashCleanupService> logger)
+    public TrashCleanupService(IServiceScopeFactory scopes, TrashCleanupOptions opts, ILogger<TrashCleanupService> logger)
     {
         _scopes = scopes;
+        _opts = opts;
         _logger = logger;
     }
 
@@ -36,7 +43,7 @@ public class TrashCleanupService : BackgroundService
     {
         await using var scope = _scopes.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<FcmsDbContext>();
-        var cutoff = FcmsTime.Now.AddDays(-30);
+        var cutoff = FcmsTime.Now.AddDays(-_opts.RetentionDays);
 
         var oldPages = await db.Pages
             .IgnoreQueryFilters()

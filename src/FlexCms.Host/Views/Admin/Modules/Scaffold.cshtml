@@ -1,0 +1,30 @@
+@model FlexCms.Host.Models.Admin.ScaffoldModuleViewModel
+@{
+    ViewData["Title"] = "Scaffold New Module";
+}
+
+<h4 class="mb-1">Scaffold New Module</h4>
+<p class="text-muted small mb-4">Development only — creates a module folder from the built-in template.</p>
+
+<form asp-action="ScaffoldPost" method="post" class="col-md-5">
+    <div asp-validation-summary="ModelOnly" class="alert alert-danger"></div>
+
+    <div class="mb-3">
+        <label asp-for="ModuleId" class="form-label">Module ID</label>
+        <input asp-for="ModuleId" class="form-control" placeholder="FlexCms.Blog" />
+        <div class="form-text">Globally unique, dot-separated. Becomes the assembly name.</div>
+        <span asp-validation-for="ModuleId" class="text-danger small"></span>
+    </div>
+
+    <div class="mb-3">
+        <label asp-for="TablePrefix" class="form-label">Table prefix</label>
+        <input asp-for="TablePrefix" class="form-control" placeholder="blog" />
+        <div class="form-text">e.g. <code>blog</code> → tables named <code>blog_posts</code>, <code>blog_categories</code>…</div>
+        <span asp-validation-for="TablePrefix" class="text-danger small"></span>
+    </div>
+
+    <button type="submit" class="btn btn-primary">Generate</button>
+    <a asp-action="Index" class="btn btn-link">Cancel</a>
+</form>
+
+@section Scripts { @{ await Html.RenderPartialAsync("_ValidationScriptsPartial"); } }

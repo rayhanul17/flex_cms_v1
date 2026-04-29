@@ -72,4 +72,29 @@ public class EfRepository<T> : IRepository<T> where T : BaseEfEntity
         _set.Update(entity);
         return Task.CompletedTask;
     }
+
+    public async Task<PagedResponse<T>> FindPagedAsync(
+        Expression<Func<T, bool>>? predicate,
+        Expression<Func<T, object>> orderBy,
+        int page,
+        int pageSize,
+        bool descending = false,
+        CancellationToken ct = default)
+    {
+        var query = _set.Where(e => !e.IsDeleted);
+        if (predicate is not null) query = query.Where(predicate);
+
+        var total = await query.CountAsync(ct);
+
+        query = descending
+            ? query.OrderByDescending(orderBy)
+            : query.OrderBy(orderBy);
+
+        var items = await query
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(ct);
+
+        return PagedResponse<T>.Create(items, total, page, pageSize);
+    }
 }

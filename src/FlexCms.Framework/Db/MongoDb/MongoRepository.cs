@@ -1,6 +1,7 @@
 using System.Linq.Expressions;
 using System.Security.Claims;
 using FlexCms.Framework.Clock;
+using FlexCms.Framework.Db;
 using Microsoft.AspNetCore.Http;
 using MongoDB.Driver;
 
@@ -109,5 +110,33 @@ public class MongoRepository<T> : IRepository<T> where T : BaseMongoEntity
         entity.UpdatedBy = CurrentUserId();
         await _collection.ReplaceOneAsync(
             Filter.Eq(e => e.Id, entity.Id), entity, cancellationToken: ct);
+    }
+
+    public async Task<PagedResponse<T>> FindPagedAsync(
+        Expression<Func<T, bool>>? predicate,
+        Expression<Func<T, object>> orderBy,
+        int page,
+        int pageSize,
+        bool descending = false,
+        CancellationToken ct = default)
+    {
+        var filter = predicate is null
+            ? NotDeleted
+            : Filter.And(NotDeleted, Filter.Where(predicate));
+
+        var total = (int)await _collection.CountDocumentsAsync(filter, cancellationToken: ct);
+
+        var sortDef = descending
+            ? Builders<T>.Sort.Descending(orderBy)
+            : Builders<T>.Sort.Ascending(orderBy);
+
+        var items = await _collection
+            .Find(filter)
+            .Sort(sortDef)
+            .Skip((page - 1) * pageSize)
+            .Limit(pageSize)
+            .ToListAsync(ct);
+
+        return PagedResponse<T>.Create(items, total, page, pageSize);
     }
 }

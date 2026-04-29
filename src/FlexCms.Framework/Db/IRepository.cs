@@ -15,4 +15,16 @@ public interface IRepository<T> where T : class, IBaseEntity
     Task UpdateAsync(T entity, CancellationToken ct = default);
     Task DeleteAsync(T entity, CancellationToken ct = default);
     Task SoftDeleteAsync(T entity, CancellationToken ct = default);
+
+    /// <summary>
+    /// Returns a page of results matching <paramref name="predicate"/> (pass <c>null</c> for all),
+    /// ordered by <paramref name="orderBy"/> (ascending by default).
+    /// </summary>
+    Task<PagedResponse<T>> FindPagedAsync(
+        Expression<Func<T, bool>>? predicate,
+        Expression<Func<T, object>> orderBy,
+        int page,
+        int pageSize,
+        bool descending = false,
+        CancellationToken ct = default);
 }

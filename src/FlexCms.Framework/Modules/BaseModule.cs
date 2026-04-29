@@ -24,5 +24,8 @@ public abstract class BaseModule : IFcmsModule
     public virtual Task SeedDataAsync(IServiceProvider sp, CancellationToken ct = default) => Task.CompletedTask;
 
     /// <inheritdoc/>
+    public virtual Task OnUpgradeAsync(string fromVersion, IServiceProvider sp, CancellationToken ct = default) => Task.CompletedTask;
+
+    /// <inheritdoc/>
     public virtual Task DropTablesAsync(string connectionString, string provider, CancellationToken ct = default) => Task.CompletedTask;
 }

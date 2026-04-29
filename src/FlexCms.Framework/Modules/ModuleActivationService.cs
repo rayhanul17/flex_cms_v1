@@ -106,6 +106,24 @@ public class ModuleActivationService : IHostedService
                     _logger.LogError(ex, "Module {Id}: seed failed.", module.ModuleId);
                 }
             }
+
+            // ── 3. OnUpgrade — version changed since last run ─────────────────
+            if (record.SeedCompleted && record.Version != module.Version)
+            {
+                try
+                {
+                    var fromVersion = record.Version;
+                    await module.OnUpgradeAsync(fromVersion, scope.ServiceProvider, ct);
+                    record.Version = module.Version;
+                    await db.SaveChangesAsync(ct);
+                    _logger.LogInformation("Module {Id}: upgraded {From} → {To}.",
+                        module.ModuleId, fromVersion, module.Version);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Module {Id}: upgrade failed.", module.ModuleId);
+                }
+            }
         }
     }
 

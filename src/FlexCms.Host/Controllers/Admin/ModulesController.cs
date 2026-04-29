@@ -4,7 +4,9 @@ using FlexCms.Framework.Modules;
 using FlexCms.Host.Models.Admin;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 namespace FlexCms.Host.Controllers.Admin;
 
@@ -94,7 +96,7 @@ public class ModulesController : BaseAdminController
 
     [HttpPost("uninstall/{id}")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Uninstall(string id, [FromForm] string confirmName, CancellationToken ct)
+    public async Task<IActionResult> Uninstall(string id, [FromForm] string confirmName, [FromForm] bool dropTables, CancellationToken ct)
     {
         var module = _registry.FindById(id);
         if (module is null) return FcmsFail("Module not found.");
@@ -107,6 +109,22 @@ public class ModulesController : BaseAdminController
             return FcmsFail("Could not schedule uninstall — folder missing.");
 
         _state.DeleteWwwroot(_env.WebRootPath, module.ModuleId);
+
+        // Drop tables if requested (runs before the DLL is locked on next startup)
+        if (dropTables)
+        {
+            var opts = HttpContext.RequestServices.GetRequiredService<ModuleActivationOptions>();
+            try
+            {
+                await module.Instance.DropTablesAsync(opts.ConnectionString, opts.Provider, ct);
+            }
+            catch (Exception ex)
+            {
+                var logger = HttpContext.RequestServices
+                    .GetRequiredService<ILogger<ModulesController>>();
+                logger.LogError(ex, "Module {Id}: DropTablesAsync failed.", id);
+            }
+        }
 
         // Soft-delete the DB record now (folder will be removed on next startup
         // by ModuleManager.ProcessPendingUninstalls)

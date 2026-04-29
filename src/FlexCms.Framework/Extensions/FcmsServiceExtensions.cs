@@ -69,6 +69,8 @@ public static class FcmsServiceExtensions
         services.AddHostedService<ScheduledPublishService>();
         services.AddSingleton(new TrashCleanupOptions { RetentionDays = options.TrashRetentionDays });
         services.AddHostedService<TrashCleanupService>();
+        services.AddScoped<IOperationLogService, OperationLogService>();
+        services.AddHostedService<LogArchiveService>();
 
         // Permission service (15min IMemoryCache — requires IRepository<> to be registered)
         services.AddMemoryCache();

@@ -69,27 +69,25 @@ public class OperationLogService : IOperationLogService
         var old = await _logs.FindAsync(l => l.CreatedAt < cutoff, ct);
         if (old.Count == 0) return;
 
-        foreach (var log in old)
+        var archiveEntries = old.Select(log => new FcmsOperationLogArchive
         {
-            await _archive.AddAsync(new FcmsOperationLogArchive
-            {
-                UserId = log.UserId,
-                UserName = log.UserName,
-                UserIp = log.UserIp,
-                UserAgent = log.UserAgent,
-                Action = log.Action,
-                EntityType = log.EntityType,
-                EntityId = log.EntityId,
-                NewValue = log.NewValue,
-                Module = log.Module,
-                Severity = log.Severity,
-                CreatedAt = log.CreatedAt,
-                UpdatedAt = log.UpdatedAt,
-                CreatedBy = log.CreatedBy,
-                UpdatedBy = log.UpdatedBy
-            }, ct);
-        }
+            UserId = log.UserId,
+            UserName = log.UserName,
+            UserIp = log.UserIp,
+            UserAgent = log.UserAgent,
+            Action = log.Action,
+            EntityType = log.EntityType,
+            EntityId = log.EntityId,
+            NewValue = log.NewValue,
+            Module = log.Module,
+            Severity = log.Severity,
+            CreatedAt = log.CreatedAt,
+            UpdatedAt = log.UpdatedAt,
+            CreatedBy = log.CreatedBy,
+            UpdatedBy = log.UpdatedBy
+        }).ToList();
 
+        await _archive.AddRangeAsync(archiveEntries, ct);
         await _logs.SoftDeleteRangeAsync(old, ct);
     }
 

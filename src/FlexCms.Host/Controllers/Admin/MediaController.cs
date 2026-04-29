@@ -1,3 +1,4 @@
+using FlexCms.Framework.Auth;
 using FlexCms.Framework.Cms;
 using FlexCms.Framework.Db;
 using Microsoft.AspNetCore.Mvc;
@@ -19,6 +20,7 @@ public class MediaController : BaseAdminController
     }
 
     [HttpGet("")]
+    [FcmsAuthorize("media.view")]
     public async Task<IActionResult> Index(Guid? folderId)
     {
         var allFolders = await _folders.GetAllAsync();
@@ -35,6 +37,7 @@ public class MediaController : BaseAdminController
 
     [HttpPost("upload")]
     [ValidateAntiForgeryToken]
+    [FcmsAuthorize("media.upload")]
     public async Task<IActionResult> Upload(IFormFile file, Guid? folderId)
     {
         if (file is null || file.Length == 0)
@@ -62,6 +65,7 @@ public class MediaController : BaseAdminController
 
     [HttpPost("folder/create")]
     [ValidateAntiForgeryToken]
+    [FcmsAuthorize("media.folders")]
     public async Task<IActionResult> CreateFolder(string name, Guid? parentId)
     {
         if (string.IsNullOrWhiteSpace(name))
@@ -84,6 +88,7 @@ public class MediaController : BaseAdminController
 
     [HttpPost("folder/{id:guid}/rename")]
     [ValidateAntiForgeryToken]
+    [FcmsAuthorize("media.folders")]
     public async Task<IActionResult> RenameFolder(Guid id, string name)
     {
         if (string.IsNullOrWhiteSpace(name))
@@ -111,6 +116,7 @@ public class MediaController : BaseAdminController
 
     [HttpPost("folder/{id:guid}/delete")]
     [ValidateAntiForgeryToken]
+    [FcmsAuthorize("media.folders")]
     public async Task<IActionResult> DeleteFolder(Guid id)
     {
         try
@@ -135,6 +141,7 @@ public class MediaController : BaseAdminController
 
     [HttpPost("{id:guid}/move")]
     [ValidateAntiForgeryToken]
+    [FcmsAuthorize("media.edit")]
     public async Task<IActionResult> Move(Guid id, Guid? targetFolderId)
     {
         try
@@ -159,6 +166,7 @@ public class MediaController : BaseAdminController
 
     [HttpPost("{id:guid}/delete")]
     [ValidateAntiForgeryToken]
+    [FcmsAuthorize("media.delete")]
     public async Task<IActionResult> Delete(Guid id)
     {
         try

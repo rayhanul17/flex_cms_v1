@@ -1,3 +1,4 @@
+using FlexCms.Framework.Auth;
 using FlexCms.Framework.Cms;
 using FlexCms.Framework.Db;
 using FlexCms.Framework.Services;
@@ -23,6 +24,7 @@ public class AuditLogController : BaseAdminController
     }
 
     [HttpGet("")]
+    [FcmsAuthorize("audit.view")]
     public async Task<IActionResult> Index(CancellationToken ct)
     {
         var recent = await _auditLog.GetRecentAsync(200, ct);
@@ -37,6 +39,7 @@ public class AuditLogController : BaseAdminController
 
     [HttpPost("archive")]
     [ValidateAntiForgeryToken]
+    [FcmsAuthorize("audit.manage")]
     public async Task<IActionResult> Archive(CancellationToken ct)
     {
         await _auditLog.ArchiveOlderThanAsync(TimeSpan.FromHours(24), ct);
@@ -47,6 +50,7 @@ public class AuditLogController : BaseAdminController
 
     [HttpPost("clear-archive")]
     [ValidateAntiForgeryToken]
+    [FcmsAuthorize("audit.manage")]
     public async Task<IActionResult> ClearArchive(CancellationToken ct)
     {
         await _auditLog.ClearArchiveAsync(ct);
@@ -57,6 +61,7 @@ public class AuditLogController : BaseAdminController
 
     [HttpPost("toggle")]
     [ValidateAntiForgeryToken]
+    [FcmsAuthorize("audit.manage")]
     public async Task<IActionResult> Toggle(CancellationToken ct)
     {
         var cfg = await _settings.GetAsync<AuditEnabledSettings>(AuditLogSettings.Key, ct: ct);

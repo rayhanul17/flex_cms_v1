@@ -3,6 +3,11 @@ using MongoDB.Driver;
 
 namespace FlexCms.Framework.Db.MongoDb;
 
+internal interface IMongoSessionAware
+{
+    void SetSession(IClientSessionHandle? session);
+}
+
 public class MongoUnitOfWork : IFcmsUnitOfWork
 {
     private readonly IMongoDatabase _database;
@@ -26,6 +31,10 @@ public class MongoUnitOfWork : IFcmsUnitOfWork
             var repoType = typeof(MongoRepository<>).MakeGenericType(type);
             repo = Activator.CreateInstance(repoType, _database, _httpContextAccessor)!;
             _repositories[type] = repo;
+
+            // If a transaction is already active, wire the session into the new repo
+            if (_session is not null && repo is IMongoSessionAware aware)
+                aware.SetSession(_session);
         }
         return (IRepository<T>)repo;
     }
@@ -34,6 +43,7 @@ public class MongoUnitOfWork : IFcmsUnitOfWork
     {
         _session = await _client.StartSessionAsync(cancellationToken: ct);
         _session.StartTransaction();
+        PropagateSession(_session);
     }
 
     public async Task CommitAsync(CancellationToken ct = default)
@@ -56,5 +66,12 @@ public class MongoUnitOfWork : IFcmsUnitOfWork
         _session?.Dispose();
         GC.SuppressFinalize(this);
         return ValueTask.CompletedTask;
+    }
+
+    private void PropagateSession(IClientSessionHandle? session)
+    {
+        foreach (var repo in _repositories.Values)
+            if (repo is IMongoSessionAware aware)
+                aware.SetSession(session);
     }
 }

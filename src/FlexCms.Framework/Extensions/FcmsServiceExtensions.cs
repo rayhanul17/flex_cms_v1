@@ -115,6 +115,9 @@ public static class FcmsServiceExtensions
         // Scheme name MUST be IdentityConstants.ApplicationScheme so that
         // SignInManager.PasswordSignInAsync (which targets that scheme) works
         // with AddIdentityCore (which does NOT auto-register Identity cookies).
+        services.Configure<SecurityStampValidatorOptions>(o =>
+            o.ValidationInterval = TimeSpan.FromMinutes(30));
+
         services.AddAuthentication(IdentityConstants.ApplicationScheme)
             .AddCookie(IdentityConstants.ApplicationScheme, opts =>
             {
@@ -131,7 +134,6 @@ public static class FcmsServiceExtensions
         services.AddHttpContextAccessor();
         services.AddAntiforgery(o => o.HeaderName = "X-FlexCms-Csrf");
         services.AddSession(o => { o.Cookie.HttpOnly = true; o.Cookie.IsEssential = true; o.IdleTimeout = TimeSpan.FromMinutes(30); });
-        services.AddSignalR();
 
         // Rate limiting — partitioned by IP (M19: prevents one IP from blocking others)
         services.AddRateLimiter(limiter =>
@@ -194,8 +196,6 @@ public static class FcmsServiceExtensions
                 .AddSignInManager<SignInManager<FcmsUser>>()
                 .AddPasswordValidator<FcmsPasswordValidator>()
                 .AddDefaultTokenProviders();
-
-            services.AddHttpContextAccessor();
 
             if (options.UseMySQL)
             {

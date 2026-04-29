@@ -1,6 +1,7 @@
 using FlexCms.Framework.Auth;
 using FlexCms.Framework.Db;
 using FlexCms.Framework.Modules;
+using FlexCms.Framework.Services;
 using FlexCms.Framework.Setup;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.DependencyInjection;
@@ -32,6 +33,7 @@ public class SeedService : IHostedService
         // Seed module records on every startup (cheap, idempotent) regardless
         // of whether admin seeding still needs to run.
         await SeedModuleRecordsAsync(ct);
+        await SeedPermissionsAsync(ct);
 
         var config = _setupHelper.Read();
         if (config is null || !config.IsSetupComplete || config.AdminSeeded)
@@ -166,5 +168,41 @@ public class SeedService : IHostedService
         }
 
         if (anyChange) await uow.SaveChangesAsync(ct);
+    }
+
+    private static readonly FcmsPermission[] CorePermissions =
+    [
+        new() { Key = "pages.create",      DisplayName = "Pages: Create",              Group = "Pages" },
+        new() { Key = "pages.edit",        DisplayName = "Pages: Edit",                Group = "Pages" },
+        new() { Key = "pages.delete",      DisplayName = "Pages: Delete",              Group = "Pages" },
+        new() { Key = "posts.create",      DisplayName = "Posts: Create",              Group = "Posts" },
+        new() { Key = "posts.edit",        DisplayName = "Posts: Edit",                Group = "Posts" },
+        new() { Key = "posts.delete",      DisplayName = "Posts: Delete",              Group = "Posts" },
+        new() { Key = "categories.create", DisplayName = "Categories: Create",         Group = "Posts" },
+        new() { Key = "categories.edit",   DisplayName = "Categories: Edit",           Group = "Posts" },
+        new() { Key = "categories.delete", DisplayName = "Categories: Delete",         Group = "Posts" },
+        new() { Key = "media.view",        DisplayName = "Media: View Library",        Group = "Media" },
+        new() { Key = "media.upload",      DisplayName = "Media: Upload",              Group = "Media" },
+        new() { Key = "media.edit",        DisplayName = "Media: Move/Edit",           Group = "Media" },
+        new() { Key = "media.delete",      DisplayName = "Media: Delete",              Group = "Media" },
+        new() { Key = "media.folders",     DisplayName = "Media: Manage Folders",      Group = "Media" },
+        new() { Key = "redirects.create",  DisplayName = "Redirects: Create",         Group = "Redirects" },
+        new() { Key = "redirects.edit",    DisplayName = "Redirects: Edit",           Group = "Redirects" },
+        new() { Key = "redirects.delete",  DisplayName = "Redirects: Delete",         Group = "Redirects" },
+        new() { Key = "roles.manage",      DisplayName = "Roles: Manage",             Group = "Admin" },
+        new() { Key = "roles.permissions", DisplayName = "Roles: Assign Permissions", Group = "Admin" },
+        new() { Key = "users.manage",      DisplayName = "Users: Manage",             Group = "Admin" },
+        new() { Key = "audit.view",        DisplayName = "Audit Log: View",           Group = "Admin" },
+        new() { Key = "audit.manage",      DisplayName = "Audit Log: Manage",         Group = "Admin" },
+        new() { Key = "settings.manage",   DisplayName = "Settings: Manage",          Group = "Admin" },
+    ];
+
+    private async Task SeedPermissionsAsync(CancellationToken ct)
+    {
+        await using var scope = _scopeFactory.CreateAsyncScope();
+        var permService = scope.ServiceProvider.GetService<IPermissionService>();
+        if (permService is null) return;
+
+        await permService.SeedPermissionsAsync(CorePermissions, ct);
     }
 }

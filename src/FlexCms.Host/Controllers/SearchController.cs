@@ -19,12 +19,12 @@ public class SearchController : Controller
             return View(new SearchResultsViewModel { Query = "" });
 
         var term = q.Trim();
-        var lower = term.ToLowerInvariant();
+        var pattern = $"%{term}%";
 
         var pages = await _db.Pages
             .AsNoTracking()
             .Where(p => !p.IsDeleted && p.IsPublished &&
-                (p.Title.ToLower().Contains(lower) || p.Content.ToLower().Contains(lower)))
+                (EF.Functions.Like(p.Title, pattern) || EF.Functions.Like(p.Content, pattern)))
             .OrderBy(p => p.Title)
             .Select(p => new SearchResultItem { Title = p.Title, Slug = "/" + p.Slug, Excerpt = p.MetaDescription ?? "" })
             .ToListAsync(ct);
@@ -32,7 +32,9 @@ public class SearchController : Controller
         var posts = await _db.Posts
             .AsNoTracking()
             .Where(p => !p.IsDeleted && p.IsPublished &&
-                (p.Title.ToLower().Contains(lower) || p.Content.ToLower().Contains(lower) || (p.Excerpt != null && p.Excerpt.ToLower().Contains(lower))))
+                (EF.Functions.Like(p.Title, pattern) ||
+                 EF.Functions.Like(p.Content, pattern) ||
+                 (p.Excerpt != null && EF.Functions.Like(p.Excerpt, pattern))))
             .OrderByDescending(p => p.PublishedAt)
             .Select(p => new SearchResultItem { Title = p.Title, Slug = "/blog/" + p.Slug, Excerpt = p.Excerpt ?? p.MetaDescription ?? "" })
             .ToListAsync(ct);

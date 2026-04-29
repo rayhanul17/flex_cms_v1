@@ -67,4 +67,50 @@ public class ModuleStateService
         File.WriteAllText(marker, $"Uninstall scheduled at {DateTime.UtcNow:O}\n");
         return true;
     }
+
+    // ── wwwroot sync ──────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Copy <c>{moduleFolder}/wwwroot/</c> → <c>{webRootPath}/modules/{moduleId}/</c>.
+    /// Called on activation so module CSS/JS are reachable at runtime.
+    /// No-op when the module has no wwwroot folder.
+    /// </summary>
+    public void SyncWwwroot(string moduleFolder, string webRootPath, string moduleId)
+    {
+        var src = Path.Combine(moduleFolder, "wwwroot");
+        if (!Directory.Exists(src)) return;
+
+        var dest = Path.Combine(webRootPath, "modules", moduleId);
+        CopyDirectory(src, dest);
+        _logger.LogInformation("Module {Id}: wwwroot synced to {Dest}", moduleId, dest);
+    }
+
+    /// <summary>
+    /// Delete <c>{webRootPath}/modules/{moduleId}/</c>.
+    /// Called on deactivation and uninstall.
+    /// </summary>
+    public void DeleteWwwroot(string webRootPath, string moduleId)
+    {
+        var dest = Path.Combine(webRootPath, "modules", moduleId);
+        if (!Directory.Exists(dest)) return;
+
+        try
+        {
+            Directory.Delete(dest, recursive: true);
+            _logger.LogInformation("Module {Id}: wwwroot removed from {Dest}", moduleId, dest);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Module {Id}: failed to remove wwwroot at {Dest}", moduleId, dest);
+        }
+    }
+
+    private static void CopyDirectory(string src, string dest)
+    {
+        Directory.CreateDirectory(dest);
+        foreach (var file in Directory.GetFiles(src))
+            File.Copy(file, Path.Combine(dest, Path.GetFileName(file)), overwrite: true);
+        foreach (var dir in Directory.GetDirectories(src))
+            CopyDirectory(dir, Path.Combine(dest, Path.GetFileName(dir)));
+    }
 }

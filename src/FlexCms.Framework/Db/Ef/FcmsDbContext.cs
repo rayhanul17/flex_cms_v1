@@ -15,7 +15,18 @@ public class FcmsDbContext : IdentityDbContext<FcmsUser, FcmsRole, Guid>
     /// <summary>Framework table prefix — applied to every Core/Identity table.</summary>
     public const string FrameworkPrefix = "fcms";
 
-    public FcmsDbContext(DbContextOptions<FcmsDbContext> options) : base(options) { }
+    private readonly IEnumerable<IFcmsModelBuilder> _moduleBuilders;
+
+    /// <summary>Used by tests — no module builders.</summary>
+    public FcmsDbContext(DbContextOptions<FcmsDbContext> options)
+        : this(options, []) { }
+
+    /// <summary>Used by DI — module builders injected for OnModelCreating.</summary>
+    public FcmsDbContext(DbContextOptions<FcmsDbContext> options, IEnumerable<IFcmsModelBuilder> moduleBuilders)
+        : base(options)
+    {
+        _moduleBuilders = moduleBuilders;
+    }
 
     public DbSet<FcmsSettings> Settings => Set<FcmsSettings>();
     public DbSet<FcmsPermission> Permissions => Set<FcmsPermission>();
@@ -127,6 +138,11 @@ public class FcmsDbContext : IdentityDbContext<FcmsUser, FcmsRole, Guid>
             .WithMany(t => t.PostTags)
             .HasForeignKey(pt => pt.TagId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        // Module builders — each registered IFcmsModelBuilder configures its
+        // own entities (tables, indexes, FKs) into this shared DbContext.
+        foreach (var builder in _moduleBuilders)
+            builder.Build(modelBuilder);
 
         // Apply soft-delete filter + auto-name table for every BaseEfEntity.
         // Module entities will follow the same convention with their own prefix

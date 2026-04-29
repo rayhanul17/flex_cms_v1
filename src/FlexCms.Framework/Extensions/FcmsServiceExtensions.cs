@@ -71,6 +71,21 @@ public static class FcmsServiceExtensions
         // Seed admin user + SuperAdmin role on first production-mode startup
         services.AddHostedService<SeedService>();
 
+        // Run module EF migrations + SeedDataAsync on every startup (idempotent)
+        services.AddSingleton(new ModuleActivationOptions
+        {
+            ConnectionString = options.UsesRelationalDb
+                ? (options.UseMySQL ? options.MySqlConnectionString
+                    : options.UseMsSql ? options.MsSqlConnectionString
+                    : options.PostgreSqlConnectionString)
+                : "",
+            Provider = options.UseMySQL ? "mysql"
+                : options.UseMsSql ? "mssql"
+                : options.UsePostgreSQL ? "postgresql"
+                : "mongodb"
+        });
+        services.AddHostedService<ModuleActivationService>();
+
         // ── Module discovery + wiring ────────────────────────────────────────
         // The registry is built once at startup; each loaded module gets:
         //   1. RegisterServices(services) called

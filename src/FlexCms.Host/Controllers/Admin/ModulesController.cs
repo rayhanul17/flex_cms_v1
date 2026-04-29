@@ -2,6 +2,7 @@ using FlexCms.Framework.Auth;
 using FlexCms.Framework.Db;
 using FlexCms.Framework.Modules;
 using FlexCms.Host.Models.Admin;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Hosting;
 
@@ -16,19 +17,22 @@ public class ModulesController : BaseAdminController
     private readonly IRepository<FcmsModuleRecord> _records;
     private readonly IFcmsUnitOfWork _uow;
     private readonly IHostApplicationLifetime _lifetime;
+    private readonly IWebHostEnvironment _env;
 
     public ModulesController(
         ModuleRegistry registry,
         ModuleStateService state,
         IRepository<FcmsModuleRecord> records,
         IFcmsUnitOfWork uow,
-        IHostApplicationLifetime lifetime)
+        IHostApplicationLifetime lifetime,
+        IWebHostEnvironment env)
     {
         _registry = registry;
         _state = state;
         _records = records;
         _uow = uow;
         _lifetime = lifetime;
+        _env = env;
     }
 
     [HttpGet("")]
@@ -70,6 +74,7 @@ public class ModulesController : BaseAdminController
         if (!_state.Activate(module.FolderPath))
             return FcmsFail("Could not activate module — folder missing.");
 
+        _state.SyncWwwroot(module.FolderPath, _env.WebRootPath, module.ModuleId);
         return FcmsOk("Module activated. Restart the app to apply.");
     }
 
@@ -83,6 +88,7 @@ public class ModulesController : BaseAdminController
         if (!_state.Deactivate(module.FolderPath))
             return FcmsFail("Could not deactivate module — folder missing.");
 
+        _state.DeleteWwwroot(_env.WebRootPath, module.ModuleId);
         return FcmsOk("Module deactivated. Restart the app to apply.");
     }
 
@@ -99,6 +105,8 @@ public class ModulesController : BaseAdminController
 
         if (!_state.Uninstall(module.FolderPath))
             return FcmsFail("Could not schedule uninstall — folder missing.");
+
+        _state.DeleteWwwroot(_env.WebRootPath, module.ModuleId);
 
         // Soft-delete the DB record now (folder will be removed on next startup
         // by ModuleManager.ProcessPendingUninstalls)

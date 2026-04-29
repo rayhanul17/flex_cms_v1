@@ -1,0 +1,40 @@
+@model FlexCms.Host.Models.Admin.CreateEditRedirectViewModel
+@{
+    ViewData["Title"] = "New Redirect";
+}
+
+<h4 class="mb-3">New Redirect</h4>
+
+<form asp-action="Create" method="post" class="col-md-6">
+    <div asp-validation-summary="ModelOnly" class="alert alert-danger d-none"></div>
+
+    <div class="mb-3">
+        <label asp-for="FromPath" class="form-label">From path</label>
+        <input asp-for="FromPath" class="form-control" placeholder="/old-url" />
+        <span asp-validation-for="FromPath" class="text-danger small"></span>
+    </div>
+
+    <div class="mb-3">
+        <label asp-for="ToPath" class="form-label">To path / URL</label>
+        <input asp-for="ToPath" class="form-control" placeholder="/new-url or https://example.com" />
+        <span asp-validation-for="ToPath" class="text-danger small"></span>
+    </div>
+
+    <div class="mb-3">
+        <label asp-for="StatusCode" class="form-label">Status code</label>
+        <select asp-for="StatusCode" class="form-select">
+            <option value="301">301 — Permanent</option>
+            <option value="302">302 — Temporary</option>
+        </select>
+    </div>
+
+    <div class="mb-3 form-check">
+        <input asp-for="IsActive" class="form-check-input" />
+        <label asp-for="IsActive" class="form-check-label">Active</label>
+    </div>
+
+    <button type="submit" class="btn btn-primary">Create</button>
+    <a asp-action="Index" class="btn btn-link">Cancel</a>
+</form>
+
+@section Scripts { @{ await Html.RenderPartialAsync("_ValidationScriptsPartial"); } }

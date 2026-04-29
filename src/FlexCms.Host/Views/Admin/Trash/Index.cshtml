@@ -1,0 +1,105 @@
+@model FlexCms.Host.Models.Admin.TrashViewModel
+@{
+    ViewData["Title"] = "Trash";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="mb-0">Trash</h4>
+    <span class="text-muted small">Items deleted more than 30 days ago are purged automatically.</span>
+</div>
+
+@if (!Model.Pages.Any() && !Model.Posts.Any())
+{
+    <div class="alert alert-info">Trash is empty.</div>
+}
+else
+{
+    <form id="csrf-form" style="display:none">@Html.AntiForgeryToken()</form>
+
+    @if (Model.Pages.Any())
+    {
+        <h6 class="text-muted mb-2">Pages</h6>
+        <table class="table table-sm align-middle mb-4">
+            <thead class="table-light">
+                <tr>
+                    <th>Title</th>
+                    <th>Deleted</th>
+                    <th class="text-end">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+            @foreach (var item in Model.Pages)
+            {
+                <tr>
+                    <td>@item.Title</td>
+                    <td class="text-muted small">@(item.DeletedAt?.ToString("yyyy-MM-dd HH:mm") ?? "—")</td>
+                    <td class="text-end">
+                        <button class="btn btn-sm btn-outline-success js-restore"
+                                data-url="/admin/trash/pages/@item.Id/restore">Restore</button>
+                        <button class="btn btn-sm btn-outline-danger js-hard-delete"
+                                data-url="/admin/trash/pages/@item.Id/delete"
+                                data-name="@item.Title">Delete permanently</button>
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    }
+
+    @if (Model.Posts.Any())
+    {
+        <h6 class="text-muted mb-2">Posts</h6>
+        <table class="table table-sm align-middle mb-4">
+            <thead class="table-light">
+                <tr>
+                    <th>Title</th>
+                    <th>Deleted</th>
+                    <th class="text-end">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+            @foreach (var item in Model.Posts)
+            {
+                <tr>
+                    <td>@item.Title</td>
+                    <td class="text-muted small">@(item.DeletedAt?.ToString("yyyy-MM-dd HH:mm") ?? "—")</td>
+                    <td class="text-end">
+                        <button class="btn btn-sm btn-outline-success js-restore"
+                                data-url="/admin/trash/posts/@item.Id/restore">Restore</button>
+                        <button class="btn btn-sm btn-outline-danger js-hard-delete"
+                                data-url="/admin/trash/posts/@item.Id/delete"
+                                data-name="@item.Title">Delete permanently</button>
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    }
+}
+
+@section Scripts {
+<script>
+(function () {
+    const token = document.querySelector('#csrf-form input[name=__RequestVerificationToken]').value;
+
+    async function post(url) {
+        const body = new URLSearchParams({ __RequestVerificationToken: token });
+        const r = await fetch(url, { method: 'POST', headers: { 'RequestVerificationToken': token }, body });
+        return r.json();
+    }
+
+    document.querySelectorAll('.js-restore').forEach(btn => btn.addEventListener('click', async () => {
+        const res = await post(btn.dataset.url);
+        if (res.isSuccess) btn.closest('tr').remove();
+        else alert(res.message);
+    }));
+
+    document.querySelectorAll('.js-hard-delete').forEach(btn => btn.addEventListener('click', async () => {
+        if (!confirm(`Permanently delete "${btn.dataset.name}"? This cannot be undone.`)) return;
+        const res = await post(btn.dataset.url);
+        if (res.isSuccess) btn.closest('tr').remove();
+        else alert(res.message);
+    }));
+})();
+</script>
+}

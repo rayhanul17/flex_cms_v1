@@ -1,5 +1,6 @@
 using FlexCms.Framework.Auth;
 using FlexCms.Framework.Auth.Ef;
+using FlexCms.Framework.Cms;
 using FlexCms.Framework.Clock;
 using FlexCms.Framework.Auth.MongoDb;
 using FlexCms.Framework.Db;
@@ -55,6 +56,14 @@ public static class FcmsServiceExtensions
         // Settings service (DB-backed; only useful when a DB provider is configured)
         services.AddScoped<ISettingsService, SettingsService>();
 
+        // CMS services
+        services.AddScoped<IPageService, PageService>();
+        services.AddScoped<ICategoryService, CategoryService>();
+        services.AddScoped<IPostService, PostService>();
+        services.AddHostedService<ScheduledPublishService>();
+        services.AddSingleton(new TrashCleanupOptions { RetentionDays = options.TrashRetentionDays });
+        services.AddHostedService<TrashCleanupService>();
+
         // Permission service (15min IMemoryCache — requires IRepository<> to be registered)
         services.AddMemoryCache();
         services.AddScoped<IPermissionService, PermissionService>();
@@ -64,6 +73,21 @@ public static class FcmsServiceExtensions
 
         // Seed admin user + SuperAdmin role on first production-mode startup
         services.AddHostedService<SeedService>();
+
+        // Run module EF migrations + SeedDataAsync on every startup (idempotent)
+        services.AddSingleton(new ModuleActivationOptions
+        {
+            ConnectionString = options.UsesRelationalDb
+                ? (options.UseMySQL ? options.MySqlConnectionString
+                    : options.UseMsSql ? options.MsSqlConnectionString
+                    : options.PostgreSqlConnectionString)
+                : "",
+            Provider = options.UseMySQL ? "mysql"
+                : options.UseMsSql ? "mssql"
+                : options.UsePostgreSQL ? "postgresql"
+                : "mongodb"
+        });
+        services.AddHostedService<ModuleActivationService>();
 
         // ── Module discovery + wiring ────────────────────────────────────────
         // The registry is built once at startup; each loaded module gets:
@@ -98,6 +122,7 @@ public static class FcmsServiceExtensions
         services.AddAuthorization();
         services.AddHttpContextAccessor();
         services.AddAntiforgery(o => o.HeaderName = "X-FlexCms-Csrf");
+        services.AddSession(o => { o.Cookie.HttpOnly = true; o.Cookie.IsEssential = true; o.IdleTimeout = TimeSpan.FromMinutes(30); });
         services.AddSignalR();
 
         // Rate limiting — partitioned by IP (M19: prevents one IP from blocking others)
@@ -289,6 +314,8 @@ public class FlexCmsOptions
 
     public string[] AllowedIps { get; set; } = [];
     public bool EnforceIpFilter { get; set; }
+    /// <summary>Days before trashed items are permanently deleted. Default: 30.</summary>
+    public int TrashRetentionDays { get; set; } = 30;
     /// <summary>IANA or Windows timezone ID. Default: Asia/Dhaka (+06:00).</summary>
     public string TimeZoneId { get; set; } = "Asia/Dhaka";
 

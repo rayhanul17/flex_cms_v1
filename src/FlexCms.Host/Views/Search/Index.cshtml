@@ -1,0 +1,36 @@
+@model SearchResultsViewModel
+@{
+    ViewData["Title"] = string.IsNullOrEmpty(Model.Query) ? "Search" : $"Search: {Model.Query}";
+}
+
+<h4 class="mb-3">Search</h4>
+
+<form action="/search" method="get" class="d-flex mb-4 col-md-6">
+    <input name="q" value="@Model.Query" class="form-control me-2" placeholder="Search…" />
+    <button type="submit" class="btn btn-primary">Go</button>
+</form>
+
+@if (!string.IsNullOrEmpty(Model.Query))
+{
+    if (!Model.Results.Any())
+    {
+        <p class="text-muted">No results for "<strong>@Model.Query</strong>".</p>
+    }
+    else
+    {
+        <p class="text-muted small mb-3">@Model.Results.Count result(s) for "<strong>@Model.Query</strong>"</p>
+        <ul class="list-unstyled">
+        @foreach (var r in Model.Results)
+        {
+            <li class="mb-3">
+                <a href="@r.Slug" class="fw-semibold text-decoration-none">@r.Title</a>
+                <div class="text-muted small">@r.Slug</div>
+                @if (!string.IsNullOrEmpty(r.Excerpt))
+                {
+                    <div class="small mt-1">@r.Excerpt</div>
+                }
+            </li>
+        }
+        </ul>
+    }
+}

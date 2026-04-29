@@ -10,7 +10,7 @@ This guide takes you from **zero to production**. Follow each step in order. Exa
 2. [First Time Setup](#2-first-time-setup)
 3. [Daily Development Workflow](#3-daily-development-workflow)
 4. [Running Tests](#4-running-tests)
-5. [What Is Built — Phases 1 to 4 Status](#5-what-is-built--phases-1-to-4-status)
+5. [What Is Built — Phases 1 to 5 Status](#5-what-is-built--phases-1-to-5-status)
 6. [Creating a New Module](#6-creating-a-new-module)
 7. [Building and Packaging](#7-building-and-packaging)
 8. [Local Testing with Docker](#8-local-testing-with-docker)
@@ -377,7 +377,7 @@ Phase 1 tests verify that the EF + MongoDB repositories work correctly against r
 
 ---
 
-## 5. What Is Built — Phases 1 to 4 Status
+## 5. What Is Built — Phases 1 to 5 Status
 
 This section tells you exactly what is done, what is not done yet, and what patterns to follow when working in the existing code.
 
@@ -553,29 +553,115 @@ return FcmsFail("User not found.", errors: new[] { "ID invalid" });
 
 ---
 
-### Phase 4 — Module System 🔄 ~70% Done
+### Phase 4 — Module System ✅ Done
 
-Phase 4 is being shipped as a series of small sub-PRs. The discovery and wiring layers are in place; the lifecycle operations (activate/deactivate/uninstall) and the scaffold template are still TODO.
+**What exists:**
+- **Naming convention** — `FcmsHelper.GetEntityName<T>(modulePrefix)` produces snake_case + plural + prefix. `[FcmsTable("custom_name")]` overrides.
+- **Module abstractions** — `IFcmsModule`, `BaseModule`, `ModuleManifest` (deserialized `module.json`).
+- **Lifecycle hooks** — `CreateMigrationContext()` → EF `MigrateAsync()` at startup; `SeedDataAsync()` once per install; `OnUpgradeAsync(fromVersion)` on version change; `DropTablesAsync()` on uninstall with "Drop Tables".
+- **Discovery pipeline** — `ModuleLoader` + `ModuleManager` (topological sort by `DependsOn`, cycle detection) + `ModuleRegistry` singleton.
+- **Persistence** — `FcmsModuleRecord` (`fcms_module_records`): tracks `SeedCompleted`, `Version`, `Status`, `ActivatedAt`.
+- **DI auto-scan** — `[FcmsScoped]`, `[FcmsSingleton]`, `[FcmsHostedService]` attributes; `AttributeScanner` runs per module assembly.
+- **Wiring** — `AddFlexCms()` calls `RegisterServices()`, `AttributeScanner`, and `AddApplicationPart()` per active module.
+- **`IFcmsModelBuilder`** — modules implement this to inject their entities into the shared `FcmsDbContext`. Register as `services.AddSingleton<IFcmsModelBuilder, MyModelBuilder>()`.
+- **`ModuleActivationService`** (IHostedService) — runs at every startup per active module: wwwroot sync → `MigrateAsync()` → `SeedDataAsync()` (if not done) → `OnUpgradeAsync()` (if version changed).
+- **Admin UI** — `/admin/modules`: list with activate / deactivate / uninstall (type name + optional Drop Tables checkbox). Restart button. Dev-only `[+ Create New Module]` scaffold button.
+- **wwwroot sync** — `{moduleFolder}/wwwroot/` → `{webRoot}/modules/{moduleId}/` on activate; deleted on deactivate/uninstall.
+- **`dotnet new flexcms-module`** — template at `templates/flexcms-module/`. Install with `dotnet new install ./templates/flexcms-module`. Creates module class, DbContext, `module.json`, `.csproj`.
+- **Admin scaffold UI** — Development env only: `/admin/modules/scaffold` generates a new module folder from the template.
 
-**Done:**
-- **Naming convention** — `FcmsHelper.GetEntityName<T>(modulePrefix)` produces snake_case + plural + prefix. Used by every framework, core, and module entity. The prefix is only prepended when the snake-cased name does not already start with it. `[FcmsTable("custom_name")]` overrides the default.
-- **Module abstractions** — `IFcmsModule`, `BaseModule`, `ModuleManifest` (the deserialized `module.json`).
-- **Discovery pipeline** — `ModuleLoader` reads a DLL + embedded `module.json` and instantiates the module type; `ModuleManager` scans the `modules/` folder, topologically orders by `DependsOn`, and detects cyclic dependencies; `ModuleRegistry` is the singleton snapshot you inject when you want to enumerate modules.
-- **Persistence** — `FcmsModuleRecord` entity → table `fcms_module_records`. `SeedService` creates a row for each loaded module on every startup (idempotent, version-aware).
-- **DI auto-scan attributes** — `[FcmsScoped]`, `[FcmsSingleton]`, `[FcmsHostedService]`. Each accepts an optional service-type for interface mapping. `AttributeScanner` runs over each module's assembly.
-- **Wiring** — `AddFlexCms()` for every loaded module: calls `module.RegisterServices(services)`, runs `AttributeScanner`, and adds the assembly as an MVC `ApplicationPart` so its controllers and views are routable.
-- **Admin UI** — `/admin/modules` read-only list (name, version, prefix, dependencies, status, activation date). Empty state explains where to drop module folders.
+**Practical usage:** drop a built module folder under `modules/` → restart → Admin → Modules → Activate. The framework runs migrations, seeds data, syncs static assets, and makes the module's routes live — all automatically.
 
-**Still TODO (Phase 4 Sub-PR 4):**
-- Module **activate** flow — run module migrations, call `SeedDataAsync`, copy `wwwroot`, trigger restart
-- Module **deactivate** flow — wwwroot delete + restart
-- Module **uninstall** — Keep/Drop tables dialog (type module name to confirm)
-- Activate / Deactivate / Uninstall buttons on `/admin/modules`
-- `dotnet new flexcms-module -n Name` project template
+---
 
-**Practical impact today:** if you drop a module folder under `modules/` in the repo root, on the next app start the framework will discover it, register its services, route its controllers, and list it in the admin UI. The module behaves as if it were always part of the host — there is no opt-in toggle yet, and there is no migration runner. Use module entities only when you can run their migrations manually for now.
+### Phase 5 — CMS: Pages + Posts + Frontend ✅ Done
 
-**The "Creating a New Module" section below describes the target state.** Most of the workflow already works; the parts that don't (admin upload, activate button, scaffold template) are called out section-by-section.
+**What exists:**
+
+#### Entities (`FlexCms.Framework/Cms/`)
+- `FcmsPage` — hierarchical pages (`ParentId` self-ref), `Slug`, `Content`, `IsPublished`, `PublishedAt`, `AccessControl`, `PasswordHash`
+- `FcmsCategory` — hierarchical categories (`ParentId` self-ref)
+- `FcmsPost` — blog posts with `CategoryId` FK, `ViewCount`, `FeaturedImageUrl`
+- `FcmsTag` + `FcmsPostTag` — many-to-many tags (junction table `fcms_post_tags`)
+- `FcmsRedirect` — URL redirects with `FromPath`, `ToPath`, `StatusCode`, `HitCount`, `IsActive`
+- All CMS entities have `DeletedAt` (set on soft delete; used by trash cleanup)
+
+#### Services
+| Service | Interface | Key methods |
+|---|---|---|
+| `PageService` | `IPageService` | CRUD + `GetBySlugAsync`, `GetPublishedAsync`, `GetDeletedAsync`, `RestoreAsync`, `HardDeleteAsync` |
+| `PostService` | `IPostService` | CRUD + tag sync + `IncrementViewCountAsync`, `GetDeletedAsync`, `RestoreAsync`, `HardDeleteAsync` |
+| `CategoryService` | `ICategoryService` | CRUD + `GetBySlugAsync` |
+
+All services sanitize `Content` via `HtmlSanitizer.Sanitize()` before save.
+
+#### Security — HTML Sanitizer
+`HtmlSanitizer` (in `FlexCms.Framework/Cms/`) strips dangerous tags (`<script>`, `<style>`, `<iframe>`, `<form>`, etc.), `on*` event attributes, and `javascript:` hrefs. Called automatically by `PageService` and `PostService` — module developers should call it too:
+
+```csharp
+using FlexCms.Framework.Cms;
+
+var safe = HtmlSanitizer.Sanitize(userProvidedHtml);
+```
+
+#### Background Services
+| Service | Interval | What it does |
+|---|---|---|
+| `ScheduledPublishService` | 1 minute | Publishes pages/posts where `IsPublished=false` and `PublishedAt <= now` |
+| `TrashCleanupService` | 24 hours | Hard-deletes trashed items older than `TrashRetentionDays` (default 30, configurable via `FlexCmsOptions`) |
+
+#### Page Access Control
+`FcmsPage.AccessControl` is a `PageAccessControl` enum:
+
+| Value | Behaviour |
+|---|---|
+| `Public` | Anyone can view |
+| `AuthenticatedOnly` | Redirect to `/auth/login` if not logged in |
+| `PasswordProtected` | Show password form; session key set on correct entry |
+
+Password stored as SHA-256 hex. Set via admin page edit form.
+
+#### Scheduling Pages/Posts
+Set `IsPublished = false` + `ScheduledAt = <future datetime>` in the create/edit form. `ScheduledPublishService` auto-publishes when the time arrives. `PublishedAt` stores the actual publish time (set to `FcmsTime.Now` on immediate publish, or to the scheduled time when using the scheduler).
+
+**Always use `FcmsTime.Now` — never `DateTime.UtcNow`** — so the site timezone is respected.
+
+#### Admin Controllers (all under `/admin`)
+| Route | Controller | Permissions |
+|---|---|---|
+| `/admin/pages` | `PageController` | `pages.create/edit/delete` |
+| `/admin/categories` | `CategoryController` | `categories.create/edit/delete` |
+| `/admin/posts` | `PostController` | `posts.create/edit/delete` |
+| `/admin/trash` | `TrashController` | `pages.edit/delete`, `posts.edit/delete` |
+| `/admin/redirects` | `RedirectController` | `redirects.create/edit/delete` |
+
+#### Frontend Routes
+| URL | Controller | Notes |
+|---|---|---|
+| `/{slug}` | `FrontendController.Page` | CMS pages; enforces AccessControl |
+| `/blog` | `BlogController.Index` | Published posts list |
+| `/blog/{slug}` | `BlogController.Post` | Post detail + view count increment |
+| `/blog/category/{slug}` | `BlogController.Category` | Filtered by category |
+| `/search?q=` | `SearchController.Index` | Title + content search across pages + posts |
+| `/sitemap.xml` | `SitemapController` | XML sitemap, 1h cache |
+| `/rss` | `RssController` | RSS 2.0, latest 50 posts, 1h cache |
+
+#### RedirectMiddleware
+Registered after `SecurityHeadersMiddleware`, before `IpFilterMiddleware`. Checks GET/HEAD requests against `fcms_redirects` table. On match: issues 301/302 and fire-and-forgets a `HitCount` increment (via `ExecuteUpdateAsync` in a new scope — does not block the response).
+
+#### Trash System
+- Soft delete sets `IsDeleted = true` + `DeletedAt = FcmsTime.Now`
+- Admin trash UI at `/admin/trash`: restore (sets `IsPublished = false`, clears `IsDeleted`) or hard delete
+- `TrashCleanupService` permanently removes items where `DeletedAt < now - RetentionDays`
+- Configure retention: `FlexCmsOptions.TrashRetentionDays = 30` (default)
+
+#### DbContext CMS Configuration
+`FcmsDbContext` includes all CMS entities. Key points:
+- Pages and Categories: `Restrict` cascade on self-ref FK (prevents accidental cascade delete of hierarchies)
+- Posts → Category: `SetNull` on delete
+- PostTags: composite PK `(PostId, TagId)`, `Cascade` on both FKs, no soft-delete
+- Redirects: unique index on `FromPath`
+- Global soft-delete query filter on all `BaseEfEntity` types — use `.IgnoreQueryFilters()` to query trash
 
 ---
 
@@ -593,24 +679,27 @@ git push -u origin feature/blog-module
 
 ### Step 2: Scaffold the module
 
-**Option A — Use the CLI template (when published):**
+**Option A — CLI template (recommended):**
 
 ```bash
-dotnet new flexcms-module -n FlexCms.Blog -o modules/FlexCms.Blog
+# Install the template once (from repo root):
+dotnet new install ./templates/flexcms-module
+
+# Scaffold:
+dotnet new flexcms-module -n FlexCms.Blog --TablePrefix blog -o modules/FlexCms.Blog
 ```
 
-**Option B — Manual scaffold (until template is published):**
+**Option B — Admin UI (Development env only):**
+
+Open `http://localhost:5000/admin/modules` → click **`[+ Create New Module]`** → fill Module ID + Table Prefix → submit. The folder is created at `modules/{ModuleId}/` automatically.
+
+**Option C — Manual:**
 
 ```bash
 mkdir modules/FlexCms.Blog
 cd modules/FlexCms.Blog
-
-# Create the project
 dotnet new classlib -n FlexCms.Blog -f net10.0
 dotnet add reference ../../src/FlexCms.Framework/FlexCms.Framework.csproj
-dotnet add reference ../../src/FlexCms.Core/FlexCms.Core.csproj
-
-# Add to solution
 cd ../..
 dotnet sln add modules/FlexCms.Blog/FlexCms.Blog.csproj
 ```
@@ -662,27 +751,49 @@ modules/FlexCms.Blog/
 ```csharp
 using Microsoft.Extensions.DependencyInjection;
 using FlexCms.Framework.Modules;
-using FlexCms.Framework.Models;
+using Microsoft.EntityFrameworkCore;
 
 namespace FlexCms.Blog;
 
 public class BlogModule : BaseModule
 {
-    public override string ModuleId => "FlexCms.Blog";
-    public override string ModuleName => "Blog";
-    public override string Version => "1.0.0";
+    public override string ModuleId    => "FlexCms.Blog";
+    public override string ModuleName  => "Blog";
+    public override string Version     => "1.0.0";
+    public override string TablePrefix => "blog";
 
     public override void RegisterServices(IServiceCollection services)
     {
         services.AddScoped<Services.PostService>();
+        // Register IFcmsModelBuilder if you share entities with FcmsDbContext:
+        // services.AddSingleton<IFcmsModelBuilder, BlogModelBuilder>();
     }
 
-    public override List<FcmsPermissionDef> GetPermissions() => new()
+    public override DbContext? CreateMigrationContext(string connectionString, string provider)
     {
-        new(Permissions.BlogPermissions.PostCreate, "Create Post", group: "Blog"),
-        new(Permissions.BlogPermissions.PostEdit,   "Edit Post",   group: "Blog"),
-        new(Permissions.BlogPermissions.PostDelete, "Delete Post", group: "Blog"),
-    };
+        var opts = new DbContextOptionsBuilder<BlogDbContext>()
+            .UseMySql(connectionString, ServerVersion.AutoDetect(connectionString))
+            .Options;
+        return new BlogDbContext(opts);
+    }
+
+    public override async Task SeedDataAsync(IServiceProvider sp, CancellationToken ct = default)
+    {
+        // Insert initial data here — called once when SeedCompleted=false
+        await Task.CompletedTask;
+    }
+
+    public override async Task OnUpgradeAsync(string fromVersion, IServiceProvider sp, CancellationToken ct = default)
+    {
+        // Apply data migrations when Version in DB differs from current Version
+        await Task.CompletedTask;
+    }
+
+    public override async Task DropTablesAsync(string connectionString, string provider, CancellationToken ct = default)
+    {
+        // Drop all module tables — called on uninstall with "Drop Tables" option
+        await Task.CompletedTask;
+    }
 }
 ```
 

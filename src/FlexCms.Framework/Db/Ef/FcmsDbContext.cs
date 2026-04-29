@@ -1,3 +1,4 @@
+using FlexCms.Framework.Cms;
 using FlexCms.Framework.Auth;
 using FlexCms.Framework.Clock;
 using FlexCms.Framework.Db;
@@ -14,12 +15,31 @@ public class FcmsDbContext : IdentityDbContext<FcmsUser, FcmsRole, Guid>
     /// <summary>Framework table prefix — applied to every Core/Identity table.</summary>
     public const string FrameworkPrefix = "fcms";
 
-    public FcmsDbContext(DbContextOptions<FcmsDbContext> options) : base(options) { }
+    private readonly IEnumerable<IFcmsModelBuilder> _moduleBuilders;
+
+    /// <summary>Used by tests — no module builders.</summary>
+    public FcmsDbContext(DbContextOptions<FcmsDbContext> options)
+        : this(options, []) { }
+
+    /// <summary>Used by DI — module builders injected for OnModelCreating.</summary>
+    public FcmsDbContext(DbContextOptions<FcmsDbContext> options, IEnumerable<IFcmsModelBuilder> moduleBuilders)
+        : base(options)
+    {
+        _moduleBuilders = moduleBuilders;
+    }
 
     public DbSet<FcmsSettings> Settings => Set<FcmsSettings>();
     public DbSet<FcmsPermission> Permissions => Set<FcmsPermission>();
     public DbSet<FcmsRolePermission> RolePermissions => Set<FcmsRolePermission>();
     public DbSet<FcmsModuleRecord> ModuleRecords => Set<FcmsModuleRecord>();
+
+    // CMS
+    public DbSet<FcmsPage> Pages => Set<FcmsPage>();
+    public DbSet<FcmsCategory> Categories => Set<FcmsCategory>();
+    public DbSet<FcmsPost> Posts => Set<FcmsPost>();
+    public DbSet<FcmsTag> Tags => Set<FcmsTag>();
+    public DbSet<FcmsPostTag> PostTags => Set<FcmsPostTag>();
+    public DbSet<FcmsRedirect> Redirects => Set<FcmsRedirect>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -60,6 +80,75 @@ public class FcmsDbContext : IdentityDbContext<FcmsUser, FcmsRole, Guid>
         modelBuilder.Entity<FcmsModuleRecord>()
             .HasIndex(m => m.ModuleId)
             .IsUnique();
+
+        // ── CMS ────────────────────────────────────────────────────────────────
+
+        // Pages: self-referential hierarchy; restrict cascade to avoid cycles
+        modelBuilder.Entity<FcmsPage>()
+            .HasOne(p => p.Parent)
+            .WithMany(p => p.Children)
+            .HasForeignKey(p => p.ParentId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<FcmsPage>()
+            .HasIndex(p => p.Slug)
+            .IsUnique();
+
+        // Categories: self-referential hierarchy
+        modelBuilder.Entity<FcmsCategory>()
+            .HasOne(c => c.Parent)
+            .WithMany(c => c.Children)
+            .HasForeignKey(c => c.ParentId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<FcmsCategory>()
+            .HasIndex(c => c.Slug)
+            .IsUnique();
+
+        // Posts
+        modelBuilder.Entity<FcmsPost>()
+            .HasOne(p => p.Category)
+            .WithMany(c => c.Posts)
+            .HasForeignKey(p => p.CategoryId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        modelBuilder.Entity<FcmsPost>()
+            .HasIndex(p => p.Slug)
+            .IsUnique();
+
+        // Tags
+        modelBuilder.Entity<FcmsTag>()
+            .HasIndex(t => t.Slug)
+            .IsUnique();
+
+        // PostTags: explicit junction table — no soft-delete, composite PK
+        modelBuilder.Entity<FcmsPostTag>()
+            .HasKey(pt => new { pt.PostId, pt.TagId });
+
+        modelBuilder.Entity<FcmsPostTag>()
+            .ToTable("fcms_post_tags");
+
+        modelBuilder.Entity<FcmsPostTag>()
+            .HasOne(pt => pt.Post)
+            .WithMany(p => p.PostTags)
+            .HasForeignKey(pt => pt.PostId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<FcmsPostTag>()
+            .HasOne(pt => pt.Tag)
+            .WithMany(t => t.PostTags)
+            .HasForeignKey(pt => pt.TagId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        // Redirects: unique FromPath
+        modelBuilder.Entity<FcmsRedirect>()
+            .HasIndex(r => r.FromPath)
+            .IsUnique();
+
+        // Module builders — each registered IFcmsModelBuilder configures its
+        // own entities (tables, indexes, FKs) into this shared DbContext.
+        foreach (var builder in _moduleBuilders)
+            builder.Build(modelBuilder);
 
         // Apply soft-delete filter + auto-name table for every BaseEfEntity.
         // Module entities will follow the same convention with their own prefix

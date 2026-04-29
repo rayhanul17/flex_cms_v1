@@ -2,8 +2,11 @@ using FlexCms.Framework.Auth;
 using FlexCms.Framework.Db;
 using FlexCms.Framework.Modules;
 using FlexCms.Host.Models.Admin;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 namespace FlexCms.Host.Controllers.Admin;
 
@@ -16,19 +19,22 @@ public class ModulesController : BaseAdminController
     private readonly IRepository<FcmsModuleRecord> _records;
     private readonly IFcmsUnitOfWork _uow;
     private readonly IHostApplicationLifetime _lifetime;
+    private readonly IWebHostEnvironment _env;
 
     public ModulesController(
         ModuleRegistry registry,
         ModuleStateService state,
         IRepository<FcmsModuleRecord> records,
         IFcmsUnitOfWork uow,
-        IHostApplicationLifetime lifetime)
+        IHostApplicationLifetime lifetime,
+        IWebHostEnvironment env)
     {
         _registry = registry;
         _state = state;
         _records = records;
         _uow = uow;
         _lifetime = lifetime;
+        _env = env;
     }
 
     [HttpGet("")]
@@ -57,6 +63,7 @@ public class ModulesController : BaseAdminController
             }).ToList()
         };
 
+        ViewBag.IsDevelopment = _env.IsDevelopment();
         return View(vm);
     }
 
@@ -70,6 +77,7 @@ public class ModulesController : BaseAdminController
         if (!_state.Activate(module.FolderPath))
             return FcmsFail("Could not activate module — folder missing.");
 
+        _state.SyncWwwroot(module.FolderPath, _env.WebRootPath, module.ModuleId);
         return FcmsOk("Module activated. Restart the app to apply.");
     }
 
@@ -83,12 +91,13 @@ public class ModulesController : BaseAdminController
         if (!_state.Deactivate(module.FolderPath))
             return FcmsFail("Could not deactivate module — folder missing.");
 
+        _state.DeleteWwwroot(_env.WebRootPath, module.ModuleId);
         return FcmsOk("Module deactivated. Restart the app to apply.");
     }
 
     [HttpPost("uninstall/{id}")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Uninstall(string id, [FromForm] string confirmName, CancellationToken ct)
+    public async Task<IActionResult> Uninstall(string id, [FromForm] string confirmName, [FromForm] bool dropTables, CancellationToken ct)
     {
         var module = _registry.FindById(id);
         if (module is null) return FcmsFail("Module not found.");
@@ -99,6 +108,24 @@ public class ModulesController : BaseAdminController
 
         if (!_state.Uninstall(module.FolderPath))
             return FcmsFail("Could not schedule uninstall — folder missing.");
+
+        _state.DeleteWwwroot(_env.WebRootPath, module.ModuleId);
+
+        // Drop tables if requested (runs before the DLL is locked on next startup)
+        if (dropTables)
+        {
+            var opts = HttpContext.RequestServices.GetRequiredService<ModuleActivationOptions>();
+            try
+            {
+                await module.Instance.DropTablesAsync(opts.ConnectionString, opts.Provider, ct);
+            }
+            catch (Exception ex)
+            {
+                var logger = HttpContext.RequestServices
+                    .GetRequiredService<ILogger<ModulesController>>();
+                logger.LogError(ex, "Module {Id}: DropTablesAsync failed.", id);
+            }
+        }
 
         // Soft-delete the DB record now (folder will be removed on next startup
         // by ModuleManager.ProcessPendingUninstalls)
@@ -124,5 +151,67 @@ public class ModulesController : BaseAdminController
             return Task.CompletedTask;
         });
         return FcmsOk("Restart triggered.");
+    }
+
+    // ── Dev-mode scaffold ─────────────────────────────────────────────────────
+
+    [HttpGet("scaffold")]
+    public IActionResult Scaffold()
+    {
+        if (!_env.IsDevelopment()) return NotFound();
+        return View(new ScaffoldModuleViewModel());
+    }
+
+    [HttpPost("scaffold")]
+    [ValidateAntiForgeryToken]
+    public IActionResult ScaffoldPost(ScaffoldModuleViewModel model)
+    {
+        if (!_env.IsDevelopment()) return NotFound();
+        if (!ModelState.IsValid) return View("Scaffold", model);
+
+        var modulesRoot = Path.Combine(_env.ContentRootPath, "..", "modules");
+        var dest = Path.Combine(modulesRoot, model.ModuleId);
+
+        if (Directory.Exists(dest))
+        {
+            ModelState.AddModelError(nameof(model.ModuleId), "A module folder with this ID already exists.");
+            return View("Scaffold", model);
+        }
+
+        // Find template source relative to solution root
+        var templateSrc = Path.Combine(_env.ContentRootPath, "..", "templates",
+            "flexcms-module", "content", "FlexCms.Module.Name");
+
+        if (!Directory.Exists(templateSrc))
+            return FcmsFail("Template source not found. Run from the repository root.");
+
+        CopyAndReplace(templateSrc, dest, model.ModuleId, model.TablePrefix);
+        return FcmsOk($"Module '{model.ModuleId}' scaffolded to modules/{model.ModuleId}/. Open the project, implement your module, build, and restart.");
+    }
+
+    private static void CopyAndReplace(string src, string dest, string moduleId, string tablePrefix)
+    {
+        Directory.CreateDirectory(dest);
+        var shortName = moduleId.Split('.').Last();
+
+        foreach (var file in Directory.GetFiles(src, "*", SearchOption.AllDirectories))
+        {
+            var rel = Path.GetRelativePath(src, file);
+            var destRel = rel
+                .Replace("FlexCms.Module.Name", moduleId)
+                .Replace("FlexCms_Module_Name", moduleId.Replace(".", "_"))
+                .Replace("Name", shortName);
+
+            var destFile = Path.Combine(dest, destRel);
+            Directory.CreateDirectory(Path.GetDirectoryName(destFile)!);
+
+            var content = System.IO.File.ReadAllText(file)
+                .Replace("FlexCms.Module.Name", moduleId)
+                .Replace("FlexCms_Module_Name", moduleId.Replace(".", "_"))
+                .Replace("mod_prefix", tablePrefix)
+                .Replace("Name", shortName);
+
+            System.IO.File.WriteAllText(destFile, content);
+        }
     }
 }

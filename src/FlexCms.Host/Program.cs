@@ -99,6 +99,7 @@ if (app.Environment.IsDevelopment())
 
 app.UseMiddleware<FcmsExceptionMiddleware>();   // logs + generic page in production
 app.UseMiddleware<SecurityHeadersMiddleware>();
+app.UseMiddleware<RedirectMiddleware>();
 app.UseMiddleware<IpFilterMiddleware>();
 
 if (!app.Environment.IsDevelopment())
@@ -106,6 +107,7 @@ if (!app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 app.UseStaticFiles();
+app.UseSession();
 app.UseRouting();
 app.UseRateLimiter();
 app.UseAuthentication();
@@ -115,6 +117,13 @@ app.UseMiddleware<ForcePasswordChangeMiddleware>();
 app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Home}/{action=Index}/{id?}");
+
+// CMS page slug catch-all — must come after all other conventional routes
+// so attribute-routed controllers (admin, auth, blog) take priority.
+app.MapControllerRoute(
+    name: "cms-page",
+    pattern: "{slug}",
+    defaults: new { controller = "Frontend", action = "Page" });
 
 app.Run();
 

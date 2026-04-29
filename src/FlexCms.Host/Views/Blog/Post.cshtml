@@ -1,0 +1,50 @@
+@model FlexCms.Framework.Cms.FcmsPost
+@{
+    ViewData["Title"] = Model.MetaTitle ?? Model.Title;
+}
+
+@if (!string.IsNullOrEmpty(Model.MetaDescription))
+{
+    <meta name="description" content="@Model.MetaDescription" />
+}
+
+<div class="row">
+    <div class="col-md-8">
+        <article>
+            @if (!string.IsNullOrEmpty(Model.FeaturedImageUrl))
+            {
+                <img src="@Model.FeaturedImageUrl" class="img-fluid rounded mb-4" alt="@Model.Title" />
+            }
+
+            <h1>@Model.Title</h1>
+
+            <p class="text-muted small">
+                @Model.PublishedAt?.ToString("MMMM d, yyyy")
+                @if (Model.Category is not null)
+                {
+                    <span class="ms-2">
+                        in <a asp-controller="Blog" asp-action="Category" asp-route-categorySlug="@Model.Category.Slug">@Model.Category.Name</a>
+                    </span>
+                }
+                <span class="ms-2">· @Model.ViewCount views</span>
+            </p>
+
+            @if (Model.PostTags.Any())
+            {
+                <div class="mb-3">
+                    @foreach (var pt in Model.PostTags)
+                    {
+                        <span class="badge text-bg-secondary me-1">@pt.Tag.Name</span>
+                    }
+                </div>
+            }
+
+            <div class="cms-content">
+                @Html.Raw(Model.Content)
+            </div>
+        </article>
+
+        <hr />
+        <a asp-controller="Blog" asp-action="Index" class="btn btn-outline-secondary btn-sm">&larr; Back to blog</a>
+    </div>
+</div>

@@ -3,7 +3,13 @@
     ViewData["Title"] = "Modules";
 }
 
-<h4 class="mb-3">Installed Modules</h4>
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="mb-0">Installed Modules</h4>
+    @if (ViewBag.IsDevelopment == true)
+    {
+        <a asp-action="Scaffold" class="btn btn-sm btn-outline-secondary">+ Create New Module</a>
+    }
+</div>
 
 @if (!Model.Modules.Any())
 {
@@ -149,14 +155,42 @@ else
         const row = rowFor(btn);
         const id = row.dataset.moduleId;
         const name = row.dataset.moduleName;
-        const confirmName = prompt(`Uninstall will delete the module folder on next restart.\n\nType the module name to confirm:\n  ${name}`);
-        if (confirmName !== name) {
-            if (confirmName !== null) alert('Name did not match — uninstall cancelled.');
-            return;
-        }
-        const res = await post(`/admin/modules/uninstall/${encodeURIComponent(id)}`, { confirmName });
-        if (res.isSuccess) showRestart();
-        else alert(res.message);
+
+        // Build a modal-like dialog using a hidden div
+        const dlg = document.createElement('div');
+        dlg.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center';
+        dlg.innerHTML = `
+          <div style="background:#fff;padding:1.5rem;border-radius:.5rem;max-width:420px;width:90%">
+            <h6 class="mb-3">Uninstall <strong>${name}</strong>?</h6>
+            <p class="small text-muted mb-2">The module folder will be deleted on next restart.</p>
+            <div class="mb-3">
+              <label class="form-label small">Type the module name to confirm:</label>
+              <input id="dlg-confirm" class="form-control form-control-sm" placeholder="${name}" />
+            </div>
+            <div class="form-check mb-3">
+              <input class="form-check-input" type="checkbox" id="dlg-drop">
+              <label class="form-check-label small text-danger" for="dlg-drop">Drop all database tables owned by this module</label>
+            </div>
+            <div class="d-flex gap-2 justify-content-end">
+              <button id="dlg-cancel" class="btn btn-sm btn-secondary">Cancel</button>
+              <button id="dlg-ok" class="btn btn-sm btn-danger">Uninstall</button>
+            </div>
+          </div>`;
+        document.body.appendChild(dlg);
+
+        dlg.querySelector('#dlg-cancel').addEventListener('click', () => document.body.removeChild(dlg));
+        dlg.querySelector('#dlg-ok').addEventListener('click', async () => {
+            const confirmName = dlg.querySelector('#dlg-confirm').value;
+            const dropTables = dlg.querySelector('#dlg-drop').checked;
+            document.body.removeChild(dlg);
+            if (confirmName !== name) {
+                alert('Name did not match — uninstall cancelled.');
+                return;
+            }
+            const res = await post(`/admin/modules/uninstall/${encodeURIComponent(id)}`, { confirmName, dropTables });
+            if (res.isSuccess) showRestart();
+            else alert(res.message);
+        });
     }));
 
     document.getElementById('restartBtn')?.addEventListener('click', async () => {

@@ -9,11 +9,13 @@
 ### Scaffold a new module
 
 ```bash
-# Option A — CLI (when template package is published):
-dotnet new flexcms-module -n MyCompany.Blog -o modules/MyCompany.Blog
+# Option A — CLI template (install once from repo root):
+dotnet new install ./templates/flexcms-module
+dotnet new flexcms-module -n MyCompany.Blog --TablePrefix blog -o modules/MyCompany.Blog
 
-# Option B — Admin UI (Dev mode only):
-# https://localhost:5000/admin → Modules → [+ Create New Module] → fill form → Download ZIP
+# Option B — Admin UI (Development env only):
+# http://localhost:5000/admin/modules → [+ Create New Module] → fill form → submit
+# Folder is generated at modules/{ModuleId}/ automatically.
 ```
 
 ### Internal module (you have repo source access)
@@ -250,7 +252,7 @@ docker exec flexcms_flexcms_1 unzip /app/modules/MyCompany.Blog.zip -d /app/modu
 - [ ] All async methods accept `CancellationToken`
 - [ ] All entities follow `IBaseEntity` (Guid Id, audit fields)
 - [ ] DTOs (NOT entities) used for form/API binding
-- [ ] HTML content sanitized via `FcmsHtmlSanitizer.Sanitize()` before save
+- [ ] HTML content sanitized via `HtmlSanitizer.Sanitize()` (in `FlexCms.Framework.Cms`) before save
 - [ ] `SeedDataAsync` is **idempotent** (uses `UpsertAsync`, not `InsertAsync`)
 - [ ] i18n strings in resx files, no hardcoded English/Bangla
 - [ ] Migrations tested on a fresh DB

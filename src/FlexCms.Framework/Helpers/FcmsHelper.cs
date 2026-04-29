@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Reflection;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.WebUtilities;
@@ -157,6 +158,24 @@ public static class FcmsHelper
         if (string.IsNullOrWhiteSpace(value)) return null;
         try { return Encoding.UTF8.GetString(WebEncoders.Base64UrlDecode(value)); }
         catch { return null; }
+    }
+
+    // ── Security helpers ───────────────────────────────────────────────────
+
+    // Fixed purpose key — protects against rainbow tables for page passwords.
+    // Changing this invalidates all stored PasswordHash values in FcmsPage.
+    private static readonly byte[] PagePasswordKey =
+        Encoding.UTF8.GetBytes("FlexCms.PagePassword.v1");
+
+    /// <summary>
+    /// Hashes a page protection password with HMACSHA256 using a fixed purpose key.
+    /// The returned hex string is stored in <c>FcmsPage.PasswordHash</c>.
+    /// </summary>
+    public static string HashPagePassword(string password)
+    {
+        using var hmac = new HMACSHA256(PagePasswordKey);
+        var bytes = hmac.ComputeHash(Encoding.UTF8.GetBytes(password));
+        return Convert.ToHexString(bytes).ToLowerInvariant();
     }
 
     // ── DateTime helpers ───────────────────────────────────────────────────

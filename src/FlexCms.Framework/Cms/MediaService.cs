@@ -14,7 +14,7 @@ public class MediaService : IMediaService
         { ".png",  [[0x89, 0x50, 0x4E, 0x47]] },
         { ".gif",  [[0x47, 0x49, 0x46, 0x38]] },
         { ".webp", [[0x52, 0x49, 0x46, 0x46]] },
-        { ".svg",  [] },  // text-based, no magic bytes — validated by MIME only
+        // SVG intentionally excluded — XSS risk without a dedicated sanitizer
         { ".pdf",  [[0x25, 0x50, 0x44, 0x46]] },
         { ".mp4",  [[0x00, 0x00, 0x00, 0x18, 0x66, 0x74, 0x79, 0x70], [0x00, 0x00, 0x00, 0x20, 0x66, 0x74, 0x79, 0x70]] },
         { ".mp3",  [[0x49, 0x44, 0x33], [0xFF, 0xFB]] },
@@ -23,7 +23,7 @@ public class MediaService : IMediaService
 
     private static readonly HashSet<string> AllowedExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
-        ".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg",
+        ".jpg", ".jpeg", ".png", ".gif", ".webp",
         ".pdf", ".mp4", ".mp3", ".zip"
     };
 

@@ -1,6 +1,7 @@
 using FlexCms.Framework.Extensions;
 using FlexCms.Framework.Middleware;
 using FlexCms.Framework.Setup;
+using Microsoft.AspNetCore.HttpOverrides;
 using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -97,9 +98,13 @@ var app = builder.Build();
 if (app.Environment.IsDevelopment())
     app.UseDeveloperExceptionPage();   // full stack trace in browser
 
+app.UseForwardedHeaders(new ForwardedHeadersOptions
+{
+    ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
+});
+
 app.UseMiddleware<FcmsExceptionMiddleware>();   // logs + generic page in production
 app.UseMiddleware<SecurityHeadersMiddleware>();
-app.UseMiddleware<RedirectMiddleware>();
 app.UseMiddleware<IpFilterMiddleware>();
 
 if (!app.Environment.IsDevelopment())
@@ -107,6 +112,7 @@ if (!app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 app.UseStaticFiles();
+app.UseMiddleware<RedirectMiddleware>();   // after static files — no DB hit per asset
 app.UseSession();
 app.UseRouting();
 app.UseRateLimiter();

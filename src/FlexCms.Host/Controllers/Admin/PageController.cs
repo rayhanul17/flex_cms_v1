@@ -1,11 +1,10 @@
 using FlexCms.Framework.Auth;
 using FlexCms.Framework.Clock;
 using FlexCms.Framework.Cms;
+using FlexCms.Framework.Helpers;
 using FlexCms.Host.Models.Admin;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
-using System.Security.Cryptography;
-using System.Text;
 
 namespace FlexCms.Host.Controllers.Admin;
 
@@ -153,11 +152,7 @@ public class PageController : BaseAdminController
 
     // ── Helper ────────────────────────────────────────────────────────────────
 
-    private static string HashPassword(string password)
-    {
-        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(password));
-        return Convert.ToHexString(bytes).ToLowerInvariant();
-    }
+    private static string HashPassword(string password) => FcmsHelper.HashPagePassword(password);
 
     private async Task<List<SelectListItem>> GetParentSelectListAsync(CancellationToken ct, Guid? excludeId = null)
     {

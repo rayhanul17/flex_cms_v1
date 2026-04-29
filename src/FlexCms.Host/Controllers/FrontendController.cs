@@ -1,7 +1,6 @@
 using FlexCms.Framework.Cms;
+using FlexCms.Framework.Helpers;
 using Microsoft.AspNetCore.Mvc;
-using System.Security.Cryptography;
-using System.Text;
 
 namespace FlexCms.Host.Controllers;
 
@@ -43,9 +42,5 @@ public class FrontendController : Controller
         return View(page);
     }
 
-    internal static string HashPassword(string password)
-    {
-        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(password));
-        return Convert.ToHexString(bytes).ToLowerInvariant();
-    }
+    internal static string HashPassword(string password) => FcmsHelper.HashPagePassword(password);
 }

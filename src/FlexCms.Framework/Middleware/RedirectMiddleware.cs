@@ -1,6 +1,6 @@
+using FlexCms.Framework.Db;
 using FlexCms.Framework.Db.Ef;
 using Microsoft.AspNetCore.Http;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -26,12 +26,10 @@ public class RedirectMiddleware
         if (ctx.Request.Method is "GET" or "HEAD")
         {
             var path = ctx.Request.Path.Value ?? "/";
-            var db = ctx.RequestServices.GetService<FcmsDbContext>();
-            if (db is not null)
+            var repo = ctx.RequestServices.GetService<IRepository<Cms.FcmsRedirect>>();
+            if (repo is not null)
             {
-                var redirect = await db.Redirects
-                    .AsNoTracking()
-                    .FirstOrDefaultAsync(r => !r.IsDeleted && r.IsActive && r.FromPath == path);
+                var redirect = await repo.FirstOrDefaultAsync(r => r.IsActive && r.FromPath == path);
 
                 if (redirect is not null)
                 {
@@ -54,10 +52,13 @@ public class RedirectMiddleware
         try
         {
             await using var scope = services.CreateAsyncScope();
-            var db = scope.ServiceProvider.GetRequiredService<FcmsDbContext>();
-            await db.Redirects
-                .Where(r => r.Id == redirectId)
-                .ExecuteUpdateAsync(s => s.SetProperty(r => r.HitCount, r => r.HitCount + 1));
+            var repo = scope.ServiceProvider.GetRequiredService<IRepository<Cms.FcmsRedirect>>();
+            var redirect = await repo.GetByIdAsync(redirectId);
+            if (redirect is not null)
+            {
+                redirect.HitCount++;
+                await repo.UpdateAsync(redirect);
+            }
         }
         catch (Exception ex)
         {

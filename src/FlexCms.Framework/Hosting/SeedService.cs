@@ -30,10 +30,24 @@ public class SeedService : IHostedService
 
     public async Task StartAsync(CancellationToken ct)
     {
-        // Seed module records on every startup (cheap, idempotent) regardless
-        // of whether admin seeding still needs to run.
-        await SeedModuleRecordsAsync(ct);
-        await SeedPermissionsAsync(ct);
+        try
+        {
+            // Seed module records on every startup (cheap, idempotent)
+            await SeedModuleRecordsAsync(ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "SeedService: failed to seed module records.");
+        }
+
+        try
+        {
+            await SeedPermissionsAsync(ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "SeedService: failed to seed permissions.");
+        }
 
         var config = _setupHelper.Read();
         if (config is null || !config.IsSetupComplete || config.AdminSeeded)
@@ -45,58 +59,69 @@ public class SeedService : IHostedService
             return;
         }
 
-        await using var scope = _scopeFactory.CreateAsyncScope();
-        var userManager = scope.ServiceProvider.GetRequiredService<UserManager<FcmsUser>>();
-        var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<FcmsRole>>();
-
-        // 1. Ensure SuperAdmin role exists
-        if (!await roleManager.RoleExistsAsync(FcmsRoles.SuperAdmin))
+        try
         {
-            var roleResult = await roleManager.CreateAsync(new FcmsRole { Name = FcmsRoles.SuperAdmin });
-            if (!roleResult.Succeeded)
-            {
-                _logger.LogError("SeedService: failed to create SuperAdmin role — {Errors}",
-                    string.Join(", ", roleResult.Errors.Select(e => e.Description)));
-                return;
-            }
-        }
+            await using var scope = _scopeFactory.CreateAsyncScope();
+            var userManager = scope.ServiceProvider.GetRequiredService<UserManager<FcmsUser>>();
+            var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<FcmsRole>>();
 
-        // 2. Create admin user if not exists
-        var existingUser = await userManager.FindByEmailAsync(config.AdminEmail);
-        if (existingUser is null)
+            // 1. Ensure SuperAdmin role exists
+            if (!await roleManager.RoleExistsAsync(FcmsRoles.SuperAdmin))
+            {
+                var roleResult = await roleManager.CreateAsync(new FcmsRole { Name = FcmsRoles.SuperAdmin });
+                if (!roleResult.Succeeded)
+                {
+                    _logger.LogError("SeedService: failed to create SuperAdmin role — {Errors}",
+                        string.Join(", ", roleResult.Errors.Select(e => e.Description)));
+                    return;
+                }
+            }
+
+            // 2. Create admin user if not exists
+            var user = await userManager.FindByEmailAsync(config.AdminEmail);
+            if (user is null)
+            {
+                string plainPassword;
+                try { plainPassword = _setupHelper.DecryptPassword(config.AdminPasswordEncrypted); }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "SeedService: failed to decrypt admin password — skipping seed.");
+                    return;
+                }
+
+                user = new FcmsUser
+                {
+                    UserName = config.AdminEmail,
+                    Email = config.AdminEmail,
+                    EmailConfirmed = true,
+                    ForcePasswordChange = false
+                };
+
+                var createResult = await userManager.CreateAsync(user, plainPassword);
+                if (!createResult.Succeeded)
+                {
+                    _logger.LogError("SeedService: failed to create admin user — {Errors}",
+                        string.Join(", ", createResult.Errors.Select(e => e.Description)));
+                    return;
+                }
+            }
+
+            // Ensure user is in SuperAdmin role
+            if (!await userManager.IsInRoleAsync(user, FcmsRoles.SuperAdmin))
+            {
+                await userManager.AddToRoleAsync(user, FcmsRoles.SuperAdmin);
+                _logger.LogInformation("SeedService: admin user {Email} added to SuperAdmin.", config.AdminEmail);
+            }
+
+            // 3. Mark seeded + clear stored password
+            config.AdminSeeded = true;
+            config.AdminPasswordEncrypted = string.Empty;
+            _setupHelper.Write(config);
+        }
+        catch (Exception ex)
         {
-            string plainPassword;
-            try { plainPassword = _setupHelper.DecryptPassword(config.AdminPasswordEncrypted); }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "SeedService: failed to decrypt admin password — skipping seed.");
-                return;
-            }
-
-            var user = new FcmsUser
-            {
-                UserName = config.AdminEmail,
-                Email = config.AdminEmail,
-                EmailConfirmed = true,
-                ForcePasswordChange = false
-            };
-
-            var createResult = await userManager.CreateAsync(user, plainPassword);
-            if (!createResult.Succeeded)
-            {
-                _logger.LogError("SeedService: failed to create admin user — {Errors}",
-                    string.Join(", ", createResult.Errors.Select(e => e.Description)));
-                return;
-            }
-
-            await userManager.AddToRoleAsync(user, FcmsRoles.SuperAdmin);
-            _logger.LogInformation("SeedService: admin user {Email} created and added to SuperAdmin.", config.AdminEmail);
+            _logger.LogError(ex, "SeedService: failed during admin/role seeding.");
         }
-
-        // 3. Mark seeded + clear stored password
-        config.AdminSeeded = true;
-        config.AdminPasswordEncrypted = string.Empty;
-        _setupHelper.Write(config);
     }
 
     public Task StopAsync(CancellationToken ct) => Task.CompletedTask;

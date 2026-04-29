@@ -72,8 +72,13 @@ public class FcmsDbContext : IdentityDbContext<FcmsUser, FcmsRole, Guid>
         modelBuilder.Entity<IdentityRoleClaim<Guid>>().ToTable("fcms_role_claims");
         modelBuilder.Entity<IdentityUserToken<Guid>>().ToTable("fcms_user_tokens");
 
-        // Roles list is embedded in Mongo only; ignore in EF
+        // Embedded collections used in Mongo only; ignore in EF
         modelBuilder.Entity<FcmsUser>().Ignore(u => u.Roles);
+        modelBuilder.Entity<FcmsUser>().Ignore(u => u.Claims);
+        modelBuilder.Entity<FcmsUser>().Ignore(u => u.Logins);
+        modelBuilder.Entity<FcmsUser>().Ignore(u => u.Tokens);
+
+        modelBuilder.Entity<FcmsRole>().Ignore(r => r.Claims);
 
         // Unique index: one permission key per role
         modelBuilder.Entity<FcmsRolePermission>()
@@ -138,9 +143,10 @@ public class FcmsDbContext : IdentityDbContext<FcmsUser, FcmsRole, Guid>
             .HasIndex(t => t.Slug)
             .IsUnique();
 
-        // PostTags: explicit junction table — no soft-delete, composite PK
+        // PostTags: junction table with unique index
         modelBuilder.Entity<FcmsPostTag>()
-            .HasKey(pt => new { pt.PostId, pt.TagId });
+            .HasIndex(pt => new { pt.PostId, pt.TagId })
+            .IsUnique();
 
         modelBuilder.Entity<FcmsPostTag>()
             .ToTable("fcms_post_tags");

@@ -21,11 +21,17 @@ public class EfRepository<T> : IRepository<T> where T : BaseEfEntity
     public async Task<List<T>> GetAllAsync(CancellationToken ct = default)
         => await _set.Where(e => !e.IsDeleted).ToListAsync(ct);
 
-    public async Task<List<T>> FindAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default)
-        => await _set.Where(e => !e.IsDeleted).Where(predicate).ToListAsync(ct);
+    public async Task<List<T>> FindAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default, bool includeDeleted = false)
+    {
+        var query = includeDeleted ? _set.IgnoreQueryFilters() : _set.Where(e => !e.IsDeleted);
+        return await query.Where(predicate).ToListAsync(ct);
+    }
 
-    public async Task<T?> FirstOrDefaultAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default)
-        => await _set.Where(e => !e.IsDeleted).FirstOrDefaultAsync(predicate, ct);
+    public async Task<T?> FirstOrDefaultAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default, bool includeDeleted = false)
+    {
+        var query = includeDeleted ? _set.IgnoreQueryFilters() : _set.Where(e => !e.IsDeleted);
+        return await query.FirstOrDefaultAsync(predicate, ct);
+    }
 
     public async Task<bool> ExistsAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default)
         => await _set.Where(e => !e.IsDeleted).AnyAsync(predicate, ct);

@@ -11,7 +11,7 @@ using MongoDB.Driver;
 
 namespace FlexCms.Framework.Db.MongoDb;
 
-public class MongoRepository<T> : IRepository<T>, IMongoSessionAware where T : BaseMongoEntity
+public class MongoRepository<T> : IRepository<T>, IMongoSessionAware where T : class, IBaseEntity, new()
 {
     protected readonly IMongoCollection<T> _collection;
     private readonly IHttpContextAccessor? _httpContextAccessor;
@@ -21,7 +21,7 @@ public class MongoRepository<T> : IRepository<T>, IMongoSessionAware where T : B
 
     public MongoRepository(IMongoDatabase database, IHttpContextAccessor? httpContextAccessor = null)
     {
-        var collectionName = typeof(T).Name.ToLowerInvariant() + "s";
+        var collectionName = Helpers.FcmsHelper.GetEntityName<T>("fcms");
         _collection = database.GetCollection<T>(collectionName);
         _httpContextAccessor = httpContextAccessor;
     }
@@ -54,18 +54,18 @@ public class MongoRepository<T> : IRepository<T>, IMongoSessionAware where T : B
         return await result.ToListAsync(ct);
     }
 
-    public async Task<List<T>> FindAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default)
+    public async Task<List<T>> FindAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default, bool includeDeleted = false)
     {
-        var f = Filter.And(NotDeleted, Filter.Where(predicate));
+        var f = includeDeleted ? Filter.Where(predicate) : Filter.And(NotDeleted, Filter.Where(predicate));
         var result = _session is not null
             ? await _collection.FindAsync(_session, f, cancellationToken: ct)
             : await _collection.FindAsync(f, cancellationToken: ct);
         return await result.ToListAsync(ct);
     }
 
-    public async Task<T?> FirstOrDefaultAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default)
+    public async Task<T?> FirstOrDefaultAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default, bool includeDeleted = false)
     {
-        var f = Filter.And(NotDeleted, Filter.Where(predicate));
+        var f = includeDeleted ? Filter.Where(predicate) : Filter.And(NotDeleted, Filter.Where(predicate));
         var result = _session is not null
             ? await _collection.FindAsync(_session, f, cancellationToken: ct)
             : await _collection.FindAsync(f, cancellationToken: ct);

@@ -108,7 +108,12 @@ app.UseMiddleware<SecurityHeadersMiddleware>();
 app.UseMiddleware<IpFilterMiddleware>();
 
 if (!app.Environment.IsDevelopment())
+{
+    app.UseExceptionHandler("/Home/Error");
     app.UseHsts();
+}
+
+app.UseStatusCodePagesWithReExecute("/Home/Error/{0}");
 
 app.UseHttpsRedirection();
 app.UseStaticFiles();

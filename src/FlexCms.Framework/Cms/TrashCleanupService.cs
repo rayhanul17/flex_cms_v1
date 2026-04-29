@@ -1,6 +1,5 @@
 using FlexCms.Framework.Clock;
-using FlexCms.Framework.Db.Ef;
-using Microsoft.EntityFrameworkCore;
+using FlexCms.Framework.Db;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -42,32 +41,25 @@ public class TrashCleanupService : BackgroundService
     private async Task PurgeOldTrashAsync(CancellationToken ct)
     {
         await using var scope = _scopes.CreateAsyncScope();
-        var db = scope.ServiceProvider.GetRequiredService<FcmsDbContext>();
+        var pageRepo = scope.ServiceProvider.GetRequiredService<Db.IRepository<FcmsPage>>();
+        var postRepo = scope.ServiceProvider.GetRequiredService<Db.IRepository<FcmsPost>>();
+        var postTagRepo = scope.ServiceProvider.GetRequiredService<Db.IRepository<FcmsPostTag>>();
         var cutoff = FcmsTime.Now.AddDays(-_opts.RetentionDays);
 
-        var oldPages = await db.Pages
-            .IgnoreQueryFilters()
-            .Where(p => p.IsDeleted && p.DeletedAt != null && p.DeletedAt < cutoff)
-            .ToListAsync(ct);
+        var oldPages = await pageRepo.FindAsync(p => p.IsDeleted && p.DeletedAt != null && p.DeletedAt < cutoff, ct: ct, includeDeleted: true);
+        var oldPosts = await postRepo.FindAsync(p => p.IsDeleted && p.DeletedAt != null && p.DeletedAt < cutoff, ct: ct, includeDeleted: true);
 
-        var oldPosts = await db.Posts
-            .IgnoreQueryFilters()
-            .Where(p => p.IsDeleted && p.DeletedAt != null && p.DeletedAt < cutoff)
-            .ToListAsync(ct);
+        foreach (var page in oldPages) await pageRepo.DeleteAsync(page, ct);
 
-        if (oldPages.Count > 0) db.Pages.RemoveRange(oldPages);
-
-        if (oldPosts.Count > 0)
+        foreach (var post in oldPosts)
         {
-            var postIds = oldPosts.Select(p => p.Id).ToList();
-            var tags = await db.PostTags.Where(pt => postIds.Contains(pt.PostId)).ToListAsync(ct);
-            db.PostTags.RemoveRange(tags);
-            db.Posts.RemoveRange(oldPosts);
+            var tags = await postTagRepo.FindAsync(pt => pt.PostId == post.Id, ct: ct, includeDeleted: true);
+            foreach (var tag in tags) await postTagRepo.DeleteAsync(tag, ct);
+            await postRepo.DeleteAsync(post, ct);
         }
 
         if (oldPages.Count + oldPosts.Count > 0)
         {
-            await db.SaveChangesAsync(ct);
             _logger.LogInformation("TrashCleanup: purged {Pages} page(s), {Posts} post(s).", oldPages.Count, oldPosts.Count);
         }
     }

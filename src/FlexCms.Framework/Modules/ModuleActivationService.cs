@@ -46,7 +46,8 @@ public class ModuleActivationService : IHostedService
         if (activeModules.Count == 0) return;
 
         await using var scope = _scopes.CreateAsyncScope();
-        var db = scope.ServiceProvider.GetRequiredService<FcmsDbContext>();
+        var repo = scope.ServiceProvider.GetService<Db.IRepository<FcmsModuleRecord>>();
+        if (repo is null) return;
 
         foreach (var loaded in activeModules)
         {
@@ -75,8 +76,7 @@ public class ModuleActivationService : IHostedService
             }
 
             // ── 2. Seed data (first activation only) ─────────────────────────
-            var record = await db.ModuleRecords
-                .FirstOrDefaultAsync(r => r.ModuleId == module.ModuleId, ct);
+            var record = await repo.FirstOrDefaultAsync(r => r.ModuleId == module.ModuleId, ct);
 
             if (record is null)
             {
@@ -87,8 +87,7 @@ public class ModuleActivationService : IHostedService
                     Status = "Active",
                     ActivatedAt = DateTime.UtcNow
                 };
-                db.ModuleRecords.Add(record);
-                await db.SaveChangesAsync(ct);
+                await repo.AddAsync(record, ct);
             }
 
             if (!record.SeedCompleted)
@@ -98,7 +97,7 @@ public class ModuleActivationService : IHostedService
                     await module.SeedDataAsync(scope.ServiceProvider, ct);
                     record.SeedCompleted = true;
                     record.Version = module.Version;
-                    await db.SaveChangesAsync(ct);
+                    await repo.UpdateAsync(record, ct);
                     _logger.LogInformation("Module {Id}: seed completed.", module.ModuleId);
                 }
                 catch (Exception ex)
@@ -115,7 +114,7 @@ public class ModuleActivationService : IHostedService
                     var fromVersion = record.Version;
                     await module.OnUpgradeAsync(fromVersion, scope.ServiceProvider, ct);
                     record.Version = module.Version;
-                    await db.SaveChangesAsync(ct);
+                    await repo.UpdateAsync(record, ct);
                     _logger.LogInformation("Module {Id}: upgraded {From} → {To}.",
                         module.ModuleId, fromVersion, module.Version);
                 }

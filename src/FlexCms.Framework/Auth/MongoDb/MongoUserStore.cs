@@ -9,14 +9,22 @@ public class MongoUserStore :
     IUserEmailStore<FcmsUser>,
     IUserLockoutStore<FcmsUser>,
     IUserRoleStore<FcmsUser>,
-    IUserSecurityStampStore<FcmsUser>
+    IUserSecurityStampStore<FcmsUser>,
+    IQueryableUserStore<FcmsUser>,
+    IUserClaimStore<FcmsUser>,
+    IUserLoginStore<FcmsUser>,
+    IUserTwoFactorStore<FcmsUser>,
+    IUserPhoneNumberStore<FcmsUser>,
+    IUserAuthenticationTokenStore<FcmsUser>
 {
     private readonly IMongoCollection<FcmsUser> _users;
 
     public MongoUserStore(IMongoDatabase database)
     {
-        _users = database.GetCollection<FcmsUser>("fcmsusers");
+        _users = database.GetCollection<FcmsUser>(Helpers.FcmsHelper.GetEntityName<FcmsUser>("fcms"));
     }
+
+    public IQueryable<FcmsUser> Users => _users.AsQueryable();
 
     private FilterDefinition<FcmsUser> ById(string userId) =>
         Builders<FcmsUser>.Filter.Eq(u => u.Id, Guid.Parse(userId));
@@ -184,6 +192,121 @@ public class MongoUserStore :
 
     public Task<string?> GetSecurityStampAsync(FcmsUser user, CancellationToken ct) =>
         Task.FromResult(user.SecurityStamp);
+
+    // IUserClaimStore
+    public Task<IList<System.Security.Claims.Claim>> GetClaimsAsync(FcmsUser user, CancellationToken ct)
+        => Task.FromResult<IList<System.Security.Claims.Claim>>(user.Claims.Select(c => c.ToClaim()).ToList());
+
+    public Task AddClaimsAsync(FcmsUser user, IEnumerable<System.Security.Claims.Claim> claims, CancellationToken ct)
+    {
+        foreach (var claim in claims)
+            user.Claims.Add(new IdentityUserClaim<Guid> { UserId = user.Id, ClaimType = claim.Type, ClaimValue = claim.Value });
+        return Task.CompletedTask;
+    }
+
+    public Task ReplaceClaimAsync(FcmsUser user, System.Security.Claims.Claim claim, System.Security.Claims.Claim newClaim, CancellationToken ct)
+    {
+        var existing = user.Claims.FirstOrDefault(c => c.ClaimType == claim.Type && c.ClaimValue == claim.Value);
+        if (existing is not null)
+        {
+            existing.ClaimType = newClaim.Type;
+            existing.ClaimValue = newClaim.Value;
+        }
+        return Task.CompletedTask;
+    }
+
+    public Task RemoveClaimsAsync(FcmsUser user, IEnumerable<System.Security.Claims.Claim> claims, CancellationToken ct)
+    {
+        foreach (var claim in claims)
+        {
+            var existing = user.Claims.FirstOrDefault(c => c.ClaimType == claim.Type && c.ClaimValue == claim.Value);
+            if (existing is not null) user.Claims.Remove(existing);
+        }
+        return Task.CompletedTask;
+    }
+
+    public async Task<IList<FcmsUser>> GetUsersForClaimAsync(System.Security.Claims.Claim claim, CancellationToken ct)
+    {
+        var filter = Builders<FcmsUser>.Filter.ElemMatch(u => u.Claims, c => c.ClaimType == claim.Type && c.ClaimValue == claim.Value);
+        return await _users.Find(filter).ToListAsync(ct);
+    }
+
+    // IUserLoginStore
+    public Task AddLoginAsync(FcmsUser user, UserLoginInfo login, CancellationToken ct)
+    {
+        user.Logins.Add(new IdentityUserLogin<Guid> { UserId = user.Id, LoginProvider = login.LoginProvider, ProviderKey = login.ProviderKey, ProviderDisplayName = login.ProviderDisplayName });
+        return Task.CompletedTask;
+    }
+
+    public Task RemoveLoginAsync(FcmsUser user, string loginProvider, string providerKey, CancellationToken ct)
+    {
+        var existing = user.Logins.FirstOrDefault(l => l.LoginProvider == loginProvider && l.ProviderKey == providerKey);
+        if (existing is not null) user.Logins.Remove(existing);
+        return Task.CompletedTask;
+    }
+
+    public Task<IList<UserLoginInfo>> GetLoginsAsync(FcmsUser user, CancellationToken ct)
+        => Task.FromResult<IList<UserLoginInfo>>(user.Logins.Select(l => new UserLoginInfo(l.LoginProvider, l.ProviderKey, l.ProviderDisplayName)).ToList());
+
+    public async Task<FcmsUser?> FindByLoginAsync(string loginProvider, string providerKey, CancellationToken ct)
+    {
+        var filter = Builders<FcmsUser>.Filter.ElemMatch(u => u.Logins, l => l.LoginProvider == loginProvider && l.ProviderKey == providerKey);
+        return await _users.Find(filter).FirstOrDefaultAsync(ct);
+    }
+
+    // IUserTwoFactorStore
+    public Task SetTwoFactorEnabledAsync(FcmsUser user, bool enabled, CancellationToken ct)
+    {
+        user.TwoFactorEnabled = enabled;
+        return Task.CompletedTask;
+    }
+
+    public Task<bool> GetTwoFactorEnabledAsync(FcmsUser user, CancellationToken ct)
+        => Task.FromResult(user.TwoFactorEnabled);
+
+    // IUserPhoneNumberStore
+    public Task SetPhoneNumberAsync(FcmsUser user, string? phoneNumber, CancellationToken ct)
+    {
+        user.PhoneNumber = phoneNumber;
+        return Task.CompletedTask;
+    }
+
+    public Task<string?> GetPhoneNumberAsync(FcmsUser user, CancellationToken ct)
+        => Task.FromResult(user.PhoneNumber);
+
+    public Task<bool> GetPhoneNumberConfirmedAsync(FcmsUser user, CancellationToken ct)
+        => Task.FromResult(user.PhoneNumberConfirmed);
+
+    public Task SetPhoneNumberConfirmedAsync(FcmsUser user, bool confirmed, CancellationToken ct)
+    {
+        user.PhoneNumberConfirmed = confirmed;
+        return Task.CompletedTask;
+    }
+
+    // IUserAuthenticationTokenStore
+    public Task SetTokenAsync(FcmsUser user, string loginProvider, string name, string? value, CancellationToken ct)
+    {
+        var existing = user.Tokens.FirstOrDefault(t => t.LoginProvider == loginProvider && t.Name == name);
+        if (existing is not null)
+        {
+            existing.Value = value;
+        }
+        else
+        {
+            user.Tokens.Add(new IdentityUserToken<Guid> { UserId = user.Id, LoginProvider = loginProvider, Name = name, Value = value });
+        }
+        return Task.CompletedTask;
+    }
+
+    public Task RemoveTokenAsync(FcmsUser user, string loginProvider, string name, CancellationToken ct)
+    {
+        var existing = user.Tokens.FirstOrDefault(t => t.LoginProvider == loginProvider && t.Name == name);
+        if (existing is not null) user.Tokens.Remove(existing);
+        return Task.CompletedTask;
+    }
+
+    public Task<string?> GetTokenAsync(FcmsUser user, string loginProvider, string name, CancellationToken ct)
+        => Task.FromResult(user.Tokens.FirstOrDefault(t => t.LoginProvider == loginProvider && t.Name == name)?.Value);
 
     public void Dispose() { }
 }

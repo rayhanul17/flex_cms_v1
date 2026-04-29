@@ -155,4 +155,7 @@ public class AuthController : Controller
 
         return View(model);
     }
+
+    [HttpGet]
+    public IActionResult AccessDenied() => View();
 }

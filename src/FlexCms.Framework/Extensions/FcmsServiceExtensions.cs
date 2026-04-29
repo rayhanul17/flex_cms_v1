@@ -98,6 +98,9 @@ public static class FcmsServiceExtensions
         services.AddHostedService<ModuleActivationService>();
 
         // ── Module discovery + wiring ────────────────────────────────────────
+        var registry = BuildModuleRegistry(services, options.AppDataPath);
+        services.AddSingleton(registry);
+
         // The registry is built once at startup; each loaded module gets:
         //   1. RegisterServices(services) called
         //   2. AttributeScanner runs over its assembly for [FcmsScoped]/etc
@@ -193,9 +196,22 @@ public static class FcmsServiceExtensions
                     opts.User.RequireUniqueEmail = true;
                 })
                 .AddRoles<FcmsRole>()
+                .AddClaimsPrincipalFactory<UserClaimsPrincipalFactory<FcmsUser, FcmsRole>>()
                 .AddSignInManager<SignInManager<FcmsUser>>()
                 .AddPasswordValidator<FcmsPasswordValidator>()
                 .AddDefaultTokenProviders();
+
+            services.AddAuthentication().AddIdentityCookies();
+
+            services.ConfigureApplicationCookie(options =>
+            {
+                options.LoginPath = "/auth/login";
+                options.AccessDeniedPath = "/auth/access-denied"; // Or wherever you want
+                options.ExpireTimeSpan = TimeSpan.FromDays(30);
+                options.Cookie.HttpOnly = true;
+                options.Cookie.SameSite = SameSiteMode.Lax;
+                options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+            });
 
             if (options.UseMySQL)
             {
@@ -246,8 +262,8 @@ public static class FcmsServiceExtensions
                             sp.GetRequiredService<IMongoClient>(),
                             sp.GetRequiredService<IMongoDatabase>()));
 
-                    services.AddScoped<IUserStore<FcmsUser>, MongoUserStore>();
-                    services.AddScoped<IRoleStore<FcmsRole>, MongoRoleStore>();
+                    identityBuilder.AddUserStore<MongoUserStore>();
+                    identityBuilder.AddRoleStore<MongoRoleStore>();
                 }
             }
         }

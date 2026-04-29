@@ -6,8 +6,8 @@ public interface IRepository<T> where T : class, IBaseEntity
 {
     Task<T?> GetByIdAsync(Guid id, CancellationToken ct = default);
     Task<List<T>> GetAllAsync(CancellationToken ct = default);
-    Task<List<T>> FindAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default);
-    Task<T?> FirstOrDefaultAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default);
+    Task<List<T>> FindAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default, bool includeDeleted = false);
+    Task<T?> FirstOrDefaultAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default, bool includeDeleted = false);
     Task<bool> ExistsAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default);
     Task<long> CountAsync(Expression<Func<T, bool>>? predicate = null, CancellationToken ct = default);
     Task AddAsync(T entity, CancellationToken ct = default);

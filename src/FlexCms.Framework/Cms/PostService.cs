@@ -47,6 +47,7 @@ public class PostService : IPostService
 
     public async Task<FcmsPost> CreateAsync(FcmsPost post, IEnumerable<string> tagSlugs, CancellationToken ct = default)
     {
+        post.Content = HtmlSanitizer.Sanitize(post.Content);
         post.CreatedAt = FcmsTime.Now;
         post.UpdatedAt = FcmsTime.Now;
         _db.Posts.Add(post);
@@ -57,10 +58,40 @@ public class PostService : IPostService
 
     public async Task UpdateAsync(FcmsPost post, IEnumerable<string> tagSlugs, CancellationToken ct = default)
     {
+        post.Content = HtmlSanitizer.Sanitize(post.Content);
         post.UpdatedAt = FcmsTime.Now;
         _db.Posts.Update(post);
         await _db.SaveChangesAsync(ct);
         await SyncTagsAsync(post.Id, tagSlugs, ct);
+    }
+
+    public Task<List<FcmsPost>> GetDeletedAsync(CancellationToken ct = default)
+        => _db.Posts.IgnoreQueryFilters()
+            .Where(p => p.IsDeleted)
+            .Include(p => p.Category)
+            .OrderByDescending(p => p.DeletedAt)
+            .ToListAsync(ct);
+
+    public async Task RestoreAsync(Guid id, CancellationToken ct = default)
+    {
+        var post = await _db.Posts.IgnoreQueryFilters().FirstOrDefaultAsync(p => p.Id == id && p.IsDeleted, ct);
+        if (post is null) return;
+        post.IsDeleted = false;
+        post.DeletedAt = null;
+        post.IsPublished = false;
+        post.UpdatedAt = FcmsTime.Now;
+        await _db.SaveChangesAsync(ct);
+    }
+
+    public async Task HardDeleteAsync(Guid id, CancellationToken ct = default)
+    {
+        var post = await _db.Posts.IgnoreQueryFilters().FirstOrDefaultAsync(p => p.Id == id, ct);
+        if (post is null) return;
+        // Remove PostTags first (no cascade from Post → PostTag in our config)
+        var tags = await _db.PostTags.Where(pt => pt.PostId == id).ToListAsync(ct);
+        _db.PostTags.RemoveRange(tags);
+        _db.Posts.Remove(post);
+        await _db.SaveChangesAsync(ct);
     }
 
     public async Task DeleteAsync(Guid id, CancellationToken ct = default)
@@ -68,6 +99,7 @@ public class PostService : IPostService
         var post = await _db.Posts.FirstOrDefaultAsync(p => p.Id == id && !p.IsDeleted, ct);
         if (post is null) return;
         post.IsDeleted = true;
+        post.DeletedAt = FcmsTime.Now;
         post.UpdatedAt = FcmsTime.Now;
         await _db.SaveChangesAsync(ct);
     }

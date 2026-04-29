@@ -39,6 +39,7 @@ public class FcmsDbContext : IdentityDbContext<FcmsUser, FcmsRole, Guid>
     public DbSet<FcmsPost> Posts => Set<FcmsPost>();
     public DbSet<FcmsTag> Tags => Set<FcmsTag>();
     public DbSet<FcmsPostTag> PostTags => Set<FcmsPostTag>();
+    public DbSet<FcmsRedirect> Redirects => Set<FcmsRedirect>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -138,6 +139,11 @@ public class FcmsDbContext : IdentityDbContext<FcmsUser, FcmsRole, Guid>
             .WithMany(t => t.PostTags)
             .HasForeignKey(pt => pt.TagId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        // Redirects: unique FromPath
+        modelBuilder.Entity<FcmsRedirect>()
+            .HasIndex(r => r.FromPath)
+            .IsUnique();
 
         // Module builders — each registered IFcmsModelBuilder configures its
         // own entities (tables, indexes, FKs) into this shared DbContext.

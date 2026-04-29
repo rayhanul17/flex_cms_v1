@@ -30,6 +30,7 @@ public class PageService : IPageService
 
     public async Task<FcmsPage> CreateAsync(FcmsPage page, CancellationToken ct = default)
     {
+        page.Content = HtmlSanitizer.Sanitize(page.Content);
         page.CreatedAt = FcmsTime.Now;
         page.UpdatedAt = FcmsTime.Now;
         _db.Pages.Add(page);
@@ -39,8 +40,31 @@ public class PageService : IPageService
 
     public async Task UpdateAsync(FcmsPage page, CancellationToken ct = default)
     {
+        page.Content = HtmlSanitizer.Sanitize(page.Content);
         page.UpdatedAt = FcmsTime.Now;
         _db.Pages.Update(page);
+        await _db.SaveChangesAsync(ct);
+    }
+
+    public Task<List<FcmsPage>> GetDeletedAsync(CancellationToken ct = default)
+        => _db.Pages.IgnoreQueryFilters().Where(p => p.IsDeleted).OrderByDescending(p => p.DeletedAt).ToListAsync(ct);
+
+    public async Task RestoreAsync(Guid id, CancellationToken ct = default)
+    {
+        var page = await _db.Pages.IgnoreQueryFilters().FirstOrDefaultAsync(p => p.Id == id && p.IsDeleted, ct);
+        if (page is null) return;
+        page.IsDeleted = false;
+        page.DeletedAt = null;
+        page.IsPublished = false;
+        page.UpdatedAt = FcmsTime.Now;
+        await _db.SaveChangesAsync(ct);
+    }
+
+    public async Task HardDeleteAsync(Guid id, CancellationToken ct = default)
+    {
+        var page = await _db.Pages.IgnoreQueryFilters().FirstOrDefaultAsync(p => p.Id == id, ct);
+        if (page is null) return;
+        _db.Pages.Remove(page);
         await _db.SaveChangesAsync(ct);
     }
 
@@ -49,6 +73,7 @@ public class PageService : IPageService
         var page = await _db.Pages.FirstOrDefaultAsync(p => p.Id == id && !p.IsDeleted, ct);
         if (page is null) return;
         page.IsDeleted = true;
+        page.DeletedAt = FcmsTime.Now;
         page.UpdatedAt = FcmsTime.Now;
         await _db.SaveChangesAsync(ct);
     }

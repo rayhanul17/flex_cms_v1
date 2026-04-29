@@ -11,4 +11,7 @@ public interface IPageService
     Task<FcmsPage> CreateAsync(FcmsPage page, CancellationToken ct = default);
     Task UpdateAsync(FcmsPage page, CancellationToken ct = default);
     Task DeleteAsync(Guid id, CancellationToken ct = default);
+    Task<List<FcmsPage>> GetDeletedAsync(CancellationToken ct = default);
+    Task RestoreAsync(Guid id, CancellationToken ct = default);
+    Task HardDeleteAsync(Guid id, CancellationToken ct = default);
 }

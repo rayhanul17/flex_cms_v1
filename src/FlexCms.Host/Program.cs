@@ -99,6 +99,7 @@ if (app.Environment.IsDevelopment())
 
 app.UseMiddleware<FcmsExceptionMiddleware>();   // logs + generic page in production
 app.UseMiddleware<SecurityHeadersMiddleware>();
+app.UseMiddleware<RedirectMiddleware>();
 app.UseMiddleware<IpFilterMiddleware>();
 
 if (!app.Environment.IsDevelopment())
@@ -106,6 +107,7 @@ if (!app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 app.UseStaticFiles();
+app.UseSession();
 app.UseRouting();
 app.UseRateLimiter();
 app.UseAuthentication();

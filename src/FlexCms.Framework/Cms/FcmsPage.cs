@@ -2,6 +2,13 @@ using FlexCms.Framework.Db.Ef;
 
 namespace FlexCms.Framework.Cms;
 
+public enum PageAccessControl
+{
+    Public = 0,
+    AuthenticatedOnly = 1,
+    PasswordProtected = 2
+}
+
 public class FcmsPage : BaseEfEntity
 {
     public string Title { get; set; } = "";
@@ -16,4 +23,6 @@ public class FcmsPage : BaseEfEntity
     public bool IsPublished { get; set; }
     public DateTime? PublishedAt { get; set; }
     public Guid? AuthorId { get; set; }
+    public PageAccessControl AccessControl { get; set; } = PageAccessControl.Public;
+    public string? PasswordHash { get; set; }
 }

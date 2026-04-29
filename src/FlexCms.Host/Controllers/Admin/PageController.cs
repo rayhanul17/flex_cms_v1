@@ -3,6 +3,8 @@ using FlexCms.Framework.Cms;
 using FlexCms.Host.Models.Admin;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace FlexCms.Host.Controllers.Admin;
 
@@ -63,7 +65,10 @@ public class PageController : BaseAdminController
             ParentId = model.ParentId,
             SortOrder = model.SortOrder,
             IsPublished = model.IsPublished,
-            PublishedAt = model.IsPublished ? DateTime.UtcNow : null
+            PublishedAt = model.IsPublished ? DateTime.UtcNow : null,
+            AccessControl = model.AccessControl,
+            PasswordHash = model.AccessControl == PageAccessControl.PasswordProtected && !string.IsNullOrEmpty(model.Password)
+                ? HashPassword(model.Password) : null
         }, ct);
 
         ShowSuccess($"Page '{model.Title}' created.");
@@ -90,6 +95,7 @@ public class PageController : BaseAdminController
             ParentId = page.ParentId,
             SortOrder = page.SortOrder,
             IsPublished = page.IsPublished,
+            AccessControl = page.AccessControl,
             AvailableParents = await GetParentSelectListAsync(ct, excludeId: id)
         });
     }
@@ -118,6 +124,11 @@ public class PageController : BaseAdminController
         page.IsPublished = model.IsPublished;
         if (model.IsPublished && page.PublishedAt is null)
             page.PublishedAt = DateTime.UtcNow;
+        page.AccessControl = model.AccessControl;
+        if (model.AccessControl == PageAccessControl.PasswordProtected && !string.IsNullOrEmpty(model.Password))
+            page.PasswordHash = HashPassword(model.Password);
+        else if (model.AccessControl != PageAccessControl.PasswordProtected)
+            page.PasswordHash = null;
 
         await _pages.UpdateAsync(page, ct);
         ShowSuccess($"Page '{page.Title}' updated.");
@@ -137,6 +148,12 @@ public class PageController : BaseAdminController
     }
 
     // ── Helper ────────────────────────────────────────────────────────────────
+
+    private static string HashPassword(string password)
+    {
+        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(password));
+        return Convert.ToHexString(bytes).ToLowerInvariant();
+    }
 
     private async Task<List<SelectListItem>> GetParentSelectListAsync(CancellationToken ct, Guid? excludeId = null)
     {

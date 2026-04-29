@@ -1,3 +1,4 @@
+using FlexCms.Framework.Cms;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using System.ComponentModel.DataAnnotations;
 
@@ -37,6 +38,11 @@ public class CreateEditPageViewModel
     public Guid? ParentId { get; set; }
     public int SortOrder { get; set; }
     public bool IsPublished { get; set; }
+    public PageAccessControl AccessControl { get; set; } = PageAccessControl.Public;
+
+    /// <summary>Plain-text; stored as SHA-256 hash. Leave blank to keep existing.</summary>
+    [MaxLength(200)]
+    public string? Password { get; set; }
 
     public List<SelectListItem> AvailableParents { get; set; } = [];
 }
@@ -114,4 +120,45 @@ public class CreateEditPostViewModel
     public string Tags { get; set; } = "";
 
     public List<SelectListItem> AvailableCategories { get; set; } = [];
+}
+
+// ── Trash ─────────────────────────────────────────────────────────────────────
+
+public class TrashItemViewModel
+{
+    public Guid Id { get; set; }
+    public string Title { get; set; } = "";
+    public string Type { get; set; } = "";
+    public DateTime? DeletedAt { get; set; }
+}
+
+public class TrashViewModel
+{
+    public List<TrashItemViewModel> Pages { get; set; } = [];
+    public List<TrashItemViewModel> Posts { get; set; } = [];
+}
+
+// ── Redirects ─────────────────────────────────────────────────────────────────
+
+public class RedirectListItemViewModel
+{
+    public Guid Id { get; set; }
+    public string FromPath { get; set; } = "";
+    public string ToPath { get; set; } = "";
+    public int StatusCode { get; set; }
+    public bool IsActive { get; set; }
+}
+
+public class CreateEditRedirectViewModel
+{
+    public Guid? Id { get; set; }
+
+    [Required, MaxLength(500)]
+    public string FromPath { get; set; } = "";
+
+    [Required, MaxLength(2000)]
+    public string ToPath { get; set; } = "";
+
+    public int StatusCode { get; set; } = 301;
+    public bool IsActive { get; set; } = true;
 }

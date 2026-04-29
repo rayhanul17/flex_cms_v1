@@ -60,6 +60,8 @@ public static class FcmsServiceExtensions
         services.AddScoped<IPageService, PageService>();
         services.AddScoped<ICategoryService, CategoryService>();
         services.AddScoped<IPostService, PostService>();
+        services.AddHostedService<ScheduledPublishService>();
+        services.AddHostedService<TrashCleanupService>();
 
         // Permission service (15min IMemoryCache — requires IRepository<> to be registered)
         services.AddMemoryCache();
@@ -119,6 +121,7 @@ public static class FcmsServiceExtensions
         services.AddAuthorization();
         services.AddHttpContextAccessor();
         services.AddAntiforgery(o => o.HeaderName = "X-FlexCms-Csrf");
+        services.AddSession(o => { o.Cookie.HttpOnly = true; o.Cookie.IsEssential = true; o.IdleTimeout = TimeSpan.FromMinutes(30); });
         services.AddSignalR();
 
         // Rate limiting — partitioned by IP (M19: prevents one IP from blocking others)

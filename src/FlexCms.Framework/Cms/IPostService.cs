@@ -12,4 +12,7 @@ public interface IPostService
     Task UpdateAsync(FcmsPost post, IEnumerable<string> tagSlugs, CancellationToken ct = default);
     Task DeleteAsync(Guid id, CancellationToken ct = default);
     Task IncrementViewCountAsync(Guid id, CancellationToken ct = default);
+    Task<List<FcmsPost>> GetDeletedAsync(CancellationToken ct = default);
+    Task RestoreAsync(Guid id, CancellationToken ct = default);
+    Task HardDeleteAsync(Guid id, CancellationToken ct = default);
 }

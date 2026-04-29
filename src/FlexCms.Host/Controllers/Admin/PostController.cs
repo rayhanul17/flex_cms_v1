@@ -1,4 +1,5 @@
 using FlexCms.Framework.Auth;
+using FlexCms.Framework.Clock;
 using FlexCms.Framework.Cms;
 using FlexCms.Host.Models.Admin;
 using Microsoft.AspNetCore.Mvc;
@@ -67,7 +68,7 @@ public class PostController : BaseAdminController
             FeaturedImageUrl = model.FeaturedImageUrl,
             CategoryId = model.CategoryId,
             IsPublished = model.IsPublished,
-            PublishedAt = model.IsPublished ? DateTime.UtcNow : null
+            PublishedAt = model.IsPublished ? FcmsTime.Now : model.ScheduledAt
         }, ParseTags(model.Tags), ct);
 
         ShowSuccess($"Post '{model.Title}' created.");
@@ -96,6 +97,7 @@ public class PostController : BaseAdminController
             FeaturedImageUrl = post.FeaturedImageUrl,
             CategoryId = post.CategoryId,
             IsPublished = post.IsPublished,
+            ScheduledAt = !post.IsPublished ? post.PublishedAt : null,
             Tags = tags,
             AvailableCategories = await GetCategorySelectListAsync(ct)
         });
@@ -125,7 +127,9 @@ public class PostController : BaseAdminController
         post.CategoryId = model.CategoryId;
         post.IsPublished = model.IsPublished;
         if (model.IsPublished && post.PublishedAt is null)
-            post.PublishedAt = DateTime.UtcNow;
+            post.PublishedAt = FcmsTime.Now;
+        else if (!model.IsPublished && model.ScheduledAt.HasValue)
+            post.PublishedAt = model.ScheduledAt;
 
         await _posts.UpdateAsync(post, ParseTags(model.Tags), ct);
         ShowSuccess($"Post '{post.Title}' updated.");

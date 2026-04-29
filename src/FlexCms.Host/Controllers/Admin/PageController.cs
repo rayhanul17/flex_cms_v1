@@ -1,4 +1,5 @@
 using FlexCms.Framework.Auth;
+using FlexCms.Framework.Clock;
 using FlexCms.Framework.Cms;
 using FlexCms.Host.Models.Admin;
 using Microsoft.AspNetCore.Mvc;
@@ -65,7 +66,7 @@ public class PageController : BaseAdminController
             ParentId = model.ParentId,
             SortOrder = model.SortOrder,
             IsPublished = model.IsPublished,
-            PublishedAt = model.IsPublished ? DateTime.UtcNow : null,
+            PublishedAt = model.IsPublished ? FcmsTime.Now : model.ScheduledAt,
             AccessControl = model.AccessControl,
             PasswordHash = model.AccessControl == PageAccessControl.PasswordProtected && !string.IsNullOrEmpty(model.Password)
                 ? HashPassword(model.Password) : null
@@ -95,6 +96,7 @@ public class PageController : BaseAdminController
             ParentId = page.ParentId,
             SortOrder = page.SortOrder,
             IsPublished = page.IsPublished,
+            ScheduledAt = !page.IsPublished ? page.PublishedAt : null,
             AccessControl = page.AccessControl,
             AvailableParents = await GetParentSelectListAsync(ct, excludeId: id)
         });
@@ -123,7 +125,9 @@ public class PageController : BaseAdminController
         page.SortOrder = model.SortOrder;
         page.IsPublished = model.IsPublished;
         if (model.IsPublished && page.PublishedAt is null)
-            page.PublishedAt = DateTime.UtcNow;
+            page.PublishedAt = FcmsTime.Now;
+        else if (!model.IsPublished && model.ScheduledAt.HasValue)
+            page.PublishedAt = model.ScheduledAt;
         page.AccessControl = model.AccessControl;
         if (model.AccessControl == PageAccessControl.PasswordProtected && !string.IsNullOrEmpty(model.Password))
             page.PasswordHash = HashPassword(model.Password);

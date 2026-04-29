@@ -38,6 +38,10 @@ public class CreateEditPageViewModel
     public Guid? ParentId { get; set; }
     public int SortOrder { get; set; }
     public bool IsPublished { get; set; }
+
+    /// <summary>Set a future time to schedule publishing (leave blank to publish immediately or save as draft).</summary>
+    public DateTime? ScheduledAt { get; set; }
+
     public PageAccessControl AccessControl { get; set; } = PageAccessControl.Public;
 
     /// <summary>Plain-text; stored as SHA-256 hash. Leave blank to keep existing.</summary>
@@ -115,6 +119,9 @@ public class CreateEditPostViewModel
 
     public Guid? CategoryId { get; set; }
     public bool IsPublished { get; set; }
+
+    /// <summary>Set a future time to schedule publishing.</summary>
+    public DateTime? ScheduledAt { get; set; }
 
     /// <summary>Comma-separated tag slugs, e.g. "dotnet,csharp,web"</summary>
     public string Tags { get; set; } = "";

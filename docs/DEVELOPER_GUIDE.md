@@ -107,8 +107,8 @@ docker ps
 ### Step 6: Build the solution
 
 ```bash
-dotnet restore FlexCms.sln
-dotnet build FlexCms.sln
+dotnet restore FlexCms.slnx
+dotnet build FlexCms.slnx
 ```
 
 If build fails — check the error. Most common: missing NuGet package, fix by running `dotnet restore` again.
@@ -177,7 +177,7 @@ dotnet watch run    # Auto-reloads on file save
 CI runs `dotnet format --verify-no-changes` and **fails the build on any formatting violation** (extra alignment whitespace, indentation drift, missing newlines, etc.). Run the auto-fix locally before you commit so you don't get bounced by CI:
 
 ```bash
-dotnet format FlexCms.slnx
+dotnet format FlexCms.slnxx
 ```
 
 This rewrites files in place to match the project's formatting rules. If the command modifies anything, stage those changes too.
@@ -185,7 +185,7 @@ This rewrites files in place to match the project's formatting rules. If the com
 To check without modifying files (same command CI runs):
 
 ```bash
-dotnet format FlexCms.slnx --verify-no-changes --severity warn
+dotnet format FlexCms.slnxx --verify-no-changes --severity warn
 ```
 
 Empty output = clean. Non-zero exit = something to fix.
@@ -314,10 +314,24 @@ dotnet test tests/FlexCms.Tests.Integration/FlexCms.Tests.Integration.csproj --f
 #### Run everything — all projects at once
 
 ```bash
-dotnet test FlexCms.sln
+dotnet test FlexCms.slnxx
 ```
 
 This runs all tests. Phase 1 integration tests will start Docker containers automatically.
+
+#### Run by phase (any phase number)
+
+```bash
+dotnet test FlexCms.slnxx --filter "Phase1"
+dotnet test FlexCms.slnxx --filter "Phase3"
+dotnet test FlexCms.slnxx --filter "Phase4"
+```
+
+#### Verbose output
+
+```bash
+dotnet test FlexCms.slnxx --logger "console;verbosity=normal"
+```
 
 #### Run a single specific test by name
 
@@ -372,8 +386,8 @@ Phase 1 tests verify that the EF + MongoDB repositories work correctly against r
 | Run all integration tests | `dotnet test tests/FlexCms.Tests.Integration/FlexCms.Tests.Integration.csproj` |
 | Run Phase 3 only (no Docker) | `dotnet test tests/FlexCms.Tests.Integration/FlexCms.Tests.Integration.csproj --filter "Phase3"` |
 | Run Phase 1 only (needs Docker) | `dotnet test tests/FlexCms.Tests.Integration/FlexCms.Tests.Integration.csproj --filter "Phase1"` |
-| Run everything | `dotnet test FlexCms.sln` |
-| Run by test name pattern | `dotnet test FlexCms.sln --filter "DisplayName~<keyword>"` |
+| Run everything | `dotnet test FlexCms.slnx` |
+| Run by test name pattern | `dotnet test FlexCms.slnx --filter "DisplayName~<keyword>"` |
 
 ---
 
@@ -388,14 +402,29 @@ This section tells you exactly what is done, what is not done yet, and what patt
 Everything in the DB layer is implemented and tested.
 
 **What exists:**
-- `IBaseEntity`, `BaseEfEntity`, `BaseMongoEntity` — all entity base classes
+- `IBaseEntity`, `BaseEfEntity`, `BaseMongoEntity` — all entity base classes. Every entity automatically gets: `Id` (Guid), `CreatedAt`, `UpdatedAt`, `CreatedBy` (Guid?), `UpdatedBy` (Guid?), `IsDeleted`, `DeletedAt`
 - `IRepository<T>`, `EfRepository<T>`, `MongoRepository<T>` — generic CRUD
 - `IFcmsUnitOfWork`, `EfUnitOfWork`, `MongoUnitOfWork` — transaction + save coordination
 - `FcmsDbContext` — EF Core context with Identity tables + soft-delete filters
-- `MongoDbSerializerSetup` — GUID as subtype 4, DateTime as Unix milliseconds
+- `MongoDbSerializerSetup` — GUID as binary UUID (Standard/subtype 4), DateTime as Unix milliseconds
 - `SetupHelper`, `SetupConfig` — reads/writes `App_Data/setup.json`
 - `FcmsServiceExtensions.AddFlexCms()` — single call registers everything
 - Phase 1 integration tests pass (uses TestContainers — Docker required)
+
+**Audit fields — auto-injected, no code needed:**
+
+`CreatedAt`, `UpdatedAt`, `CreatedBy`, `UpdatedBy` are set automatically on every save:
+
+| Field | Added | Modified | Background service |
+|---|---|---|---|
+| `CreatedAt` | `FcmsTime.Now` | — | `FcmsTime.Now` |
+| `UpdatedAt` | `FcmsTime.Now` | `FcmsTime.Now` | `FcmsTime.Now` |
+| `CreatedBy` | current user ID (`??=` — keeps pre-set value) | — | `null` |
+| `UpdatedBy` | current user ID | current user ID | `null` |
+
+- HTTP request → user ID from `ClaimTypes.NameIdentifier`
+- Background service (no `HttpContext`) → `null` (means "system operation")
+- To create a record as a specific user from code: set `entity.CreatedBy = someId` before save — the `??=` rule keeps it
 
 **EF Migrations — how to run them for this project:**
 
@@ -1876,7 +1905,7 @@ The external developer **never clones your CMS source** — they only need the p
 | Open PR | `gh pr create --base main` |
 | Run dev | `cd src/FlexCms.Host && dotnet watch run` |
 | Run tests | `dotnet test` |
-| Format code | `dotnet format FlexCms.slnx` (run before every commit) |
+| Format code | `dotnet format FlexCms.slnxx` (run before every commit) |
 | Start local DB | `docker compose -f docker/docker-compose.dev.yml up -d` |
 | Stop local DB | `docker compose -f docker/docker-compose.dev.yml down` |
 | Build module ZIP | `cd modules/X && dotnet publish -c Release -o publish/` |

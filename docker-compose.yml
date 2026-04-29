@@ -1,0 +1,166 @@
+version: '3.8'
+
+# ─────────────────────────────────────────────────────────────────
+#  FlexCMS v1 — Dev Database Stack
+#  MSSQL · MySQL · PostgreSQL · MongoDB (3-node replica set)
+#
+#  Usage:
+#    docker compose up -d
+#
+#  MongoDB connection string (after rs-init completes):
+#    mongodb://dev:Dev%40123456@localhost:27017,localhost:27018,localhost:27019/?replicaSet=rs0&authSource=admin
+#
+#  Windows /etc/hosts (required for Mongo replica set from host):
+#    127.0.0.1  mongo1 mongo2 mongo3
+# ─────────────────────────────────────────────────────────────────
+
+services:
+
+  # ── SQL Server 2022 ───────────────────────────────────────────
+  mssql:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: flexcms-mssql
+    restart: unless-stopped
+    ports:
+      - "1433:1433"
+    environment:
+      - ACCEPT_EULA=Y
+      - MSSQL_SA_PASSWORD=Dev@123456
+      - MSSQL_PID=Developer
+    volumes:
+      - mssql_data:/var/opt/mssql
+
+  # ── MySQL 8.4 ─────────────────────────────────────────────────
+  mysql:
+    image: mysql:8.4
+    container_name: flexcms-mysql
+    restart: unless-stopped
+    ports:
+      - "3306:3306"
+    environment:
+      - MYSQL_ROOT_PASSWORD=Dev@123456
+      - MYSQL_USER=dev
+      - MYSQL_PASSWORD=Dev@123456
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+  # ── PostgreSQL 16 ─────────────────────────────────────────────
+  postgres:
+    image: postgres:16
+    container_name: flexcms-postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=dev
+      - POSTGRES_PASSWORD=Dev@123456
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  # ── MongoDB 7 — Replica Set (rs0) ────────────────────────────
+  # Step 1: generate shared keyfile (one-shot, idempotent)
+  mongo-keyfile-init:
+    image: mongo:7
+    container_name: flexcms-mongo-keyfile-init
+    restart: "no"
+    entrypoint: >
+      bash -c "
+        if [ ! -s /keyfile/mongo.key ]; then
+          openssl rand -base64 756 > /keyfile/mongo.key &&
+          chmod 400 /keyfile/mongo.key;
+        fi
+      "
+    volumes:
+      - mongo_keyfile:/keyfile
+
+  mongo1:
+    image: mongo:7
+    container_name: flexcms-mongo1
+    restart: unless-stopped
+    command: mongod --replSet rs0 --bind_ip_all --keyFile /etc/mongo-keyfile
+    ports:
+      - "27017:27017"
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=dev
+      - MONGO_INITDB_ROOT_PASSWORD=Dev@123456
+    volumes:
+      - mongo1_data:/data/db
+      - mongo_keyfile:/etc/mongo-keyfile:ro
+    depends_on:
+      mongo-keyfile-init:
+        condition: service_completed_successfully
+
+  mongo2:
+    image: mongo:7
+    container_name: flexcms-mongo2
+    restart: unless-stopped
+    command: mongod --replSet rs0 --bind_ip_all --keyFile /etc/mongo-keyfile
+    ports:
+      - "27018:27017"
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=dev
+      - MONGO_INITDB_ROOT_PASSWORD=Dev@123456
+    volumes:
+      - mongo2_data:/data/db
+      - mongo_keyfile:/etc/mongo-keyfile:ro
+    depends_on:
+      mongo-keyfile-init:
+        condition: service_completed_successfully
+
+  mongo3:
+    image: mongo:7
+    container_name: flexcms-mongo3
+    restart: unless-stopped
+    command: mongod --replSet rs0 --bind_ip_all --keyFile /etc/mongo-keyfile
+    ports:
+      - "27019:27017"
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=dev
+      - MONGO_INITDB_ROOT_PASSWORD=Dev@123456
+    volumes:
+      - mongo3_data:/data/db
+      - mongo_keyfile:/etc/mongo-keyfile:ro
+    depends_on:
+      mongo-keyfile-init:
+        condition: service_completed_successfully
+
+  # Step 2: initiate replica set (one-shot, runs after all 3 nodes are up)
+  mongo-rs-init:
+    image: mongo:7
+    container_name: flexcms-mongo-rs-init
+    restart: "no"
+    entrypoint: >
+      bash -c "
+        echo 'Waiting for mongo1 to be ready...' &&
+        until mongosh --host mongo1 --username dev --password Dev@123456 --authenticationDatabase admin --eval 'db.runCommand({ping:1})' --quiet; do sleep 2; done &&
+        mongosh --host mongo1 --username dev --password Dev@123456 --authenticationDatabase admin --eval '
+          try {
+            rs.status();
+            print(\"Replica set already initiated.\");
+          } catch(e) {
+            rs.initiate({
+              _id: \"rs0\",
+              members: [
+                { _id: 0, host: \"mongo1:27017\", priority: 2 },
+                { _id: 1, host: \"mongo2:27017\", priority: 1 },
+                { _id: 2, host: \"mongo3:27017\", priority: 1 }
+              ]
+            });
+            print(\"Replica set initiated.\");
+          }
+        '
+      "
+    depends_on:
+      - mongo1
+      - mongo2
+      - mongo3
+
+# ── Named volumes ──────────────────────────────────────────────
+volumes:
+  mssql_data:
+  mysql_data:
+  postgres_data:
+  mongo1_data:
+  mongo2_data:
+  mongo3_data:
+  mongo_keyfile:

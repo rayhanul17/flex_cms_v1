@@ -2,6 +2,7 @@ using FlexCms.Framework.Auth;
 using FlexCms.Framework.Auth.Ef;
 using FlexCms.Framework.Cms;
 using FlexCms.Framework.Clock;
+using FlexCms.Framework.Storage;
 using FlexCms.Framework.Auth.MongoDb;
 using FlexCms.Framework.Db;
 using FlexCms.Framework.Db.Ef;
@@ -56,10 +57,15 @@ public static class FcmsServiceExtensions
         // Settings service (DB-backed; only useful when a DB provider is configured)
         services.AddScoped<ISettingsService, SettingsService>();
 
+        // File storage — local by default; swap for cloud implementation without changing services
+        services.AddScoped<IFcmsFileStorage, LocalFileStorage>();
+
         // CMS services
         services.AddScoped<IPageService, PageService>();
         services.AddScoped<ICategoryService, CategoryService>();
         services.AddScoped<IPostService, PostService>();
+        services.AddScoped<IMediaService, MediaService>();
+        services.AddScoped<IMediaFolderService, MediaFolderService>();
         services.AddHostedService<ScheduledPublishService>();
         services.AddSingleton(new TrashCleanupOptions { RetentionDays = options.TrashRetentionDays });
         services.AddHostedService<TrashCleanupService>();

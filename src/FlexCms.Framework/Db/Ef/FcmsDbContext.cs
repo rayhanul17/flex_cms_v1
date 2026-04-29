@@ -51,6 +51,8 @@ public class FcmsDbContext : IdentityDbContext<FcmsUser, FcmsRole, Guid>
     public DbSet<FcmsTag> Tags => Set<FcmsTag>();
     public DbSet<FcmsPostTag> PostTags => Set<FcmsPostTag>();
     public DbSet<FcmsRedirect> Redirects => Set<FcmsRedirect>();
+    public DbSet<FcmsMediaFolder> MediaFolders => Set<FcmsMediaFolder>();
+    public DbSet<FcmsMedia> Media => Set<FcmsMedia>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -155,6 +157,20 @@ public class FcmsDbContext : IdentityDbContext<FcmsUser, FcmsRole, Guid>
         modelBuilder.Entity<FcmsRedirect>()
             .HasIndex(r => r.FromPath)
             .IsUnique();
+
+        // MediaFolders: self-referential hierarchy
+        modelBuilder.Entity<FcmsMediaFolder>()
+            .HasOne(f => f.Parent)
+            .WithMany(f => f.Children)
+            .HasForeignKey(f => f.ParentId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // Media: FK to folder (nullable — root-level media has no folder)
+        modelBuilder.Entity<FcmsMedia>()
+            .HasOne(m => m.Folder)
+            .WithMany(f => f.Media)
+            .HasForeignKey(m => m.FolderId)
+            .OnDelete(DeleteBehavior.SetNull);
 
         // Module builders — each registered IFcmsModelBuilder configures its
         // own entities (tables, indexes, FKs) into this shared DbContext.

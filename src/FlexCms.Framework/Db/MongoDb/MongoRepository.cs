@@ -250,7 +250,10 @@ public class MongoRepository<T> : IRepository<T> where T : BaseMongoEntity
             .Select(p =>
             {
                 var attr = p.GetCustomAttribute<BsonElementAttribute>();
-                return attr?.ElementName ?? char.ToLower(p.Name[0]) + p.Name[1..];
+                var name = p.Name;
+                return attr?.ElementName ?? (name.Length == 1
+                    ? char.ToLower(name[0]).ToString()
+                    : char.ToLower(name[0]) + name[1..]);
             });
 
         var orFilters = stringProps

@@ -110,10 +110,7 @@ public class MediaService : IMediaService
         => _mediaRepo.GetByIdAsync(id, ct);
 
     public async Task<IReadOnlyList<FcmsMedia>> GetByFolderAsync(Guid? folderId, CancellationToken ct = default)
-    {
-        var all = await _mediaRepo.GetAllAsync(ct);
-        return all.Where(m => m.FolderId == folderId).ToList();
-    }
+        => await _mediaRepo.FindAsync(m => m.FolderId == folderId, ct);
 
     public async Task MoveToFolderAsync(Guid mediaId, Guid? targetFolderId, CancellationToken ct = default)
     {

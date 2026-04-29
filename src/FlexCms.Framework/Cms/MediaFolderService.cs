@@ -31,15 +31,16 @@ public class MediaFolderService : IMediaFolderService
 
     public async Task DeleteAsync(Guid id, CancellationToken ct = default)
     {
-        // Move media in this folder to parent (or root) before deleting
-        var all = await _mediaRepo.GetAllAsync(ct);
         var folder = await _folderRepo.GetByIdAsync(id, ct)
             ?? throw new InvalidOperationException("Folder not found.");
 
-        foreach (var m in all.Where(m => m.FolderId == id))
+        // Reparent media in this folder before deleting
+        var affected = await _mediaRepo.FindAsync(m => m.FolderId == id, ct);
+        if (affected.Count > 0)
         {
-            m.FolderId = folder.ParentId;
-            await _mediaRepo.UpdateAsync(m, ct);
+            foreach (var m in affected)
+                m.FolderId = folder.ParentId;
+            await _mediaRepo.UpdateRangeAsync(affected, ct);
         }
 
         await _folderRepo.SoftDeleteAsync(folder, ct);

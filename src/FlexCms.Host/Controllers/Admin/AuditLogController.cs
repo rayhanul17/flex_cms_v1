@@ -28,7 +28,7 @@ public class AuditLogController : BaseAdminController
         var recent = await _auditLog.GetRecentAsync(200, ct);
         var archive = await _auditLog.GetArchiveAsync(200, ct);
 
-        var cfg = await _settings.GetAsync<AuditEnabledSettings>("audit:enabled", ct: ct);
+        var cfg = await _settings.GetAsync<AuditEnabledSettings>(AuditLogSettings.Key, ct: ct);
         ViewBag.AuditEnabled = cfg.Enabled;
         ViewBag.Archive = archive;
 
@@ -59,9 +59,9 @@ public class AuditLogController : BaseAdminController
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Toggle(CancellationToken ct)
     {
-        var cfg = await _settings.GetAsync<AuditEnabledSettings>("audit:enabled", ct: ct);
+        var cfg = await _settings.GetAsync<AuditEnabledSettings>(AuditLogSettings.Key, ct: ct);
         cfg.Enabled = !cfg.Enabled;
-        await _settings.SaveAsync("audit:enabled", cfg, ct);
+        await _settings.SaveAsync(AuditLogSettings.Key, cfg, ct);
         return FcmsOk(cfg.Enabled ? "Audit logging enabled." : "Audit logging disabled.", new { enabled = cfg.Enabled });
     }
 

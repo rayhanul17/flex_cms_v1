@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Http;
 using MongoDB.Driver;
 
 namespace FlexCms.Framework.Db.MongoDb;
@@ -6,13 +7,15 @@ public class MongoUnitOfWork : IFcmsUnitOfWork
 {
     private readonly IMongoDatabase _database;
     private readonly IMongoClient _client;
+    private readonly IHttpContextAccessor? _httpContextAccessor;
     private IClientSessionHandle? _session;
     private readonly Dictionary<Type, object> _repositories = new();
 
-    public MongoUnitOfWork(IMongoClient client, IMongoDatabase database)
+    public MongoUnitOfWork(IMongoClient client, IMongoDatabase database, IHttpContextAccessor? httpContextAccessor = null)
     {
         _client = client;
         _database = database;
+        _httpContextAccessor = httpContextAccessor;
     }
 
     public IRepository<T> Repository<T>() where T : class, IBaseEntity
@@ -20,9 +23,8 @@ public class MongoUnitOfWork : IFcmsUnitOfWork
         var type = typeof(T);
         if (!_repositories.TryGetValue(type, out var repo))
         {
-            // Use Activator to bypass compile-time BaseMongoEntity constraint
             var repoType = typeof(MongoRepository<>).MakeGenericType(type);
-            repo = Activator.CreateInstance(repoType, _database)!;
+            repo = Activator.CreateInstance(repoType, _database, _httpContextAccessor)!;
             _repositories[type] = repo;
         }
         return (IRepository<T>)repo;

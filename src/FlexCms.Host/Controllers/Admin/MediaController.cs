@@ -67,11 +67,19 @@ public class MediaController : BaseAdminController
         if (string.IsNullOrWhiteSpace(name))
             return FcmsFail("Folder name is required.");
 
-        await _uow.BeginTransactionAsync();
-        var folder = await _folders.CreateAsync(name, parentId);
-        await _uow.SaveChangesAsync();
-        await _uow.CommitAsync();
-        return FcmsOk("Folder created.", new { id = folder.Id, name = folder.Name });
+        try
+        {
+            await _uow.BeginTransactionAsync();
+            var folder = await _folders.CreateAsync(name, parentId);
+            await _uow.SaveChangesAsync();
+            await _uow.CommitAsync();
+            return FcmsOk("Folder created.", new { id = folder.Id, name = folder.Name });
+        }
+        catch
+        {
+            await _uow.RollbackAsync();
+            return FcmsFail("Failed to create folder.");
+        }
     }
 
     [HttpPost("folder/{id:guid}/rename")]
@@ -81,33 +89,72 @@ public class MediaController : BaseAdminController
         if (string.IsNullOrWhiteSpace(name))
             return FcmsFail("Name is required.");
 
-        await _uow.BeginTransactionAsync();
-        var folder = await _folders.RenameAsync(id, name);
-        await _uow.SaveChangesAsync();
-        await _uow.CommitAsync();
-        return FcmsOk("Renamed.", new { name = folder.Name });
+        try
+        {
+            await _uow.BeginTransactionAsync();
+            var folder = await _folders.RenameAsync(id, name);
+            await _uow.SaveChangesAsync();
+            await _uow.CommitAsync();
+            return FcmsOk("Renamed.", new { name = folder.Name });
+        }
+        catch (InvalidOperationException ex)
+        {
+            await _uow.RollbackAsync();
+            return FcmsFail(ex.Message);
+        }
+        catch
+        {
+            await _uow.RollbackAsync();
+            return FcmsFail("Failed to rename folder.");
+        }
     }
 
     [HttpPost("folder/{id:guid}/delete")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> DeleteFolder(Guid id)
     {
-        await _uow.BeginTransactionAsync();
-        await _folders.DeleteAsync(id);
-        await _uow.SaveChangesAsync();
-        await _uow.CommitAsync();
-        return FcmsOk("Folder deleted.");
+        try
+        {
+            await _uow.BeginTransactionAsync();
+            await _folders.DeleteAsync(id);
+            await _uow.SaveChangesAsync();
+            await _uow.CommitAsync();
+            return FcmsOk("Folder deleted.");
+        }
+        catch (InvalidOperationException ex)
+        {
+            await _uow.RollbackAsync();
+            return FcmsFail(ex.Message);
+        }
+        catch
+        {
+            await _uow.RollbackAsync();
+            return FcmsFail("Failed to delete folder.");
+        }
     }
 
     [HttpPost("{id:guid}/move")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Move(Guid id, Guid? targetFolderId)
     {
-        await _uow.BeginTransactionAsync();
-        await _media.MoveToFolderAsync(id, targetFolderId);
-        await _uow.SaveChangesAsync();
-        await _uow.CommitAsync();
-        return FcmsOk("Moved.");
+        try
+        {
+            await _uow.BeginTransactionAsync();
+            await _media.MoveToFolderAsync(id, targetFolderId);
+            await _uow.SaveChangesAsync();
+            await _uow.CommitAsync();
+            return FcmsOk("Moved.");
+        }
+        catch (InvalidOperationException ex)
+        {
+            await _uow.RollbackAsync();
+            return FcmsFail(ex.Message);
+        }
+        catch
+        {
+            await _uow.RollbackAsync();
+            return FcmsFail("Failed to move media.");
+        }
     }
 
     [HttpPost("{id:guid}/delete")]
@@ -126,6 +173,11 @@ public class MediaController : BaseAdminController
         {
             await _uow.RollbackAsync();
             ShowError(ex.Message);
+        }
+        catch
+        {
+            await _uow.RollbackAsync();
+            ShowError("Failed to delete media.");
         }
         return RedirectToAction(nameof(Index));
     }

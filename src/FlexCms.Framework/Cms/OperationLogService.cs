@@ -4,6 +4,11 @@ using FlexCms.Framework.Services;
 
 namespace FlexCms.Framework.Cms;
 
+public static class AuditLogSettings
+{
+    public const string Key = "audit:enabled";
+}
+
 public class OperationLogService : IOperationLogService
 {
     private readonly IRepository<FcmsOperationLog> _logs;
@@ -38,7 +43,7 @@ public class OperationLogService : IOperationLogService
         FcmsLogSeverity severity = FcmsLogSeverity.Info,
         CancellationToken ct = default)
     {
-        var cfg = await _settings.GetAsync<AuditSettings>("audit:enabled", ct: ct);
+        var cfg = await _settings.GetAsync<AuditConfig>(AuditLogSettings.Key, ct: ct);
         if (!cfg.Enabled) return;
 
         var log = new FcmsOperationLog
@@ -61,14 +66,12 @@ public class OperationLogService : IOperationLogService
     public async Task ArchiveOlderThanAsync(TimeSpan age, CancellationToken ct = default)
     {
         var cutoff = DateTime.UtcNow - age;
-        var all = await _logs.GetAllAsync(ct);
-        var old = all.Where(l => l.CreatedAt < cutoff).ToList();
-
+        var old = await _logs.FindAsync(l => l.CreatedAt < cutoff, ct);
         if (old.Count == 0) return;
 
         foreach (var log in old)
         {
-            var archivedEntry = new FcmsOperationLogArchive
+            await _archive.AddAsync(new FcmsOperationLogArchive
             {
                 UserId = log.UserId,
                 UserName = log.UserName,
@@ -84,36 +87,36 @@ public class OperationLogService : IOperationLogService
                 UpdatedAt = log.UpdatedAt,
                 CreatedBy = log.CreatedBy,
                 UpdatedBy = log.UpdatedBy
-            };
-            await _archive.AddAsync(archivedEntry, ct);
+            }, ct);
         }
 
-        foreach (var log in old)
-            await _logs.DeleteAsync(log, ct);
+        await _logs.SoftDeleteRangeAsync(old, ct);
     }
 
     public async Task ClearArchiveAsync(CancellationToken ct = default)
     {
         var all = await _archive.GetAllAsync(ct);
-        foreach (var entry in all)
-            await _archive.DeleteAsync(entry, ct);
+        if (all.Count > 0)
+            await _archive.SoftDeleteRangeAsync(all, ct);
     }
 
     public async Task<IReadOnlyList<FcmsOperationLog>> GetRecentAsync(int count = 100, CancellationToken ct = default)
     {
-        var all = await _logs.GetAllAsync(ct);
-        return all.OrderByDescending(l => l.CreatedAt).Take(count).ToList();
+        var filter = new QueryFilter<FcmsOperationLog>()
+            .OrderByDescending(l => l.CreatedAt)
+            .Page(1, count);
+        return await _logs.FindAsync(filter, ct);
     }
 
     public async Task<IReadOnlyList<FcmsOperationLogArchive>> GetArchiveAsync(int count = 100, CancellationToken ct = default)
     {
-        var all = await _archive.GetAllAsync(ct);
-        return all.OrderByDescending(l => l.CreatedAt).Take(count).ToList();
+        var filter = new QueryFilter<FcmsOperationLogArchive>()
+            .OrderByDescending(l => l.CreatedAt)
+            .Page(1, count);
+        return await _archive.FindAsync(filter, ct);
     }
 
-    // ── Inner settings POCO ───────────────────────────────────────────────────
-
-    private sealed class AuditSettings
+    private sealed class AuditConfig
     {
         public bool Enabled { get; set; } = true;
     }

@@ -116,6 +116,13 @@ app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Home}/{action=Index}/{id?}");
 
+// CMS page slug catch-all — must come after all other conventional routes
+// so attribute-routed controllers (admin, auth, blog) take priority.
+app.MapControllerRoute(
+    name: "cms-page",
+    pattern: "{slug}",
+    defaults: new { controller = "Frontend", action = "Page" });
+
 app.Run();
 
 // Needed for WebApplicationFactory in integration tests

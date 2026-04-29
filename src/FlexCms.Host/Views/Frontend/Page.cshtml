@@ -1,0 +1,16 @@
+@model FlexCms.Framework.Cms.FcmsPage
+@{
+    ViewData["Title"] = Model.MetaTitle ?? Model.Title;
+}
+
+@if (!string.IsNullOrEmpty(Model.MetaDescription))
+{
+    <meta name="description" content="@Model.MetaDescription" />
+}
+
+<article class="cms-page">
+    <h1>@Model.Title</h1>
+    <div class="cms-content">
+        @Html.Raw(Model.Content)
+    </div>
+</article>

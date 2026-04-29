@@ -187,9 +187,11 @@ public static class FcmsServiceExtensions
                 .AddPasswordValidator<FcmsPasswordValidator>()
                 .AddDefaultTokenProviders();
 
+            services.AddHttpContextAccessor();
+
             if (options.UseMySQL)
             {
-                services.AddDbContext<FcmsDbContext>(o =>
+                services.AddDbContext<FcmsDbContext>((sp, o) =>
                     o.UseMySql(
                         options.MySqlConnectionString,
                         Microsoft.EntityFrameworkCore.ServerVersion.AutoDetect(options.MySqlConnectionString),
@@ -199,7 +201,7 @@ public static class FcmsServiceExtensions
             }
             else if (options.UseMsSql)
             {
-                services.AddDbContext<FcmsDbContext>(o =>
+                services.AddDbContext<FcmsDbContext>((sp, o) =>
                     o.UseSqlServer(
                         options.MsSqlConnectionString,
                         m => { m.EnableRetryOnFailure(3); m.CommandTimeout(30); }));
@@ -208,7 +210,7 @@ public static class FcmsServiceExtensions
             }
             else if (options.UsePostgreSQL)
             {
-                services.AddDbContext<FcmsDbContext>(o =>
+                services.AddDbContext<FcmsDbContext>((sp, o) =>
                     o.UseNpgsql(
                         options.PostgreSqlConnectionString,
                         m => { m.EnableRetryOnFailure(3); m.CommandTimeout(30); }));

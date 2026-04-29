@@ -143,6 +143,17 @@ public class MongoPhase1Tests : IAsyncLifetime
         await _mongo.DisposeAsync();
     }
 
+    // Helper: binary UUID filter for raw BsonDocument queries
+    private static FilterDefinition<BsonDocument> IdFilter(Guid id)
+    {
+        var bytes = GuidToStandardBytes(id);
+        var bsonId = new BsonBinaryData(bytes, BsonBinarySubType.UuidStandard);
+        return Builders<BsonDocument>.Filter.Eq("_id", bsonId);
+    }
+
+    // GuidRepresentation.Standard uses RFC 4122 byte order (no shuffling)
+    private static byte[] GuidToStandardBytes(Guid id) => id.ToByteArray(bigEndian: true);
+
     [Fact]
     public async Task MongoRepository_Insert_DocumentExistsWithGuidSubtype4()
     {
@@ -151,13 +162,13 @@ public class MongoPhase1Tests : IAsyncLifetime
 
         await repo.AddAsync(entity);
 
-        // Verify GUID stored as Standard (subtype 4) string
+        // Verify GUID stored as binary UUID subtype 4 (Standard)
         var collection = _database.GetCollection<BsonDocument>("mongotestentitys");
-        var doc = await collection.Find(new BsonDocument("_id", entity.Id.ToString())).FirstOrDefaultAsync();
+        var doc = await collection.Find(IdFilter(entity.Id)).FirstOrDefaultAsync();
 
         Assert.NotNull(doc);
-        // Id stored as string UUID (Standard representation)
-        Assert.True(doc["_id"].IsString || doc["_id"].BsonType == BsonType.String);
+        Assert.Equal(BsonType.Binary, doc["_id"].BsonType);
+        Assert.Equal(BsonBinarySubType.UuidStandard, doc["_id"].AsBsonBinaryData.SubType);
     }
 
     [Fact]
@@ -169,12 +180,11 @@ public class MongoPhase1Tests : IAsyncLifetime
         await repo.AddAsync(entity);
 
         var collection = _database.GetCollection<BsonDocument>("mongotestentitys");
-        var doc = await collection.Find(new BsonDocument("_id", entity.Id.ToString())).FirstOrDefaultAsync();
+        var doc = await collection.Find(IdFilter(entity.Id)).FirstOrDefaultAsync();
 
         Assert.NotNull(doc);
         // createdAt must be stored as Int64 (Unix ms), NOT BsonType.DateTime
-        var createdAt = doc["createdAt"];
-        Assert.Equal(BsonType.Int64, createdAt.BsonType);
+        Assert.Equal(BsonType.Int64, doc["createdAt"].BsonType);
     }
 
     [Fact]
@@ -189,7 +199,7 @@ public class MongoPhase1Tests : IAsyncLifetime
 
         // 1. Raw BSON: Int64 Unix ms (UTC-epoch based)
         var collection = _database.GetCollection<BsonDocument>("mongotestentitys");
-        var doc = await collection.Find(new BsonDocument("_id", entity.Id.ToString())).FirstOrDefaultAsync();
+        var doc = await collection.Find(IdFilter(entity.Id)).FirstOrDefaultAsync();
         Assert.NotNull(doc);
         Assert.Equal(BsonType.Int64, doc["createdAt"].BsonType);
 
@@ -217,7 +227,7 @@ public class MongoPhase1Tests : IAsyncLifetime
 
         // But document still physically exists in collection
         var collection = _database.GetCollection<BsonDocument>("mongotestentitys");
-        var doc = await collection.Find(new BsonDocument("_id", entity.Id.ToString())).FirstOrDefaultAsync();
+        var doc = await collection.Find(IdFilter(entity.Id)).FirstOrDefaultAsync();
         Assert.NotNull(doc);
         Assert.True(doc["isDeleted"].AsBoolean);
     }

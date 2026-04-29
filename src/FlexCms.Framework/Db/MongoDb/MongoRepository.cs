@@ -1,5 +1,7 @@
 using System.Linq.Expressions;
+using System.Security.Claims;
 using FlexCms.Framework.Clock;
+using Microsoft.AspNetCore.Http;
 using MongoDB.Driver;
 
 namespace FlexCms.Framework.Db.MongoDb;
@@ -7,13 +9,21 @@ namespace FlexCms.Framework.Db.MongoDb;
 public class MongoRepository<T> : IRepository<T> where T : BaseMongoEntity
 {
     protected readonly IMongoCollection<T> _collection;
+    private readonly IHttpContextAccessor? _httpContextAccessor;
 
     private static readonly FilterDefinitionBuilder<T> Filter = Builders<T>.Filter;
 
-    public MongoRepository(IMongoDatabase database)
+    public MongoRepository(IMongoDatabase database, IHttpContextAccessor? httpContextAccessor = null)
     {
         var collectionName = typeof(T).Name.ToLowerInvariant() + "s";
         _collection = database.GetCollection<T>(collectionName);
+        _httpContextAccessor = httpContextAccessor;
+    }
+
+    private Guid? CurrentUserId()
+    {
+        var claim = _httpContextAccessor?.HttpContext?.User?.FindFirstValue(ClaimTypes.NameIdentifier);
+        return Guid.TryParse(claim, out var id) ? id : null;
     }
 
     // All queries auto-prepend IsDeleted=false (B3 fix)
@@ -61,22 +71,28 @@ public class MongoRepository<T> : IRepository<T> where T : BaseMongoEntity
 
     public async Task AddAsync(T entity, CancellationToken ct = default)
     {
-        entity.CreatedAt = FcmsTime.Now;
-        entity.UpdatedAt = FcmsTime.Now;
+        var now = FcmsTime.Now;
+        var userId = CurrentUserId();
+        entity.CreatedAt = now;
+        entity.UpdatedAt = now;
+        entity.CreatedBy ??= userId;
+        entity.UpdatedBy = userId;
         await _collection.InsertOneAsync(entity, cancellationToken: ct);
     }
 
     public async Task AddRangeAsync(IEnumerable<T> entities, CancellationToken ct = default)
     {
         var now = FcmsTime.Now;
+        var userId = CurrentUserId();
         var list = entities.ToList();
-        foreach (var e in list) { e.CreatedAt = now; e.UpdatedAt = now; }
+        foreach (var e in list) { e.CreatedAt = now; e.UpdatedAt = now; e.CreatedBy ??= userId; e.UpdatedBy = userId; }
         await _collection.InsertManyAsync(list, cancellationToken: ct);
     }
 
     public async Task UpdateAsync(T entity, CancellationToken ct = default)
     {
         entity.UpdatedAt = FcmsTime.Now;
+        entity.UpdatedBy = CurrentUserId();
         await _collection.ReplaceOneAsync(
             Filter.Eq(e => e.Id, entity.Id), entity, cancellationToken: ct);
     }
@@ -90,6 +106,7 @@ public class MongoRepository<T> : IRepository<T> where T : BaseMongoEntity
     {
         entity.IsDeleted = true;
         entity.UpdatedAt = FcmsTime.Now;
+        entity.UpdatedBy = CurrentUserId();
         await _collection.ReplaceOneAsync(
             Filter.Eq(e => e.Id, entity.Id), entity, cancellationToken: ct);
     }

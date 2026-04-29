@@ -1,17 +1,18 @@
 version: '3.8'
 
 # ─────────────────────────────────────────────────────────────────
-#  FlexCMS v1 — Dev Database Stack
+#  Dev Database Stack
 #  MSSQL · MySQL · PostgreSQL · MongoDB (single-node replica set)
 #
 #  Usage:
 #    docker compose up -d
 #
 #  Connection strings:
-#    MSSQL      : Server=localhost,1433;User=sa;Password=Dev@123456;
-#    MySQL      : Server=localhost;Port=3306;Uid=dev;Pwd=Dev@123456;
-#    PostgreSQL : Host=localhost;Port=5432;Username=dev;Password=Dev@123456;
-#    MongoDB    : mongodb://dev:Dev%40123456@localhost:27017/?replicaSet=rs0&authSource=admin
+#    MSSQL                 : Server=localhost,1433;User=sa;Password=Dev@123456;
+#    MySQL                 : Server=localhost;Port=3306;Uid=dev;Pwd=Dev@123456;
+#    PostgreSQL            : Host=localhost;Port=5432;Username=dev;Password=Dev@123456;
+#    MongoDB (PC)          : mongodb://dev:Dev%40123456@localhost:27017/?replicaSet=rs0&authSource=admin
+#    MongoDB (Container)   : mongodb://dev:Dev%40123456@mongodb:27017/?replicaSet=rs0&authSource=admin
 # ─────────────────────────────────────────────────────────────────
 
 services:
@@ -19,7 +20,7 @@ services:
   # ── SQL Server 2022 ───────────────────────────────────────────
   mssql:
     image: mcr.microsoft.com/mssql/server:2022-latest
-    container_name: flexcms-mssql
+    container_name: mssql
     restart: unless-stopped
     ports:
       - "1433:1433"
@@ -33,12 +34,13 @@ services:
   # ── MySQL 8.4 ─────────────────────────────────────────────────
   mysql:
     image: mysql:8.4
-    container_name: flexcms-mysql
+    container_name: mysql
     restart: unless-stopped
     ports:
       - "3306:3306"
     environment:
       - MYSQL_ROOT_PASSWORD=Dev@123456
+      - MYSQL_DATABASE=testdb
       - MYSQL_USER=dev
       - MYSQL_PASSWORD=Dev@123456
     volumes:
@@ -47,24 +49,22 @@ services:
   # ── PostgreSQL 16 ─────────────────────────────────────────────
   postgres:
     image: postgres:16
-    container_name: flexcms-postgres
+    container_name: postgres
     restart: unless-stopped
     ports:
       - "5432:5432"
     environment:
+      - POSTGRES_DB=testdb
       - POSTGRES_USER=dev
       - POSTGRES_PASSWORD=Dev@123456
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
-  # ── MongoDB 7 — single-node replica set ──────────────────────
-  # Single node is enough for dev; transactions and change streams work fine.
-  # rs-init runs once and exits; subsequent `docker compose up` skips it safely.
+  # ── MongoDB 7 — single-node replica set (WITH KEYFILE FIX) ────
   mongodb:
     image: mongo:7
-    container_name: flexcms-mongodb
+    container_name: mongodb
     restart: unless-stopped
-    command: mongod --replSet rs0 --bind_ip_all
     ports:
       - "27017:27017"
     environment:
@@ -72,22 +72,46 @@ services:
       - MONGO_INITDB_ROOT_PASSWORD=Dev@123456
     volumes:
       - mongo_data:/data/db
-
-  mongo-rs-init:
-    image: mongo:7
-    container_name: flexcms-mongo-rs-init
-    restart: "no"
     entrypoint: >
       bash -c "
-        echo 'Waiting for mongodb...' &&
-        until mongosh --host mongodb --username dev --password Dev@123456 --authenticationDatabase admin --eval 'db.runCommand({ping:1})' --quiet; do sleep 2; done &&
+        if [ ! -f /data/keyfile ]; then
+          openssl rand -base64 756 > /data/keyfile;
+          chmod 400 /data/keyfile;
+          chown mongodb:mongodb /data/keyfile;
+        fi;
+        exec docker-entrypoint.sh mongod --replSet rs0 --bind_ip_all --keyFile /data/keyfile
+      "
+    healthcheck:
+      test: [ "CMD", "mongosh", "-u", "dev", "-p", "Dev@123456", "--authenticationDatabase", "admin", "--eval", "db.adminCommand('ping')" ]
+      interval: 5s
+      timeout: 10s
+      retries: 10
+      start_period: 20s
+
+  # ── Mongo Replica Set Init ────────────────────────────────────
+  mongo-rs-init:
+    image: mongo:7
+    container_name: mongo-rs-init
+    restart: "no"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    entrypoint: >
+      bash -c "
+        echo 'Initializing MongoDB replica set...' &&
         mongosh --host mongodb --username dev --password Dev@123456 --authenticationDatabase admin --eval '
-          try { rs.status(); print(\"Already initiated.\"); }
-          catch(e) { rs.initiate({ _id: \"rs0\", members: [{ _id: 0, host: \"localhost:27017\" }] }); print(\"Done.\"); }
+          try {
+            rs.status();
+            print(\"Replica set already initialized.\");
+          } catch(e) {
+            rs.initiate({
+              _id: \"rs0\",
+              members: [{ _id: 0, host: \"mongodb:27017\" }]
+            });
+            print(\"Replica set initialized.\");
+          }
         '
       "
-    depends_on:
-      - mongodb
 
 # ── Named volumes ──────────────────────────────────────────────
 volumes:

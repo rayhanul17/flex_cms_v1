@@ -1,5 +1,6 @@
 using FlexCms.Framework.Auth;
 using FlexCms.Framework.Auth.Ef;
+using FlexCms.Framework.Cms;
 using FlexCms.Framework.Clock;
 using FlexCms.Framework.Auth.MongoDb;
 using FlexCms.Framework.Db;
@@ -54,6 +55,11 @@ public static class FcmsServiceExtensions
 
         // Settings service (DB-backed; only useful when a DB provider is configured)
         services.AddScoped<ISettingsService, SettingsService>();
+
+        // CMS services
+        services.AddScoped<IPageService, PageService>();
+        services.AddScoped<ICategoryService, CategoryService>();
+        services.AddScoped<IPostService, PostService>();
 
         // Permission service (15min IMemoryCache — requires IRepository<> to be registered)
         services.AddMemoryCache();

@@ -17,7 +17,11 @@ public class CategoryService : ICategoryService
         => _db.Categories.FirstOrDefaultAsync(c => c.Slug == slug && !c.IsDeleted, ct);
 
     public Task<List<FcmsCategory>> GetAllAsync(CancellationToken ct = default)
-        => _db.Categories.Where(c => !c.IsDeleted).OrderBy(c => c.SortOrder).ThenBy(c => c.Name).ToListAsync(ct);
+        => _db.Categories
+            .Where(c => !c.IsDeleted)
+            .Include(c => c.Posts.Where(p => !p.IsDeleted))
+            .OrderBy(c => c.SortOrder).ThenBy(c => c.Name)
+            .ToListAsync(ct);
 
     public Task<bool> SlugExistsAsync(string slug, Guid? excludeId = null, CancellationToken ct = default)
         => _db.Categories.AnyAsync(c => !c.IsDeleted && c.Slug == slug && c.Id != (excludeId ?? Guid.Empty), ct);

@@ -13,4 +13,5 @@ public abstract class BaseMongoEntity : IBaseEntity
     public Guid? CreatedBy { get; set; }
     public Guid? UpdatedBy { get; set; }
     public bool IsDeleted { get; set; }
+    public DateTime? DeletedAt { get; set; }
 }

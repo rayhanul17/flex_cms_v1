@@ -138,6 +138,7 @@ public class MongoRepository<T> : IRepository<T>, IMongoSessionAware where T : c
     public async Task SoftDeleteAsync(T entity, CancellationToken ct = default)
     {
         entity.IsDeleted = true;
+        entity.DeletedAt ??= FcmsTime.Now;
         entity.UpdatedAt = FcmsTime.Now;
         entity.UpdatedBy = CurrentUserId();
         var f = Filter.Eq(e => e.Id, entity.Id);
@@ -221,6 +222,7 @@ public class MongoRepository<T> : IRepository<T>, IMongoSessionAware where T : c
         var models = entities.Select(e =>
         {
             e.IsDeleted = true;
+            e.DeletedAt ??= now;
             e.UpdatedAt = now;
             e.UpdatedBy = userId;
             return new ReplaceOneModel<T>(Filter.Eq(x => x.Id, e.Id), e);

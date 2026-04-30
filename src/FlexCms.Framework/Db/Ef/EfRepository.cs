@@ -45,22 +45,13 @@ public class EfRepository<T> : IRepository<T> where T : BaseEfEntity
     }
 
     public async Task AddAsync(T entity, CancellationToken ct = default)
-    {
-        entity.CreatedAt = FcmsTime.Now;
-        entity.UpdatedAt = FcmsTime.Now;
-        await _set.AddAsync(entity, ct);
-    }
+        => await _set.AddAsync(entity, ct);
 
     public async Task AddRangeAsync(IEnumerable<T> entities, CancellationToken ct = default)
-    {
-        var now = FcmsTime.Now;
-        foreach (var e in entities) { e.CreatedAt = now; e.UpdatedAt = now; }
-        await _set.AddRangeAsync(entities, ct);
-    }
+        => await _set.AddRangeAsync(entities, ct);
 
     public Task UpdateAsync(T entity, CancellationToken ct = default)
     {
-        entity.UpdatedAt = FcmsTime.Now;
         _set.Update(entity);
         return Task.CompletedTask;
     }
@@ -74,6 +65,7 @@ public class EfRepository<T> : IRepository<T> where T : BaseEfEntity
     public Task SoftDeleteAsync(T entity, CancellationToken ct = default)
     {
         entity.IsDeleted = true;
+        entity.DeletedAt ??= FcmsTime.Now;
         entity.UpdatedAt = FcmsTime.Now;
         _set.Update(entity);
         return Task.CompletedTask;
@@ -116,8 +108,6 @@ public class EfRepository<T> : IRepository<T> where T : BaseEfEntity
 
     public Task UpdateRangeAsync(IEnumerable<T> entities, CancellationToken ct = default)
     {
-        var now = FcmsTime.Now;
-        foreach (var e in entities) e.UpdatedAt = now;
         _set.UpdateRange(entities);
         return Task.CompletedTask;
     }
@@ -125,7 +115,7 @@ public class EfRepository<T> : IRepository<T> where T : BaseEfEntity
     public Task SoftDeleteRangeAsync(IEnumerable<T> entities, CancellationToken ct = default)
     {
         var now = FcmsTime.Now;
-        foreach (var e in entities) { e.IsDeleted = true; e.UpdatedAt = now; }
+        foreach (var e in entities) { e.IsDeleted = true; e.DeletedAt ??= now; e.UpdatedAt = now; }
         _set.UpdateRange(entities);
         return Task.CompletedTask;
     }

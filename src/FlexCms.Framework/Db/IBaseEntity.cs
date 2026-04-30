@@ -8,4 +8,5 @@ public interface IBaseEntity
     Guid? CreatedBy { get; set; }
     Guid? UpdatedBy { get; set; }
     bool IsDeleted { get; set; }
+    DateTime? DeletedAt { get; set; }
 }

@@ -250,6 +250,9 @@ public static class FcmsServiceExtensions
 
                     identityBuilder.AddUserStore<MongoUserStore>();
                     identityBuilder.AddRoleStore<MongoRoleStore>();
+
+                    // Create indexes mirroring EF unique constraints / FKs
+                    services.AddHostedService<MongoIndexService>();
                 }
             }
         }

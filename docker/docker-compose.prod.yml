@@ -1,0 +1,91 @@
+version: '3.8'
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  FlexCMS — Production Stack
+#
+#  Required secrets (set via environment or .env file on the server):
+#    FLEXCMS_IMAGE      — GHCR image tag, e.g. ghcr.io/org/flex_cms_v1:latest
+#    MONGO_PASSWORD     — MongoDB root/app password
+#    APP_DATA_PATH      — Host path for App_Data volume (default: ./data/app_data)
+#    MONGO_DATA_PATH    — Host path for MongoDB data   (default: ./data/mongo)
+#    DOMAIN             — Public domain, used by Traefik labels
+#
+#  Usage:
+#    docker compose -f docker/docker-compose.prod.yml up -d
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+
+  # ── FlexCMS Application ────────────────────────────────────────────────────
+  flexcms:
+    image: ${FLEXCMS_IMAGE:-ghcr.io/rayhanul17/flex_cms_v1:latest}
+    container_name: flexcms
+    restart: unless-stopped
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    volumes:
+      - ${APP_DATA_PATH:-./data/app_data}:/app/App_Data
+      - ${APP_DATA_PATH:-./data/app_data}/uploads:/app/wwwroot/uploads
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+    # Health check — hits the setup wizard redirect or login page
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # ── MongoDB 7 — single-node replica set ───────────────────────────────────
+  mongodb:
+    image: mongo:7
+    container_name: mongodb
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:27017:27017"   # bind only to localhost — not exposed publicly
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=dev
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_PASSWORD:-Dev@123456}
+    volumes:
+      - ${MONGO_DATA_PATH:-./data/mongo}:/data/db
+      - mongo_keyfile:/data/keyfile_dir
+    entrypoint: >
+      bash -c "
+        if [ ! -f /data/keyfile_dir/keyfile ]; then
+          openssl rand -base64 756 > /data/keyfile_dir/keyfile;
+          chmod 400 /data/keyfile_dir/keyfile;
+          chown 999:999 /data/keyfile_dir/keyfile;
+        fi;
+        exec docker-entrypoint.sh mongod --replSet rs0 --bind_ip_all --keyFile /data/keyfile_dir/keyfile
+      "
+    healthcheck:
+      test: ["CMD", "mongosh", "-u", "dev", "-p", "${MONGO_PASSWORD:-Dev@123456}", "--authenticationDatabase", "admin", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 10s
+      retries: 10
+      start_period: 20s
+
+  # ── Replica Set Init (runs once, then exits) ──────────────────────────────
+  mongo-rs-init:
+    image: mongo:7
+    container_name: mongo-rs-init
+    restart: "no"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    entrypoint: >
+      bash -c "
+        mongosh --host mongodb -u dev -p '${MONGO_PASSWORD:-Dev@123456}' --authenticationDatabase admin --eval '
+          try { rs.status(); print(\"Already initialized.\"); }
+          catch(e) {
+            rs.initiate({ _id: \"rs0\", members: [{ _id: 0, host: \"mongodb:27017\" }] });
+            print(\"Replica set initialized.\");
+          }
+        '
+      "
+
+volumes:
+  mongo_keyfile:

@@ -77,7 +77,7 @@ services:
         if [ ! -f /data/keyfile ]; then
           openssl rand -base64 756 > /data/keyfile;
           chmod 400 /data/keyfile;
-          chown mongodb:mongodb /data/keyfile;
+          chown 999:999 /data/keyfile;
         fi;
         exec docker-entrypoint.sh mongod --replSet rs0 --bind_ip_all --keyFile /data/keyfile
       "

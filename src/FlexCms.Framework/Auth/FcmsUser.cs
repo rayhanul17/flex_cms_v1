@@ -11,6 +11,7 @@ public class FcmsUser : IdentityUser<Guid>
 
     public bool ForcePasswordChange { get; set; }
     public DateTime CreatedAt { get; set; } = FlexCms.Framework.Clock.FcmsTime.Now;
+    public DateTime UpdatedAt { get; set; } = FlexCms.Framework.Clock.FcmsTime.Now;
     public List<string> Roles { get; set; } = [];
 
     // Embedded collections for MongoDB

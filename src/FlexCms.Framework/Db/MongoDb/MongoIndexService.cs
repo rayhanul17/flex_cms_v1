@@ -34,6 +34,23 @@ public class MongoIndexService : IHostedService
 
     private async Task CreateIndexesAsync(CancellationToken ct)
     {
+        // ── Identity ──────────────────────────────────────────────────────────
+
+        // FcmsUser.NormalizedUserName unique (mirrors EF Identity convention)
+        await UniqueAsync<FcmsUser>(
+            Builders<FcmsUser>.IndexKeys.Ascending(u => u.NormalizedUserName),
+            "ux_users_normalized_user_name", ct);
+
+        // FcmsUser.NormalizedEmail unique
+        await UniqueAsync<FcmsUser>(
+            Builders<FcmsUser>.IndexKeys.Ascending(u => u.NormalizedEmail),
+            "ux_users_normalized_email", ct);
+
+        // FcmsRole.NormalizedName unique
+        await UniqueAsync<FcmsRole>(
+            Builders<FcmsRole>.IndexKeys.Ascending(r => r.NormalizedName),
+            "ux_roles_normalized_name", ct);
+
         // ── Auth ──────────────────────────────────────────────────────────────
 
         // FcmsPermission.Key unique

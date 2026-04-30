@@ -40,6 +40,7 @@ public class MongoUserStore :
 
     public async Task<IdentityResult> UpdateAsync(FcmsUser user, CancellationToken ct)
     {
+        user.UpdatedAt = FlexCms.Framework.Clock.FcmsTime.Now;
         await _users.ReplaceOneAsync(ById(user.Id.ToString()), user, new ReplaceOptions(), ct);
         return IdentityResult.Success;
     }
@@ -187,7 +188,12 @@ public class MongoUserStore :
 
     public async Task<IList<FcmsUser>> GetUsersInRoleAsync(string roleName, CancellationToken ct)
     {
-        var filter = Builders<FcmsUser>.Filter.AnyEq(u => u.Roles, roleName);
+        // roleName may be normalized (uppercase). Look up the actual stored name first.
+        var role = await _roles.Find(
+            Builders<FcmsRole>.Filter.Eq(r => r.NormalizedName, roleName.ToUpperInvariant()))
+            .FirstOrDefaultAsync(ct);
+        var nameToSearch = role?.Name ?? roleName;
+        var filter = Builders<FcmsUser>.Filter.AnyEq(u => u.Roles, nameToSearch);
         return await _users.Find(filter).ToListAsync(ct);
     }
 

@@ -18,7 +18,7 @@ public class PostServiceTrashTests : IDisposable
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
             .Options;
         _db = new FcmsDbContext(opts);
-        _svc = new PostService(_db);
+        _svc = new PostService(new EfRepository<FcmsPost>(_db), new EfRepository<FcmsTag>(_db), new EfRepository<FcmsPostTag>(_db), new EfUnitOfWork(_db));
     }
 
     public void Dispose() => _db.Dispose();

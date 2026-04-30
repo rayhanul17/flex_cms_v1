@@ -27,7 +27,7 @@ public class HomeController : Controller
     {
         if (statusCode == 404)
             return View("Error404");
-            
+
         return View("Error");
     }
 }

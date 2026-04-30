@@ -18,7 +18,7 @@ public class PageServiceTrashTests : IDisposable
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
             .Options;
         _db = new FcmsDbContext(opts);
-        _svc = new PageService(_db);
+        _svc = new PageService(new EfRepository<FcmsPage>(_db), new EfUnitOfWork(_db));
     }
 
     public void Dispose() => _db.Dispose();

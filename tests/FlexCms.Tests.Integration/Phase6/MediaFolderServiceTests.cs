@@ -93,8 +93,15 @@ public class MediaFolderServiceTests : IDisposable
         var child = await _svc.CreateAsync("Child", parent.Id);
         await Save();
 
-        var media = new FcmsMedia { FileName = "f.pdf", OriginalFileName = "f.pdf", MimeType = "application/pdf",
-            Extension = ".pdf", Url = "/f.pdf", FolderId = child.Id };
+        var media = new FcmsMedia
+        {
+            FileName = "f.pdf",
+            OriginalFileName = "f.pdf",
+            MimeType = "application/pdf",
+            Extension = ".pdf",
+            Url = "/f.pdf",
+            FolderId = child.Id
+        };
         _db.Set<FcmsMedia>().Add(media);
         await Save();
 
@@ -110,8 +117,15 @@ public class MediaFolderServiceTests : IDisposable
     {
         var folder = await _svc.CreateAsync("RootChild", null);
         await Save();
-        var media = new FcmsMedia { FileName = "g.pdf", OriginalFileName = "g.pdf", MimeType = "application/pdf",
-            Extension = ".pdf", Url = "/g.pdf", FolderId = folder.Id };
+        var media = new FcmsMedia
+        {
+            FileName = "g.pdf",
+            OriginalFileName = "g.pdf",
+            MimeType = "application/pdf",
+            Extension = ".pdf",
+            Url = "/g.pdf",
+            FolderId = folder.Id
+        };
         _db.Set<FcmsMedia>().Add(media);
         await Save();
 

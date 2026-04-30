@@ -44,6 +44,7 @@ public class TrashCleanupService : BackgroundService
         var pageRepo = scope.ServiceProvider.GetRequiredService<Db.IRepository<FcmsPage>>();
         var postRepo = scope.ServiceProvider.GetRequiredService<Db.IRepository<FcmsPost>>();
         var postTagRepo = scope.ServiceProvider.GetRequiredService<Db.IRepository<FcmsPostTag>>();
+        var uow = scope.ServiceProvider.GetRequiredService<Db.IFcmsUnitOfWork>();
         var cutoff = FcmsTime.Now.AddDays(-_opts.RetentionDays);
 
         var oldPages = await pageRepo.FindAsync(p => p.IsDeleted && p.DeletedAt != null && p.DeletedAt < cutoff, ct: ct, includeDeleted: true);
@@ -60,6 +61,7 @@ public class TrashCleanupService : BackgroundService
 
         if (oldPages.Count + oldPosts.Count > 0)
         {
+            await uow.SaveChangesAsync(ct);
             _logger.LogInformation("TrashCleanup: purged {Pages} page(s), {Posts} post(s).", oldPages.Count, oldPosts.Count);
         }
     }

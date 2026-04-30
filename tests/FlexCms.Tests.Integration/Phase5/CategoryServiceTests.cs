@@ -15,7 +15,7 @@ public class CategoryServiceTests : IDisposable
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
             .Options;
         _db = new FcmsDbContext(opts);
-        _svc = new CategoryService(_db);
+        _svc = new CategoryService(new EfRepository<FcmsCategory>(_db), new EfUnitOfWork(_db));
     }
 
     public void Dispose() => _db.Dispose();

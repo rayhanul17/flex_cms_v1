@@ -60,7 +60,7 @@ public static class FcmsServiceExtensions
         // File storage — local by default; swap for cloud implementation without changing services
         services.AddScoped<IFcmsFileStorage, LocalFileStorage>();
 
-        // CMS services
+        // CMS services — IFcmsUnitOfWork is injected by DI (registered below per provider)
         services.AddScoped<IPageService, PageService>();
         services.AddScoped<ICategoryService, CategoryService>();
         services.AddScoped<IPostService, PostService>();
@@ -98,21 +98,19 @@ public static class FcmsServiceExtensions
         services.AddHostedService<ModuleActivationService>();
 
         // ── Module discovery + wiring ────────────────────────────────────────
-        var registry = BuildModuleRegistry(services, options.AppDataPath);
-        services.AddSingleton(registry);
-
-        // The registry is built once at startup; each loaded module gets:
+        // Scan the modules/ directory (sibling of App_Data). Each discovered module gets:
         //   1. RegisterServices(services) called
         //   2. AttributeScanner runs over its assembly for [FcmsScoped]/etc
         //   3. Its assembly added as an MVC ApplicationPart so its controllers
         //      and Razor views become routable
+        // ModuleLoader/Manager/StateService are available for admin UI queries.
         services.AddSingleton<ModuleLoader>();
         services.AddSingleton<ModuleManager>();
         services.AddSingleton<ModuleStateService>();
 
         var modulesRoot = Path.Combine(options.AppDataPath, "..", "modules");
-        var loadedModules = BuildModuleRegistry(services, modulesRoot);
-        services.AddSingleton(loadedModules);
+        var registry = BuildModuleRegistry(services, modulesRoot);
+        services.AddSingleton(registry);
 
         // Cookie authentication (8h sliding window).
         // Scheme name MUST be IdentityConstants.ApplicationScheme so that
@@ -200,18 +198,6 @@ public static class FcmsServiceExtensions
                 .AddSignInManager<SignInManager<FcmsUser>>()
                 .AddPasswordValidator<FcmsPasswordValidator>()
                 .AddDefaultTokenProviders();
-
-            services.AddAuthentication().AddIdentityCookies();
-
-            services.ConfigureApplicationCookie(options =>
-            {
-                options.LoginPath = "/auth/login";
-                options.AccessDeniedPath = "/auth/access-denied"; // Or wherever you want
-                options.ExpireTimeSpan = TimeSpan.FromDays(30);
-                options.Cookie.HttpOnly = true;
-                options.Cookie.SameSite = SameSiteMode.Lax;
-                options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
-            });
 
             if (options.UseMySQL)
             {

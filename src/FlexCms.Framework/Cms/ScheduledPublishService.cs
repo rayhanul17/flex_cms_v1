@@ -36,6 +36,7 @@ public class ScheduledPublishService : BackgroundService
         await using var scope = _scopes.CreateAsyncScope();
         var pageRepo = scope.ServiceProvider.GetRequiredService<Db.IRepository<FcmsPage>>();
         var postRepo = scope.ServiceProvider.GetRequiredService<Db.IRepository<FcmsPost>>();
+        var uow = scope.ServiceProvider.GetRequiredService<Db.IFcmsUnitOfWork>();
         var now = FcmsTime.Now;
 
         var pages = await pageRepo.FindAsync(p => !p.IsPublished && p.PublishedAt != null && p.PublishedAt <= now, ct);
@@ -46,6 +47,7 @@ public class ScheduledPublishService : BackgroundService
         foreach (var page in pages) { page.IsPublished = true; page.UpdatedAt = now; await pageRepo.UpdateAsync(page, ct); }
         foreach (var post in posts) { post.IsPublished = true; post.UpdatedAt = now; await postRepo.UpdateAsync(post, ct); }
 
+        await uow.SaveChangesAsync(ct);
         _logger.LogInformation("ScheduledPublish: published {Pages} page(s), {Posts} post(s).", pages.Count, posts.Count);
     }
 }

@@ -31,7 +31,7 @@ public static class MongoDbSerializerSetup
                 new EnumRepresentationConvention(BsonType.String)
             };
             ConventionRegistry.Register("FcmsConventions", pack, _ => true);
-            
+
             // Map BaseEfEntity Id to BsonId since it doesn't have the [BsonId] attribute
             if (!BsonClassMap.IsClassMapRegistered(typeof(Db.Ef.BaseEfEntity)))
             {

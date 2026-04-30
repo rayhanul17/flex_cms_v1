@@ -23,6 +23,10 @@ public static class MongoDbSerializerSetup
             // DateTime as Unix milliseconds Int64 (NOT BSON Date)
             BsonSerializer.RegisterSerializer(typeof(DateTime), FcmsDateTimeSerializer.Instance);
 
+            // DateTimeOffset (used by IdentityUser.LockoutEnd) — store as ISO string
+            BsonSerializer.RegisterSerializer(typeof(DateTimeOffset), new DateTimeOffsetSerializer(BsonType.String));
+            BsonSerializer.RegisterSerializer(typeof(DateTimeOffset?), new NullableSerializer<DateTimeOffset>(new DateTimeOffsetSerializer(BsonType.String)));
+
             // Camel-case element names, ignore extra elements
             var pack = new ConventionPack
             {

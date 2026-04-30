@@ -15,6 +15,7 @@ public class OperationLogService : IOperationLogService
     private readonly IRepository<FcmsOperationLogArchive> _archive;
     private readonly IFcmsContextService _context;
     private readonly ISettingsService _settings;
+    private readonly IFcmsUnitOfWork _uow;
 
     private static readonly JsonSerializerOptions JsonOpts = new()
     {
@@ -26,12 +27,14 @@ public class OperationLogService : IOperationLogService
         IRepository<FcmsOperationLog> logs,
         IRepository<FcmsOperationLogArchive> archive,
         IFcmsContextService context,
-        ISettingsService settings)
+        ISettingsService settings,
+        IFcmsUnitOfWork uow)
     {
         _logs = logs;
         _archive = archive;
         _context = context;
         _settings = settings;
+        _uow = uow;
     }
 
     public async Task LogAsync(
@@ -61,6 +64,7 @@ public class OperationLogService : IOperationLogService
         };
 
         await _logs.AddAsync(log, ct);
+        await _uow.SaveChangesAsync(ct);
     }
 
     public async Task ArchiveOlderThanAsync(TimeSpan age, CancellationToken ct = default)
@@ -89,13 +93,17 @@ public class OperationLogService : IOperationLogService
 
         await _archive.AddRangeAsync(archiveEntries, ct);
         await _logs.SoftDeleteRangeAsync(old, ct);
+        await _uow.SaveChangesAsync(ct);
     }
 
     public async Task ClearArchiveAsync(CancellationToken ct = default)
     {
         var all = await _archive.GetAllAsync(ct);
         if (all.Count > 0)
+        {
             await _archive.SoftDeleteRangeAsync(all, ct);
+            await _uow.SaveChangesAsync(ct);
+        }
     }
 
     public async Task<IReadOnlyList<FcmsOperationLog>> GetRecentAsync(int count = 100, CancellationToken ct = default)

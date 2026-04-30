@@ -118,8 +118,8 @@ app.UseStatusCodePagesWithReExecute("/Home/Error/{0}");
 app.UseHttpsRedirection();
 app.UseStaticFiles();
 app.UseMiddleware<RedirectMiddleware>();   // after static files — no DB hit per asset
-app.UseSession();
 app.UseRouting();
+app.UseSession();
 app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();

@@ -1,5 +1,4 @@
 using FlexCms.Framework.Db;
-using FlexCms.Framework.Db.Ef;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -53,11 +52,13 @@ public class RedirectMiddleware
         {
             await using var scope = services.CreateAsyncScope();
             var repo = scope.ServiceProvider.GetRequiredService<IRepository<Cms.FcmsRedirect>>();
+            var uow = scope.ServiceProvider.GetRequiredService<IFcmsUnitOfWork>();
             var redirect = await repo.GetByIdAsync(redirectId);
             if (redirect is not null)
             {
                 redirect.HitCount++;
                 await repo.UpdateAsync(redirect);
+                await uow.SaveChangesAsync();
             }
         }
         catch (Exception ex)

@@ -34,7 +34,7 @@ public class OperationLogServiceTests : IDisposable
 
         var logRepo = new EfRepository<FcmsOperationLog>(_db);
         var archiveRepo = new EfRepository<FcmsOperationLogArchive>(_db);
-        _svc = new OperationLogService(logRepo, archiveRepo, context, _settings);
+        _svc = new OperationLogService(logRepo, archiveRepo, context, _settings, new EfUnitOfWork(_db));
     }
 
     public void Dispose() => _db.Dispose();

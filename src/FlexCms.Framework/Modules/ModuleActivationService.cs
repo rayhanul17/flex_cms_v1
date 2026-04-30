@@ -48,6 +48,7 @@ public class ModuleActivationService : IHostedService
         await using var scope = _scopes.CreateAsyncScope();
         var repo = scope.ServiceProvider.GetService<Db.IRepository<FcmsModuleRecord>>();
         if (repo is null) return;
+        var uow = scope.ServiceProvider.GetRequiredService<Db.IFcmsUnitOfWork>();
 
         foreach (var loaded in activeModules)
         {
@@ -88,6 +89,7 @@ public class ModuleActivationService : IHostedService
                     ActivatedAt = DateTime.UtcNow
                 };
                 await repo.AddAsync(record, ct);
+                await uow.SaveChangesAsync(ct);
             }
 
             if (!record.SeedCompleted)
@@ -98,6 +100,7 @@ public class ModuleActivationService : IHostedService
                     record.SeedCompleted = true;
                     record.Version = module.Version;
                     await repo.UpdateAsync(record, ct);
+                    await uow.SaveChangesAsync(ct);
                     _logger.LogInformation("Module {Id}: seed completed.", module.ModuleId);
                 }
                 catch (Exception ex)
@@ -115,6 +118,7 @@ public class ModuleActivationService : IHostedService
                     await module.OnUpgradeAsync(fromVersion, scope.ServiceProvider, ct);
                     record.Version = module.Version;
                     await repo.UpdateAsync(record, ct);
+                    await uow.SaveChangesAsync(ct);
                     _logger.LogInformation("Module {Id}: upgraded {From} → {To}.",
                         module.ModuleId, fromVersion, module.Version);
                 }

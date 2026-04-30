@@ -18,10 +18,12 @@ public class MongoUserStore :
     IUserAuthenticationTokenStore<FcmsUser>
 {
     private readonly IMongoCollection<FcmsUser> _users;
+    private readonly IMongoCollection<FcmsRole> _roles;
 
     public MongoUserStore(IMongoDatabase database)
     {
         _users = database.GetCollection<FcmsUser>(Helpers.FcmsHelper.GetEntityName<FcmsUser>("fcms"));
+        _roles = database.GetCollection<FcmsRole>(Helpers.FcmsHelper.GetEntityName<FcmsRole>("fcms"));
     }
 
     public IQueryable<FcmsUser> Users => _users.AsQueryable();
@@ -156,11 +158,17 @@ public class MongoUserStore :
     }
 
     // IUserRoleStore
-    public Task AddToRoleAsync(FcmsUser user, string roleName, CancellationToken ct)
+    public async Task AddToRoleAsync(FcmsUser user, string roleName, CancellationToken ct)
     {
-        if (!user.Roles.Contains(roleName, StringComparer.OrdinalIgnoreCase))
-            user.Roles.Add(roleName);
-        return Task.CompletedTask;
+        // UserManager passes the normalized (uppercase) role name.
+        // Look up the actual role name so the claim stored in the cookie matches
+        // the original casing expected by IsInRole("SuperAdmin") etc.
+        var role = await _roles.Find(
+            Builders<FcmsRole>.Filter.Eq(r => r.NormalizedName, roleName.ToUpperInvariant()))
+            .FirstOrDefaultAsync(ct);
+        var nameToStore = role?.Name ?? roleName;
+        if (!user.Roles.Contains(nameToStore, StringComparer.OrdinalIgnoreCase))
+            user.Roles.Add(nameToStore);
     }
 
     public Task RemoveFromRoleAsync(FcmsUser user, string roleName, CancellationToken ct)

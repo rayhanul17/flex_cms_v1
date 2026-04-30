@@ -58,8 +58,11 @@ internal sealed class FcmsAuthorizeFilter : IAsyncAuthorizationFilter
             return;
         }
 
-        // SuperAdmin bypasses all permission checks
-        if (user.IsInRole(FcmsRoles.SuperAdmin)) return;
+        // SuperAdmin bypasses all permission checks.
+        // Check both the standard ClaimTypes.Role claim and the normalized-uppercase variant
+        // that MongoUserStore stores (UserManager.AddToRoleAsync normalizes role names).
+        if (user.IsInRole(FcmsRoles.SuperAdmin) ||
+            user.IsInRole(FcmsRoles.SuperAdmin.ToUpperInvariant())) return;
 
         if (_permission is null) return;
 

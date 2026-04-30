@@ -1,6 +1,7 @@
 using FlexCms.Framework.Cms;
 using FlexCms.Framework.Db.Ef;
 using Microsoft.EntityFrameworkCore;
+using NSubstitute;
 
 namespace FlexCms.Tests.Integration.Phase5;
 
@@ -18,7 +19,7 @@ public class PageServiceTrashTests : IDisposable
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
             .Options;
         _db = new FcmsDbContext(opts);
-        _svc = new PageService(new EfRepository<FcmsPage>(_db), new EfUnitOfWork(_db));
+        _svc = new PageService(new EfRepository<FcmsPage>(_db), new EfUnitOfWork(_db), Substitute.For<IOperationLogService>());
     }
 
     public void Dispose() => _db.Dispose();

@@ -1,6 +1,7 @@
 using FlexCms.Framework.Cms;
 using FlexCms.Framework.Db.Ef;
 using Microsoft.EntityFrameworkCore;
+using NSubstitute;
 
 namespace FlexCms.Tests.Integration.Phase5;
 
@@ -15,7 +16,7 @@ public class PostServiceTests : IDisposable
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
             .Options;
         _db = new FcmsDbContext(opts);
-        _svc = new PostService(new EfRepository<FcmsPost>(_db), new EfRepository<FcmsTag>(_db), new EfRepository<FcmsPostTag>(_db), new EfUnitOfWork(_db));
+        _svc = new PostService(new EfRepository<FcmsPost>(_db), new EfRepository<FcmsTag>(_db), new EfRepository<FcmsPostTag>(_db), new EfUnitOfWork(_db), Substitute.For<IOperationLogService>());
     }
 
     public void Dispose() => _db.Dispose();

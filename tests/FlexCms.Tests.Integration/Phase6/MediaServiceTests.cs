@@ -32,7 +32,7 @@ public class MediaServiceTests : IDisposable
             .Returns(Task.CompletedTask);
 
         var mediaRepo = new EfRepository<FcmsMedia>(_db);
-        _svc = new MediaService(mediaRepo, _storage);
+        _svc = new MediaService(mediaRepo, new EfUnitOfWork(_db), _storage, Substitute.For<IOperationLogService>());
     }
 
     public void Dispose() => _db.Dispose();

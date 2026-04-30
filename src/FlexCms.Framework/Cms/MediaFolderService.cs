@@ -6,17 +6,28 @@ public class MediaFolderService : IMediaFolderService
 {
     private readonly IRepository<FcmsMediaFolder> _folderRepo;
     private readonly IRepository<FcmsMedia> _mediaRepo;
+    private readonly IFcmsUnitOfWork _uow;
+    private readonly IOperationLogService _audit;
 
-    public MediaFolderService(IRepository<FcmsMediaFolder> folderRepo, IRepository<FcmsMedia> mediaRepo)
+    public MediaFolderService(
+        IRepository<FcmsMediaFolder> folderRepo,
+        IRepository<FcmsMedia> mediaRepo,
+        IFcmsUnitOfWork uow,
+        IOperationLogService audit)
     {
         _folderRepo = folderRepo;
         _mediaRepo = mediaRepo;
+        _uow = uow;
+        _audit = audit;
     }
 
     public async Task<FcmsMediaFolder> CreateAsync(string name, Guid? parentId, CancellationToken ct = default)
     {
         var folder = new FcmsMediaFolder { Name = name.Trim(), ParentId = parentId };
         await _folderRepo.AddAsync(folder, ct);
+        await _uow.SaveChangesAsync(ct);
+        await _audit.LogAsync(FcmsAuditActions.FolderCreated, nameof(FcmsMediaFolder), folder.Id.ToString(),
+            new { folder.Name, ParentId = parentId }, ct: ct);
         return folder;
     }
 
@@ -24,8 +35,12 @@ public class MediaFolderService : IMediaFolderService
     {
         var folder = await _folderRepo.GetByIdAsync(id, ct)
             ?? throw new InvalidOperationException("Folder not found.");
+        var oldName = folder.Name;
         folder.Name = newName.Trim();
         await _folderRepo.UpdateAsync(folder, ct);
+        await _uow.SaveChangesAsync(ct);
+        await _audit.LogAsync(FcmsAuditActions.FolderRenamed, nameof(FcmsMediaFolder), id.ToString(),
+            new { OldName = oldName, NewName = folder.Name }, ct: ct);
         return folder;
     }
 
@@ -43,14 +58,14 @@ public class MediaFolderService : IMediaFolderService
             await _mediaRepo.UpdateRangeAsync(affected, ct);
         }
 
+        await _audit.LogAsync(FcmsAuditActions.FolderDeleted, nameof(FcmsMediaFolder), id.ToString(),
+            new { folder.Name }, ct: ct);
         await _folderRepo.SoftDeleteAsync(folder, ct);
+        await _uow.SaveChangesAsync(ct);
     }
 
     public async Task<IReadOnlyList<FcmsMediaFolder>> GetAllAsync(CancellationToken ct = default)
-    {
-        var all = await _folderRepo.GetAllAsync(ct);
-        return all.ToList();
-    }
+        => await _folderRepo.GetAllAsync(ct);
 
     public async Task<IReadOnlyList<FcmsMediaFolder>> GetBreadcrumbAsync(Guid folderId, CancellationToken ct = default)
     {

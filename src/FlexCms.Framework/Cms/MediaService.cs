@@ -35,12 +35,20 @@ public class MediaService : IMediaService
     private const int ThumbnailMaxSize = 300;
 
     private readonly IRepository<FcmsMedia> _mediaRepo;
+    private readonly IFcmsUnitOfWork _uow;
     private readonly IFcmsFileStorage _storage;
+    private readonly IOperationLogService _audit;
 
-    public MediaService(IRepository<FcmsMedia> mediaRepo, IFcmsFileStorage storage)
+    public MediaService(
+        IRepository<FcmsMedia> mediaRepo,
+        IFcmsUnitOfWork uow,
+        IFcmsFileStorage storage,
+        IOperationLogService audit)
     {
         _mediaRepo = mediaRepo;
+        _uow = uow;
         _storage = storage;
+        _audit = audit;
     }
 
     public async Task<FcmsMedia> UploadAsync(IFormFile file, Guid? folderId, CancellationToken ct = default)
@@ -86,6 +94,9 @@ public class MediaService : IMediaService
         }
 
         await _mediaRepo.AddAsync(media, ct);
+        await _uow.SaveChangesAsync(ct);
+        await _audit.LogAsync(FcmsAuditActions.MediaUploaded, nameof(FcmsMedia), media.Id.ToString(),
+            new { media.OriginalFileName, media.MimeType, media.FileSize }, ct: ct);
         return media;
     }
 
@@ -103,7 +114,21 @@ public class MediaService : IMediaService
             await _storage.DeleteAsync(thumbRelative, ct);
         }
 
+        await _audit.LogAsync(FcmsAuditActions.MediaDeleted, nameof(FcmsMedia), id.ToString(),
+            new { media.OriginalFileName, media.Url }, ct: ct);
         await _mediaRepo.SoftDeleteAsync(media, ct);
+        await _uow.SaveChangesAsync(ct);
+    }
+
+    public async Task MoveToFolderAsync(Guid mediaId, Guid? targetFolderId, CancellationToken ct = default)
+    {
+        var media = await _mediaRepo.GetByIdAsync(mediaId, ct)
+            ?? throw new InvalidOperationException("Media not found.");
+        media.FolderId = targetFolderId;
+        await _mediaRepo.UpdateAsync(media, ct);
+        await _uow.SaveChangesAsync(ct);
+        await _audit.LogAsync(FcmsAuditActions.MediaMoved, nameof(FcmsMedia), mediaId.ToString(),
+            new { media.OriginalFileName, TargetFolderId = targetFolderId }, ct: ct);
     }
 
     public Task<FcmsMedia?> GetByIdAsync(Guid id, CancellationToken ct = default)
@@ -112,19 +137,10 @@ public class MediaService : IMediaService
     public async Task<IReadOnlyList<FcmsMedia>> GetByFolderAsync(Guid? folderId, CancellationToken ct = default)
         => await _mediaRepo.FindAsync(m => m.FolderId == folderId, ct);
 
-    public async Task MoveToFolderAsync(Guid mediaId, Guid? targetFolderId, CancellationToken ct = default)
-    {
-        var media = await _mediaRepo.GetByIdAsync(mediaId, ct)
-            ?? throw new InvalidOperationException("Media not found.");
-        media.FolderId = targetFolderId;
-        await _mediaRepo.UpdateAsync(media, ct);
-    }
-
     // -- helpers ----------------------------------------------------------------
 
     private static string SanitizeFileName(string fileName)
     {
-        // Strip directory traversal, then replace all invalid chars with underscore
         var name = Path.GetFileName(fileName);
         var invalid = Path.GetInvalidFileNameChars();
         return string.Concat(name.Select(c => invalid.Contains(c) ? '_' : c));
@@ -133,7 +149,7 @@ public class MediaService : IMediaService
     private static bool ValidateMagicBytes(Stream stream, string ext)
     {
         if (!MagicBytes.TryGetValue(ext, out var signatures) || signatures.Length == 0)
-            return true; // SVG and unknown-but-allowed: skip binary check
+            return true;
 
         var header = new byte[12];
         var read = stream.Read(header, 0, header.Length);

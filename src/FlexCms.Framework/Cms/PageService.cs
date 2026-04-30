@@ -6,11 +6,13 @@ public class PageService : IPageService
 {
     private readonly IRepository<FcmsPage> _repo;
     private readonly IFcmsUnitOfWork _uow;
+    private readonly IOperationLogService _audit;
 
-    public PageService(IRepository<FcmsPage> repo, IFcmsUnitOfWork uow)
+    public PageService(IRepository<FcmsPage> repo, IFcmsUnitOfWork uow, IOperationLogService audit)
     {
         _repo = repo;
         _uow = uow;
+        _audit = audit;
     }
 
     public Task<FcmsPage?> GetByIdAsync(Guid id, CancellationToken ct = default)
@@ -39,6 +41,8 @@ public class PageService : IPageService
         page.Content = HtmlSanitizer.Sanitize(page.Content);
         await _repo.AddAsync(page, ct);
         await _uow.SaveChangesAsync(ct);
+        await _audit.LogAsync(FcmsAuditActions.PageCreated, nameof(FcmsPage), page.Id.ToString(),
+            new { page.Title, page.Slug, page.IsPublished }, ct: ct);
         return page;
     }
 
@@ -47,6 +51,8 @@ public class PageService : IPageService
         page.Content = HtmlSanitizer.Sanitize(page.Content);
         await _repo.UpdateAsync(page, ct);
         await _uow.SaveChangesAsync(ct);
+        await _audit.LogAsync(FcmsAuditActions.PageUpdated, nameof(FcmsPage), page.Id.ToString(),
+            new { page.Title, page.Slug, page.IsPublished }, ct: ct);
     }
 
     public async Task RestoreAsync(Guid id, CancellationToken ct = default)
@@ -58,12 +64,16 @@ public class PageService : IPageService
         page.IsPublished = false; // always restore as draft
         await _repo.UpdateAsync(page, ct);
         await _uow.SaveChangesAsync(ct);
+        await _audit.LogAsync(FcmsAuditActions.PageRestored, nameof(FcmsPage), id.ToString(), ct: ct);
     }
 
     public async Task HardDeleteAsync(Guid id, CancellationToken ct = default)
     {
         var page = await _repo.FirstOrDefaultAsync(p => p.Id == id, ct, includeDeleted: true);
         if (page is null) return;
+        // Log before delete — entity must exist in DB when log is written
+        await _audit.LogAsync(FcmsAuditActions.PageHardDeleted, nameof(FcmsPage), id.ToString(),
+            new { page.Title, page.Slug }, severity: FcmsLogSeverity.Warning, ct: ct);
         await _repo.DeleteAsync(page, ct);
         await _uow.SaveChangesAsync(ct);
     }
@@ -75,5 +85,7 @@ public class PageService : IPageService
         page.DeletedAt = Clock.FcmsTime.Now;
         await _repo.SoftDeleteAsync(page, ct);
         await _uow.SaveChangesAsync(ct);
+        await _audit.LogAsync(FcmsAuditActions.PageDeleted, nameof(FcmsPage), id.ToString(),
+            new { page.Title, page.Slug }, ct: ct);
     }
 }

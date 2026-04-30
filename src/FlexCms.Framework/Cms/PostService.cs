@@ -8,17 +8,20 @@ public class PostService : IPostService
     private readonly IRepository<FcmsTag> _tagRepo;
     private readonly IRepository<FcmsPostTag> _postTagRepo;
     private readonly IFcmsUnitOfWork _uow;
+    private readonly IOperationLogService _audit;
 
     public PostService(
         IRepository<FcmsPost> postRepo,
         IRepository<FcmsTag> tagRepo,
         IRepository<FcmsPostTag> postTagRepo,
-        IFcmsUnitOfWork uow)
+        IFcmsUnitOfWork uow,
+        IOperationLogService audit)
     {
         _postRepo = postRepo;
         _tagRepo = tagRepo;
         _postTagRepo = postTagRepo;
         _uow = uow;
+        _audit = audit;
     }
 
     public Task<FcmsPost?> GetByIdAsync(Guid id, CancellationToken ct = default)
@@ -48,6 +51,8 @@ public class PostService : IPostService
         await _postRepo.AddAsync(post, ct);
         await _uow.SaveChangesAsync(ct);
         await SyncTagsAsync(post.Id, tagSlugs, ct);
+        await _audit.LogAsync(FcmsAuditActions.PostCreated, nameof(FcmsPost), post.Id.ToString(),
+            new { post.Title, post.Slug, post.IsPublished }, ct: ct);
         return post;
     }
 
@@ -57,6 +62,8 @@ public class PostService : IPostService
         await _postRepo.UpdateAsync(post, ct);
         await _uow.SaveChangesAsync(ct);
         await SyncTagsAsync(post.Id, tagSlugs, ct);
+        await _audit.LogAsync(FcmsAuditActions.PostUpdated, nameof(FcmsPost), post.Id.ToString(),
+            new { post.Title, post.Slug, post.IsPublished }, ct: ct);
     }
 
     public async Task RestoreAsync(Guid id, CancellationToken ct = default)
@@ -68,16 +75,18 @@ public class PostService : IPostService
         post.IsPublished = false; // always restore as draft
         await _postRepo.UpdateAsync(post, ct);
         await _uow.SaveChangesAsync(ct);
+        await _audit.LogAsync(FcmsAuditActions.PostRestored, nameof(FcmsPost), id.ToString(), ct: ct);
     }
 
     public async Task HardDeleteAsync(Guid id, CancellationToken ct = default)
     {
         var post = await _postRepo.FirstOrDefaultAsync(p => p.Id == id, ct, includeDeleted: true);
         if (post is null) return;
-
+        // Log before delete — entity must still exist in DB when log is written
+        await _audit.LogAsync(FcmsAuditActions.PostHardDeleted, nameof(FcmsPost), id.ToString(),
+            new { post.Title, post.Slug }, severity: FcmsLogSeverity.Warning, ct: ct);
         var tags = await _postTagRepo.FindAsync(pt => pt.PostId == id, ct, includeDeleted: true);
         foreach (var tag in tags) await _postTagRepo.DeleteAsync(tag, ct);
-
         await _postRepo.DeleteAsync(post, ct);
         await _uow.SaveChangesAsync(ct);
     }
@@ -89,6 +98,8 @@ public class PostService : IPostService
         post.DeletedAt = Clock.FcmsTime.Now;
         await _postRepo.SoftDeleteAsync(post, ct);
         await _uow.SaveChangesAsync(ct);
+        await _audit.LogAsync(FcmsAuditActions.PostDeleted, nameof(FcmsPost), id.ToString(),
+            new { post.Title, post.Slug }, ct: ct);
     }
 
     public async Task<List<string>> GetTagSlugsAsync(Guid postId, CancellationToken ct = default)

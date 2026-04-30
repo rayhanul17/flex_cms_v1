@@ -1,6 +1,7 @@
 using FlexCms.Framework.Cms;
 using FlexCms.Framework.Db.Ef;
 using Microsoft.EntityFrameworkCore;
+using NSubstitute;
 
 namespace FlexCms.Tests.Integration.Phase6;
 
@@ -23,7 +24,7 @@ public class MediaFolderServiceTests : IDisposable
 
         var folderRepo = new EfRepository<FcmsMediaFolder>(_db);
         var mediaRepo = new EfRepository<FcmsMedia>(_db);
-        _svc = new MediaFolderService(folderRepo, mediaRepo);
+        _svc = new MediaFolderService(folderRepo, mediaRepo, new EfUnitOfWork(_db), Substitute.For<IOperationLogService>());
     }
 
     public void Dispose() => _db.Dispose();

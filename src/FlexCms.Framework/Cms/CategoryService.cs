@@ -7,12 +7,18 @@ public class CategoryService : ICategoryService
     private readonly IRepository<FcmsCategory> _repo;
     private readonly IRepository<FcmsPost> _postRepo;
     private readonly IFcmsUnitOfWork _uow;
+    private readonly IOperationLogService _audit;
 
-    public CategoryService(IRepository<FcmsCategory> repo, IRepository<FcmsPost> postRepo, IFcmsUnitOfWork uow)
+    public CategoryService(
+        IRepository<FcmsCategory> repo,
+        IRepository<FcmsPost> postRepo,
+        IFcmsUnitOfWork uow,
+        IOperationLogService audit)
     {
         _repo = repo;
         _postRepo = postRepo;
         _uow = uow;
+        _audit = audit;
     }
 
     public Task<FcmsCategory?> GetByIdAsync(Guid id, CancellationToken ct = default)
@@ -27,10 +33,15 @@ public class CategoryService : ICategoryService
     public Task<bool> SlugExistsAsync(string slug, Guid? excludeId = null, CancellationToken ct = default)
         => _repo.ExistsAsync(c => c.Slug == slug && c.Id != (excludeId ?? Guid.Empty), ct);
 
+    public Task<int> GetPostCountAsync(Guid categoryId, CancellationToken ct = default)
+        => _postRepo.CountAsync(p => p.CategoryId == categoryId, ct).ContinueWith(t => (int)t.Result, ct);
+
     public async Task<FcmsCategory> CreateAsync(FcmsCategory category, CancellationToken ct = default)
     {
         await _repo.AddAsync(category, ct);
         await _uow.SaveChangesAsync(ct);
+        await _audit.LogAsync(FcmsAuditActions.CategoryCreated, nameof(FcmsCategory), category.Id.ToString(),
+            new { category.Name, category.Slug }, ct: ct);
         return category;
     }
 
@@ -38,10 +49,9 @@ public class CategoryService : ICategoryService
     {
         await _repo.UpdateAsync(category, ct);
         await _uow.SaveChangesAsync(ct);
+        await _audit.LogAsync(FcmsAuditActions.CategoryUpdated, nameof(FcmsCategory), category.Id.ToString(),
+            new { category.Name, category.Slug }, ct: ct);
     }
-
-    public Task<int> GetPostCountAsync(Guid categoryId, CancellationToken ct = default)
-        => _postRepo.CountAsync(p => p.CategoryId == categoryId, ct).ContinueWith(t => (int)t.Result, ct);
 
     public async Task DeleteAsync(Guid id, CancellationToken ct = default)
     {
@@ -49,5 +59,7 @@ public class CategoryService : ICategoryService
         if (category is null) return;
         await _repo.SoftDeleteAsync(category, ct);
         await _uow.SaveChangesAsync(ct);
+        await _audit.LogAsync(FcmsAuditActions.CategoryDeleted, nameof(FcmsCategory), id.ToString(),
+            new { category.Name, category.Slug }, ct: ct);
     }
 }

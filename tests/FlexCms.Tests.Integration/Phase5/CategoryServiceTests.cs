@@ -1,6 +1,7 @@
 using FlexCms.Framework.Cms;
 using FlexCms.Framework.Db.Ef;
 using Microsoft.EntityFrameworkCore;
+using NSubstitute;
 
 namespace FlexCms.Tests.Integration.Phase5;
 
@@ -15,7 +16,7 @@ public class CategoryServiceTests : IDisposable
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
             .Options;
         _db = new FcmsDbContext(opts);
-        _svc = new CategoryService(new EfRepository<FcmsCategory>(_db), new EfRepository<FcmsPost>(_db), new EfUnitOfWork(_db));
+        _svc = new CategoryService(new EfRepository<FcmsCategory>(_db), new EfRepository<FcmsPost>(_db), new EfUnitOfWork(_db), Substitute.For<IOperationLogService>());
     }
 
     public void Dispose() => _db.Dispose();

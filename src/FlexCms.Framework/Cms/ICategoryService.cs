@@ -9,4 +9,6 @@ public interface ICategoryService
     Task<FcmsCategory> CreateAsync(FcmsCategory category, CancellationToken ct = default);
     Task UpdateAsync(FcmsCategory category, CancellationToken ct = default);
     Task DeleteAsync(Guid id, CancellationToken ct = default);
+    /// <summary>Returns the number of published posts in a category without navigation-property loading.</summary>
+    Task<int> GetPostCountAsync(Guid categoryId, CancellationToken ct = default);
 }

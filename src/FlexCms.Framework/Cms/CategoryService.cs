@@ -5,11 +5,13 @@ namespace FlexCms.Framework.Cms;
 public class CategoryService : ICategoryService
 {
     private readonly IRepository<FcmsCategory> _repo;
+    private readonly IRepository<FcmsPost> _postRepo;
     private readonly IFcmsUnitOfWork _uow;
 
-    public CategoryService(IRepository<FcmsCategory> repo, IFcmsUnitOfWork uow)
+    public CategoryService(IRepository<FcmsCategory> repo, IRepository<FcmsPost> postRepo, IFcmsUnitOfWork uow)
     {
         _repo = repo;
+        _postRepo = postRepo;
         _uow = uow;
     }
 
@@ -37,6 +39,9 @@ public class CategoryService : ICategoryService
         await _repo.UpdateAsync(category, ct);
         await _uow.SaveChangesAsync(ct);
     }
+
+    public Task<int> GetPostCountAsync(Guid categoryId, CancellationToken ct = default)
+        => _postRepo.CountAsync(p => p.CategoryId == categoryId, ct).ContinueWith(t => (int)t.Result, ct);
 
     public async Task DeleteAsync(Guid id, CancellationToken ct = default)
     {

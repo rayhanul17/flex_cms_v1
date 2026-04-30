@@ -84,7 +84,8 @@ public class PostController : BaseAdminController
         var post = await _posts.GetByIdAsync(id, ct);
         if (post is null) return NotFound();
 
-        var tags = string.Join(", ", post.PostTags.Select(pt => pt.Tag.Slug));
+        var tagSlugs = await _posts.GetTagSlugsAsync(id, ct);
+        var tags = string.Join(", ", tagSlugs);
         return View(new CreateEditPostViewModel
         {
             Id = post.Id,

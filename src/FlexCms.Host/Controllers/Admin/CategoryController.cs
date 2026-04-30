@@ -19,13 +19,14 @@ public class CategoryController : BaseAdminController
     public async Task<IActionResult> Index(CancellationToken ct)
     {
         var all = await _categories.GetAllAsync(ct);
-        var vm = all.Select(c => new CategoryListItemViewModel
+        var counts = await Task.WhenAll(all.Select(c => _categories.GetPostCountAsync(c.Id, ct)));
+        var vm = all.Select((c, i) => new CategoryListItemViewModel
         {
             Id = c.Id,
             Name = c.Name,
             Slug = c.Slug,
             Description = c.Description,
-            PostCount = c.Posts.Count
+            PostCount = counts[i]
         }).ToList();
 
         return View(vm);

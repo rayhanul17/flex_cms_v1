@@ -15,4 +15,6 @@ public interface IPostService
     Task<List<FcmsPost>> GetDeletedAsync(CancellationToken ct = default);
     Task RestoreAsync(Guid id, CancellationToken ct = default);
     Task HardDeleteAsync(Guid id, CancellationToken ct = default);
+    /// <summary>Returns tag slugs for a post without relying on navigation-property loading.</summary>
+    Task<List<string>> GetTagSlugsAsync(Guid postId, CancellationToken ct = default);
 }

@@ -91,6 +91,15 @@ public class PostService : IPostService
         await _uow.SaveChangesAsync(ct);
     }
 
+    public async Task<List<string>> GetTagSlugsAsync(Guid postId, CancellationToken ct = default)
+    {
+        var postTags = await _postTagRepo.FindAsync(pt => pt.PostId == postId, ct);
+        if (postTags.Count == 0) return [];
+        var tagIds = postTags.Select(pt => pt.TagId).ToList();
+        var tags = await _tagRepo.GetByIdsAsync(tagIds, ct);
+        return tags.Select(t => t.Slug).ToList();
+    }
+
     public async Task IncrementViewCountAsync(Guid id, CancellationToken ct = default)
     {
         var post = await _postRepo.GetByIdAsync(id, ct);

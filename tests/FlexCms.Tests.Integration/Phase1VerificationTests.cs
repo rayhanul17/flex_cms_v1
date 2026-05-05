@@ -44,7 +44,7 @@ public class EfPhase1Tests : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
-        _mysql = new MySqlBuilder("mysql:8.0")
+        _mysql = new MySqlBuilder("mysql:8.4")
             .WithDatabase("flexcms_test")
             .WithUsername("root")
             .WithPassword("root")
@@ -129,7 +129,7 @@ public class MongoPhase1Tests : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
-        _mongo = new MongoDbBuilder("mongo:7.0").Build();
+        _mongo = new MongoDbBuilder("mongo:7").Build();
         await _mongo.StartAsync();
 
         MongoDbSerializerSetup.Register();

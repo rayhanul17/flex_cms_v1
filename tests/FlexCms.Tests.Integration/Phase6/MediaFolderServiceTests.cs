@@ -24,7 +24,9 @@ public class MediaFolderServiceTests : IDisposable
 
         var folderRepo = new EfRepository<FcmsMediaFolder>(_db);
         var mediaRepo = new EfRepository<FcmsMedia>(_db);
+#pragma warning disable CA2000
         _svc = new MediaFolderService(folderRepo, mediaRepo, new EfUnitOfWork(_db), Substitute.For<IOperationLogService>());
+#pragma warning restore CA2000
     }
 
     public void Dispose() => _db.Dispose();

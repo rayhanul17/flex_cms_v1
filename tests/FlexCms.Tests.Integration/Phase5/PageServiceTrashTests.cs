@@ -19,7 +19,9 @@ public class PageServiceTrashTests : IDisposable
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
             .Options;
         _db = new FcmsDbContext(opts);
+#pragma warning disable CA2000
         _svc = new PageService(new EfRepository<FcmsPage>(_db), new EfUnitOfWork(_db), Substitute.For<IOperationLogService>());
+#pragma warning restore CA2000
     }
 
     public void Dispose() => _db.Dispose();

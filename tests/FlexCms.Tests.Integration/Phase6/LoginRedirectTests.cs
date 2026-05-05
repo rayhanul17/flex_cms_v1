@@ -25,7 +25,9 @@ public class LoginRedirectTests : IDisposable
             .Options;
         _db = new FcmsDbContext(opts);
 
+#pragma warning disable CA2000
         var roleStore = new FcmsInMemoryRoleStoreForRedirect(_db);
+#pragma warning restore CA2000
 #pragma warning disable CA2000
         _roleManager = new RoleManager<FcmsRole>(
             roleStore, [],

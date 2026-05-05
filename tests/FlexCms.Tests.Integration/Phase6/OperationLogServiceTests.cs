@@ -23,7 +23,9 @@ public class OperationLogServiceTests : IDisposable
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
             .Options;
         _db = new FcmsDbContext(opts);
+#pragma warning disable CA2000
         _settings = new SettingsService(new EfRepository<FlexCms.Framework.Db.FcmsSettings>(_db), new EfUnitOfWork(_db));
+#pragma warning restore CA2000
 
         var context = Substitute.For<IFcmsContextService>();
         context.UserId.Returns((Guid?)Guid.NewGuid());
@@ -34,7 +36,9 @@ public class OperationLogServiceTests : IDisposable
 
         var logRepo = new EfRepository<FcmsLog>(_db);
         var archiveRepo = new EfRepository<FcmsLogArchive>(_db);
+#pragma warning disable CA2000
         _svc = new OperationLogService(logRepo, archiveRepo, context, _settings, new EfUnitOfWork(_db));
+#pragma warning restore CA2000
     }
 
     public void Dispose() => _db.Dispose();

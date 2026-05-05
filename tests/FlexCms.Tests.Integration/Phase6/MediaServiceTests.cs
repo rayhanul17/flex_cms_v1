@@ -32,7 +32,9 @@ public class MediaServiceTests : IDisposable
             .Returns(Task.CompletedTask);
 
         var mediaRepo = new EfRepository<FcmsMedia>(_db);
+#pragma warning disable CA2000
         _svc = new MediaService(mediaRepo, new EfUnitOfWork(_db), _storage, Substitute.For<IOperationLogService>());
+#pragma warning restore CA2000
     }
 
     public void Dispose() => _db.Dispose();

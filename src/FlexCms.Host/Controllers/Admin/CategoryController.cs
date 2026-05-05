@@ -26,7 +26,8 @@ public class CategoryController : BaseAdminController
             Name = c.Name,
             Slug = c.Slug,
             Description = c.Description,
-            PostCount = counts[i]
+            PostCount = counts[i],
+            Status = c.Status
         }).ToList();
 
         return View(vm);

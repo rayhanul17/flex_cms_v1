@@ -1,0 +1,27 @@
+@*
+    Single global modal driving fcms.confirm() / fcms.alert() / fcms.dialog().
+    Included once in _AdminLayout. JS in fcms-confirm.js controls visibility,
+    title/message, and button rendering — no per-page modal markup needed.
+*@
+<div class="modal fade" id="fcmsConfirmModal" tabindex="-1" aria-labelledby="fcmsConfirmTitle" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="fcmsConfirmTitle">Confirm</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="fcmsConfirmBody">
+                Are you sure?
+            </div>
+            <div class="modal-footer" id="fcmsConfirmFooter">
+                @* JS injects buttons here *@
+            </div>
+        </div>
+    </div>
+</div>
+
+@*
+    Toast container — bottom-right by default. fcms.toast.* JS API uses this
+    for showing transient notifications (success/danger/warning/info).
+*@
+<div class="toast-container position-fixed bottom-0 end-0 p-3" id="fcmsToastContainer" style="z-index: 1100;"></div>

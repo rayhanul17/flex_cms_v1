@@ -33,7 +33,7 @@ public class UserController : BaseAdminController
                 Id = u.Id,
                 Email = u.Email ?? "",
                 DisplayName = u.UserName,
-                IsActive = u.Status == FlexCms.Framework.Db.EntityStatus.Active,
+                Status = u.Status,
                 ForcePasswordChange = u.ForcePasswordChange,
                 CreatedAt = u.CreatedAt,
                 Roles = [.. roles]

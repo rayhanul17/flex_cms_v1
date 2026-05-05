@@ -96,34 +96,28 @@
         </div>
     </div>
 
-    <!-- Toast notifications -->
-    @if (TempData["Toast.Message"] is string toastMsg)
-    {
-        var toastType = TempData["Toast.Type"]?.ToString() ?? "success";
-        <div class="toast-container position-fixed top-0 end-0 p-3">
-            <div class="toast align-items-center text-bg-@toastType border-0 show" role="alert">
-                <div class="d-flex">
-                    <div class="toast-body">@toastMsg</div>
-                    <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
-                </div>
-            </div>
-        </div>
-    }
-
     <!-- Page body -->
     <div id="page-body">
         @RenderBody()
     </div>
 </div>
 
+<!-- Shared confirm modal + toast container — driven by fcms.confirm/alert/dialog/toast JS APIs -->
+<partial name="_FcmsConfirm" />
+
 <script src="~/lib/jquery/dist/jquery.min.js"></script>
 <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
 <script src="~/js/site.js" asp-append-version="true"></script>
+<script src="~/js/fcms-confirm.js" asp-append-version="true"></script>
+<script src="~/js/fcms-toast.js" asp-append-version="true"></script>
+<script src="~/js/fcms-actions.js" asp-append-version="true"></script>
 <script>
-    // Auto-dismiss toasts
-    document.querySelectorAll('.toast').forEach(el => {
-        setTimeout(() => bootstrap.Toast.getOrCreateInstance(el).hide(), 4000);
-    });
+    // Server-side TempData toast → fcms.toast on next render
+    @if (TempData["Toast.Message"] is string toastMsg)
+    {
+        var toastType = TempData["Toast.Type"]?.ToString() ?? "success";
+        <text>document.addEventListener('DOMContentLoaded', () => fcms.toast.@(toastType)(@Html.Raw(System.Text.Json.JsonSerializer.Serialize(toastMsg))));</text>
+    }
 </script>
 @await RenderSectionAsync("Scripts", required: false)
 </body>

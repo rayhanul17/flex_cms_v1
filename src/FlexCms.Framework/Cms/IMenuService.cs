@@ -24,4 +24,16 @@ public interface IMenuService
 
     /// <summary>Invalidate the cached menu for a location (or all locations if null).</summary>
     void InvalidateCache(string? location = null);
+
+    /// <summary>Get all items for a location (no permission filter, includes admin-only fields). For admin UI.</summary>
+    Task<List<FcmsMenuItem>> GetAllForAdminAsync(string location, CancellationToken ct = default);
+
+    /// <summary>Get one item by id (no permission filter).</summary>
+    Task<FcmsMenuItem?> GetByIdAsync(Guid id, CancellationToken ct = default);
+
+    /// <summary>Create or update a single item (admin UI). Returns the saved item.</summary>
+    Task<FcmsMenuItem> SaveAsync(FcmsMenuItem item, CancellationToken ct = default);
+
+    /// <summary>Soft-delete a menu item.</summary>
+    Task DeleteAsync(Guid id, CancellationToken ct = default);
 }

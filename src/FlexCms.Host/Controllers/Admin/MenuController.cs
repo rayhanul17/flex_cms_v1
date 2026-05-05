@@ -1,5 +1,7 @@
 using FlexCms.Framework.Auth;
 using FlexCms.Framework.Cms;
+using FlexCms.Framework.Db;
+using FlexCms.Host.Models.Admin;
 using Microsoft.AspNetCore.Mvc;
 
 namespace FlexCms.Host.Controllers.Admin;
@@ -8,10 +10,12 @@ namespace FlexCms.Host.Controllers.Admin;
 public class MenuController : BaseAdminController
 {
     private readonly IMenuService _menuService;
+    private readonly IRepository<FcmsPermission> _permissions;
 
-    public MenuController(IMenuService menuService)
+    public MenuController(IMenuService menuService, IRepository<FcmsPermission> permissions)
     {
         _menuService = menuService;
+        _permissions = permissions;
     }
 
     // ── List ──────────────────────────────────────────────────────────────────
@@ -20,11 +24,57 @@ public class MenuController : BaseAdminController
     [FcmsAuthorize("settings.manage")]
     public async Task<IActionResult> Index(CancellationToken ct)
     {
-        var items = await _menuService.GetMenuAsync("AdminSidebar", ct);
+        var items = await _menuService.GetAllForAdminAsync("AdminSidebar", ct);
         return View(items);
     }
 
-    // ── Rename (AJAX) ─────────────────────────────────────────────────────────
+    // ── Create / Edit (single combined view) ──────────────────────────────────
+
+    [HttpGet("create")]
+    [FcmsAuthorize("settings.manage")]
+    public async Task<IActionResult> Create(CancellationToken ct)
+        => View("Edit", await BuildVmAsync(new FcmsMenuItem { ModuleId = "core" }, ct));
+
+    [HttpGet("{id:guid}/edit")]
+    [FcmsAuthorize("settings.manage")]
+    public async Task<IActionResult> Edit(Guid id, CancellationToken ct)
+    {
+        var item = await _menuService.GetByIdAsync(id, ct);
+        if (item is null) return NotFound();
+        return View(await BuildVmAsync(item, ct));
+    }
+
+    [HttpPost("save")]
+    [ValidateAntiForgeryToken]
+    [FcmsAuthorize("settings.manage")]
+    [FcmsLog("menu.save", "FcmsMenuItem")]
+    public async Task<IActionResult> Save(MenuItemEditViewModel vm, CancellationToken ct)
+    {
+        if (!ModelState.IsValid)
+            return View("Edit", await BuildVmAsync(ToEntity(vm), ct, vm));
+
+        var item = ToEntity(vm);
+        if (string.IsNullOrWhiteSpace(item.ModuleId)) item.ModuleId = "core";
+        if (string.IsNullOrWhiteSpace(item.Location)) item.Location = "AdminSidebar";
+
+        await _menuService.SaveAsync(item, ct);
+        ShowSuccess(vm.Id == Guid.Empty ? "Menu item created." : "Menu item updated.");
+        return RedirectToAction(nameof(Index));
+    }
+
+    // ── Delete (AJAX) ─────────────────────────────────────────────────────────
+
+    [HttpPost("{id:guid}/delete")]
+    [ValidateAntiForgeryToken]
+    [FcmsAuthorize("settings.manage")]
+    [FcmsLog("menu.delete", "FcmsMenuItem")]
+    public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
+    {
+        await _menuService.DeleteAsync(id, ct);
+        return FcmsOk("Deleted.");
+    }
+
+    // ── Rename (AJAX — inline edit on Index) ─────────────────────────────────
 
     [HttpPost("{id:guid}/rename")]
     [ValidateAntiForgeryToken]
@@ -36,7 +86,7 @@ public class MenuController : BaseAdminController
         return FcmsOk("Renamed.");
     }
 
-    // ── Reorder (AJAX — receives JSON array [{id, order}]) ────────────────────
+    // ── Reorder (AJAX) ────────────────────────────────────────────────────────
 
     [HttpPost("reorder")]
     [ValidateAntiForgeryToken]
@@ -51,6 +101,55 @@ public class MenuController : BaseAdminController
         await _menuService.ReorderAsync(dict, ct);
         return FcmsOk("Order saved.");
     }
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
+    private async Task<MenuItemEditViewModel> BuildVmAsync(
+        FcmsMenuItem item, CancellationToken ct, MenuItemEditViewModel? source = null)
+    {
+        var allItems = await _menuService.GetAllForAdminAsync(item.Location, ct);
+        var permissions = await _permissions.GetAllAsync(ct);
+
+        var vm = source ?? new MenuItemEditViewModel
+        {
+            Id = item.Id,
+            ModuleId = item.ModuleId,
+            Location = item.Location,
+            DefaultName = item.DefaultName,
+            CustomName = item.CustomName,
+            Icon = string.IsNullOrWhiteSpace(item.Icon) ? "bi bi-circle" : item.Icon,
+            Url = item.Url,
+            ParentId = item.ParentId,
+            Order = item.Order,
+            RequiredPermission = item.RequiredPermission
+        };
+
+        // Top-level items only (can't nest a parent under another parent for now)
+        vm.AvailableParents = [.. allItems
+            .Where(m => m.ParentId is null && m.Id != item.Id)
+            .Select(m => new MenuItemSelectItem { Id = m.Id, Name = m.DisplayName })];
+
+        vm.AvailablePermissions = [.. permissions
+            .Where(p => !p.IsDeleted)
+            .OrderBy(p => p.Group).ThenBy(p => p.DisplayName)
+            .Select(p => new MenuItemSelectItem { Key = p.Key, Name = $"{p.Group} — {p.DisplayName}" })];
+
+        return vm;
+    }
+
+    private static FcmsMenuItem ToEntity(MenuItemEditViewModel vm) => new()
+    {
+        Id = vm.Id,
+        ModuleId = string.IsNullOrWhiteSpace(vm.ModuleId) ? "core" : vm.ModuleId,
+        Location = string.IsNullOrWhiteSpace(vm.Location) ? "AdminSidebar" : vm.Location,
+        DefaultName = vm.DefaultName ?? "",
+        CustomName = string.IsNullOrWhiteSpace(vm.CustomName) ? null : vm.CustomName,
+        Icon = string.IsNullOrWhiteSpace(vm.Icon) ? "bi bi-circle" : vm.Icon,
+        Url = vm.Url ?? "",
+        ParentId = vm.ParentId == Guid.Empty ? null : vm.ParentId,
+        Order = vm.Order,
+        RequiredPermission = string.IsNullOrWhiteSpace(vm.RequiredPermission) ? null : vm.RequiredPermission
+    };
 
     public record MenuOrderItem(Guid Id, int Order);
 }

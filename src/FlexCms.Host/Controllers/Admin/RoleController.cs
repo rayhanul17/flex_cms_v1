@@ -62,6 +62,7 @@ public class RoleController : BaseAdminController
     [HttpPost("create")]
     [ValidateAntiForgeryToken]
     [FcmsAuthorize("roles.create")]
+    [FcmsLog("roles.create", "FcmsRole")]
     public async Task<IActionResult> Create(CreateRoleViewModel model)
     {
         if (!ModelState.IsValid) return View(model);
@@ -87,7 +88,7 @@ public class RoleController : BaseAdminController
             return View(model);
         }
 
-        await OpLog.LogAsync("roles.create", "FcmsRole", role.Id.ToString());
+        FcmsLogContext.SetEntityId(HttpContext, role.Id);
         ShowSuccess($"Role '{model.Name}' created.");
         return RedirectToAction(nameof(Index));
     }
@@ -113,6 +114,7 @@ public class RoleController : BaseAdminController
     [HttpPost("{id:guid}/edit")]
     [ValidateAntiForgeryToken]
     [FcmsAuthorize("roles.edit")]
+    [FcmsLog("roles.edit", "FcmsRole")]
     public async Task<IActionResult> Edit(Guid id, EditRoleViewModel model)
     {
         if (!ModelState.IsValid) return View(model);
@@ -143,7 +145,6 @@ public class RoleController : BaseAdminController
             return View(model);
         }
 
-        await OpLog.LogAsync("roles.edit", "FcmsRole", role.Id.ToString());
         ShowSuccess($"Role '{role.Name}' updated.");
         return RedirectToAction(nameof(Detail), new { id });
     }
@@ -192,6 +193,7 @@ public class RoleController : BaseAdminController
     [HttpPost("{id:guid}/delete")]
     [ValidateAntiForgeryToken]
     [FcmsAuthorize("roles.delete")]
+    [FcmsLog("roles.delete", "FcmsRole")]
     public async Task<IActionResult> Delete(Guid id)
     {
         var role = await _roleManager.FindByIdAsync(id.ToString());
@@ -204,7 +206,6 @@ public class RoleController : BaseAdminController
         if (!result.Succeeded)
             return FcmsFail(string.Join(", ", result.Errors.Select(e => e.Description)));
 
-        await OpLog.LogAsync("roles.delete", "FcmsRole", role.Id.ToString());
         ShowSuccess($"Role '{role.Name}' deleted.");
         return FcmsOk("Role deleted.");
     }

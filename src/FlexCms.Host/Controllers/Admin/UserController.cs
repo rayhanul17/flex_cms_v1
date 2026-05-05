@@ -53,6 +53,7 @@ public class UserController : BaseAdminController
     [HttpPost("create")]
     [ValidateAntiForgeryToken]
     [FcmsAuthorize("users.create")]
+    [FcmsLog("users.create", "FcmsUser")]
     public async Task<IActionResult> Create(CreateUserViewModel model, CancellationToken ct)
     {
         model.AvailableRoles = await GetRoleSelectItemsAsync();
@@ -81,7 +82,7 @@ public class UserController : BaseAdminController
                 await _userManager.AddToRoleAsync(user, role.Name);
         }
 
-        await OpLog.LogAsync("users.create", "FcmsUser", user.Id.ToString(), ct: ct);
+        FcmsLogContext.SetEntityId(HttpContext, user.Id);
         ShowSuccess($"User '{model.Email}' created.");
         return RedirectToAction(nameof(Index));
     }
@@ -116,6 +117,7 @@ public class UserController : BaseAdminController
     [HttpPost("{id:guid}/edit")]
     [ValidateAntiForgeryToken]
     [FcmsAuthorize("users.edit")]
+    [FcmsLog("users.edit", "FcmsUser")]
     public async Task<IActionResult> Edit(Guid id, EditUserViewModel model, CancellationToken ct)
     {
         model.AvailableRoles = await GetRoleSelectItemsAsync();
@@ -129,7 +131,6 @@ public class UserController : BaseAdminController
         user.ForcePasswordChange = model.ForcePasswordChange;
         await _userManager.UpdateAsync(user);
 
-        // Sync roles
         var currentRoles = await _userManager.GetRolesAsync(user);
         await _userManager.RemoveFromRolesAsync(user, currentRoles);
 
@@ -140,7 +141,6 @@ public class UserController : BaseAdminController
                 await _userManager.AddToRoleAsync(user, role.Name);
         }
 
-        await OpLog.LogAsync("users.edit", "FcmsUser", user.Id.ToString(), ct: ct);
         ShowSuccess($"User '{model.Email}' updated.");
         return RedirectToAction(nameof(Index));
     }
@@ -155,7 +155,6 @@ public class UserController : BaseAdminController
         var user = await _userManager.FindByIdAsync(id.ToString());
         if (user is null) return FcmsFail("User not found.");
 
-        // Lockout to disable: set LockoutEnd far future; remove to enable
         var isCurrentlyLocked = user.LockoutEnd.HasValue && user.LockoutEnd > DateTimeOffset.UtcNow;
         if (isCurrentlyLocked)
         {
@@ -176,6 +175,7 @@ public class UserController : BaseAdminController
     [HttpPost("{id:guid}/delete")]
     [ValidateAntiForgeryToken]
     [FcmsAuthorize("users.delete")]
+    [FcmsLog("users.delete", "FcmsUser")]
     public async Task<IActionResult> Delete(Guid id)
     {
         var user = await _userManager.FindByIdAsync(id.ToString());
@@ -185,7 +185,6 @@ public class UserController : BaseAdminController
             return FcmsFail("You cannot delete your own account.");
 
         await _userManager.DeleteAsync(user);
-        await OpLog.LogAsync("users.delete", "FcmsUser", user.Id.ToString());
         ShowSuccess("User deleted.");
         return FcmsOk("User deleted.");
     }

@@ -1,0 +1,41 @@
+@model Dictionary<string, List<FlexCms.Framework.Auth.FcmsPermission>>
+@{
+    ViewData["Title"] = "Permissions";
+    var totalCount = Model.Sum(g => g.Value.Count);
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h4 class="mb-0">Permissions</h4>
+        <small class="text-muted">@totalCount permission keys across @Model.Count group(s) — assignments are managed per-role at <a asp-controller="Role" asp-action="Index">Roles</a>.</small>
+    </div>
+</div>
+
+@foreach (var grp in Model)
+{
+    <div class="card shadow-sm mb-3">
+        <div class="card-header d-flex justify-content-between align-items-center bg-light">
+            <strong>@grp.Key</strong>
+            <span class="badge text-bg-secondary">@grp.Value.Count</span>
+        </div>
+        <div class="card-body p-0">
+            <table class="table table-sm table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th style="width:40%">Display Name</th>
+                        <th>Key</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var p in grp.Value)
+                    {
+                        <tr>
+                            <td>@p.DisplayName</td>
+                            <td><code class="text-muted small">@p.Key</code></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}

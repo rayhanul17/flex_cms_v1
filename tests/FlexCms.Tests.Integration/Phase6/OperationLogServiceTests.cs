@@ -32,8 +32,8 @@ public class OperationLogServiceTests : IDisposable
         context.Browser.Returns("Chrome");
         context.Os.Returns("Windows");
 
-        var logRepo = new EfRepository<FcmsOperationLog>(_db);
-        var archiveRepo = new EfRepository<FcmsOperationLogArchive>(_db);
+        var logRepo = new EfRepository<FcmsLog>(_db);
+        var archiveRepo = new EfRepository<FcmsLogArchive>(_db);
         _svc = new OperationLogService(logRepo, archiveRepo, context, _settings, new EfUnitOfWork(_db));
     }
 
@@ -49,7 +49,7 @@ public class OperationLogServiceTests : IDisposable
         await _svc.LogAsync("Post.Created", "FcmsPost", Guid.NewGuid().ToString());
         await Save();
 
-        Assert.Equal(1, await _db.Set<FcmsOperationLog>().CountAsync(l => !l.IsDeleted));
+        Assert.Equal(1, await _db.Set<FcmsLog>().CountAsync(l => !l.IsDeleted));
     }
 
     [Fact]
@@ -60,7 +60,7 @@ public class OperationLogServiceTests : IDisposable
         await _svc.LogAsync("X.Action", "Entity", "id");
         await Save();
 
-        Assert.Equal(0, await _db.Set<FcmsOperationLog>().CountAsync());
+        Assert.Equal(0, await _db.Set<FcmsLog>().CountAsync());
     }
 
     [Fact]
@@ -70,7 +70,7 @@ public class OperationLogServiceTests : IDisposable
         await _svc.LogAsync("Default.Check", "Entity", "1");
         await Save();
 
-        Assert.Equal(1, await _db.Set<FcmsOperationLog>().CountAsync(l => !l.IsDeleted));
+        Assert.Equal(1, await _db.Set<FcmsLog>().CountAsync(l => !l.IsDeleted));
     }
 
     // ── LogAsync field correctness ────────────────────────────────────────────
@@ -84,7 +84,7 @@ public class OperationLogServiceTests : IDisposable
         await _svc.LogAsync("Post.Created", "FcmsPost", entityId, new { Title = "Test" }, "blog", FcmsLogSeverity.Warning);
         await Save();
 
-        var log = await _db.Set<FcmsOperationLog>().FirstAsync(l => !l.IsDeleted);
+        var log = await _db.Set<FcmsLog>().FirstAsync(l => !l.IsDeleted);
         Assert.Equal("Post.Created", log.Action);
         Assert.Equal("FcmsPost", log.EntityType);
         Assert.Equal(entityId, log.EntityId);
@@ -106,8 +106,8 @@ public class OperationLogServiceTests : IDisposable
         await _svc.ArchiveOlderThanAsync(TimeSpan.FromHours(24));
         await Save();
 
-        var remaining = await _db.Set<FcmsOperationLog>().CountAsync(l => !l.IsDeleted);
-        var archived = await _db.Set<FcmsOperationLogArchive>().CountAsync(a => !a.IsDeleted);
+        var remaining = await _db.Set<FcmsLog>().CountAsync(l => !l.IsDeleted);
+        var archived = await _db.Set<FcmsLogArchive>().CountAsync(a => !a.IsDeleted);
         Assert.Equal(1, remaining);
         Assert.Equal(2, archived);
     }
@@ -120,7 +120,7 @@ public class OperationLogServiceTests : IDisposable
         await _svc.ArchiveOlderThanAsync(TimeSpan.FromHours(24));
         await Save();
 
-        Assert.Equal(0, await _db.Set<FcmsOperationLogArchive>().CountAsync());
+        Assert.Equal(0, await _db.Set<FcmsLogArchive>().CountAsync());
     }
 
     [Fact]
@@ -132,7 +132,7 @@ public class OperationLogServiceTests : IDisposable
         await _svc.ArchiveOlderThanAsync(TimeSpan.FromHours(1));
         await Save();
 
-        var archived = await _db.Set<FcmsOperationLogArchive>().FirstAsync(a => !a.IsDeleted);
+        var archived = await _db.Set<FcmsLogArchive>().FirstAsync(a => !a.IsDeleted);
         Assert.Equal("User.Deleted", archived.Action);
         Assert.Equal(entityId, archived.EntityId);
         Assert.Equal(log.UserName, archived.UserName);
@@ -148,8 +148,8 @@ public class OperationLogServiceTests : IDisposable
         await _svc.ArchiveOlderThanAsync(TimeSpan.FromHours(1));
         await Save();
 
-        var visibleLogs = await _db.Set<FcmsOperationLog>().CountAsync(l => !l.IsDeleted);
-        var rawLogs = await _db.Set<FcmsOperationLog>().IgnoreQueryFilters().CountAsync();
+        var visibleLogs = await _db.Set<FcmsLog>().CountAsync(l => !l.IsDeleted);
+        var rawLogs = await _db.Set<FcmsLog>().IgnoreQueryFilters().CountAsync();
         Assert.Equal(0, visibleLogs);
         Assert.Equal(1, rawLogs); // soft-deleted, physically still there
     }
@@ -208,8 +208,8 @@ public class OperationLogServiceTests : IDisposable
         await _svc.ClearArchiveAsync();
         await Save();
 
-        Assert.Equal(0, await _db.Set<FcmsOperationLogArchive>().CountAsync(a => !a.IsDeleted));
-        Assert.Equal(2, await _db.Set<FcmsOperationLogArchive>().IgnoreQueryFilters().CountAsync());
+        Assert.Equal(0, await _db.Set<FcmsLogArchive>().CountAsync(a => !a.IsDeleted));
+        Assert.Equal(2, await _db.Set<FcmsLogArchive>().IgnoreQueryFilters().CountAsync());
     }
 
     [Fact]
@@ -226,12 +226,12 @@ public class OperationLogServiceTests : IDisposable
     private async Task SetAuditEnabledAsync(bool enabled)
         => await _settings.SaveAsync(AuditLogSettings.Key, new AuditEnabledDto { Enabled = enabled });
 
-    private async Task<FcmsOperationLog> InsertLogAsync(
+    private async Task<FcmsLog> InsertLogAsync(
         int daysAgo = 0,
         string action = "Test.Action",
         string entityId = "")
     {
-        var log = new FcmsOperationLog
+        var log = new FcmsLog
         {
             Action = action,
             EntityType = "TestEntity",
@@ -242,7 +242,7 @@ public class OperationLogServiceTests : IDisposable
             Module = "core",
             Severity = FcmsLogSeverity.Info,
         };
-        _db.Set<FcmsOperationLog>().Add(log);
+        _db.Set<FcmsLog>().Add(log);
         await _db.SaveChangesAsync();
 
         // Patch CreatedAt/UpdatedAt after save because SaveChangesAsync overrides them with FcmsTime.Now
@@ -251,7 +251,7 @@ public class OperationLogServiceTests : IDisposable
             var past = DateTime.UtcNow.AddDays(-daysAgo);
             log.CreatedAt = past;
             log.UpdatedAt = past;
-            _db.Set<FcmsOperationLog>().Update(log);
+            _db.Set<FcmsLog>().Update(log);
             await _db.SaveChangesAsync();
         }
 

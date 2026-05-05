@@ -54,9 +54,9 @@ public class FcmsDbContext : IdentityDbContext<FcmsUser, FcmsRole, Guid>
     public DbSet<FcmsMediaFolder> MediaFolders => Set<FcmsMediaFolder>();
     public DbSet<FcmsMedia> Media => Set<FcmsMedia>();
 
-    // Audit / operation logs
-    public DbSet<FcmsOperationLog> OperationLogs => Set<FcmsOperationLog>();
-    public DbSet<FcmsOperationLogArchive> OperationLogArchives => Set<FcmsOperationLogArchive>();
+    // Audit logs
+    public DbSet<FcmsLog> Logs => Set<FcmsLog>();
+    public DbSet<FcmsLogArchive> LogArchives => Set<FcmsLogArchive>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

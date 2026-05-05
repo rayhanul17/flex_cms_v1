@@ -1,7 +1,7 @@
-@model IReadOnlyList<FlexCms.Framework.Cms.FcmsOperationLog>
+@model IReadOnlyList<FlexCms.Framework.Cms.FcmsLog>
 @{
     ViewData["Title"] = "Audit Log";
-    var archive = (IReadOnlyList<FlexCms.Framework.Cms.FcmsOperationLogArchive>)ViewBag.Archive;
+    var archive = (IReadOnlyList<FlexCms.Framework.Cms.FcmsLogArchive>)ViewBag.Archive;
     var auditEnabled = (bool)ViewBag.AuditEnabled;
 }
 

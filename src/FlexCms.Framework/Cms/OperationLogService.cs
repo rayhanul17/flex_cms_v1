@@ -11,8 +11,8 @@ public static class AuditLogSettings
 
 public class OperationLogService : IOperationLogService
 {
-    private readonly IRepository<FcmsOperationLog> _logs;
-    private readonly IRepository<FcmsOperationLogArchive> _archive;
+    private readonly IRepository<FcmsLog> _logs;
+    private readonly IRepository<FcmsLogArchive> _archive;
     private readonly IFcmsContextService _context;
     private readonly ISettingsService _settings;
     private readonly IFcmsUnitOfWork _uow;
@@ -24,8 +24,8 @@ public class OperationLogService : IOperationLogService
     };
 
     public OperationLogService(
-        IRepository<FcmsOperationLog> logs,
-        IRepository<FcmsOperationLogArchive> archive,
+        IRepository<FcmsLog> logs,
+        IRepository<FcmsLogArchive> archive,
         IFcmsContextService context,
         ISettingsService settings,
         IFcmsUnitOfWork uow)
@@ -49,7 +49,7 @@ public class OperationLogService : IOperationLogService
         var cfg = await _settings.GetAsync<AuditConfig>(AuditLogSettings.Key, ct: ct);
         if (!cfg.Enabled) return;
 
-        var log = new FcmsOperationLog
+        var log = new FcmsLog
         {
             UserId = _context.UserId,
             UserName = _context.Username ?? string.Empty,
@@ -73,7 +73,7 @@ public class OperationLogService : IOperationLogService
         var old = await _logs.FindAsync(l => l.CreatedAt < cutoff, ct);
         if (old.Count == 0) return;
 
-        var archiveEntries = old.Select(log => new FcmsOperationLogArchive
+        var archiveEntries = old.Select(log => new FcmsLogArchive
         {
             UserId = log.UserId,
             UserName = log.UserName,
@@ -106,17 +106,17 @@ public class OperationLogService : IOperationLogService
         }
     }
 
-    public async Task<IReadOnlyList<FcmsOperationLog>> GetRecentAsync(int count = 100, CancellationToken ct = default)
+    public async Task<IReadOnlyList<FcmsLog>> GetRecentAsync(int count = 100, CancellationToken ct = default)
     {
-        var filter = new QueryFilter<FcmsOperationLog>()
+        var filter = new QueryFilter<FcmsLog>()
             .OrderByDescending(l => l.CreatedAt)
             .Page(1, count);
         return await _logs.FindAsync(filter, ct);
     }
 
-    public async Task<IReadOnlyList<FcmsOperationLogArchive>> GetArchiveAsync(int count = 100, CancellationToken ct = default)
+    public async Task<IReadOnlyList<FcmsLogArchive>> GetArchiveAsync(int count = 100, CancellationToken ct = default)
     {
-        var filter = new QueryFilter<FcmsOperationLogArchive>()
+        var filter = new QueryFilter<FcmsLogArchive>()
             .OrderByDescending(l => l.CreatedAt)
             .Page(1, count);
         return await _archive.FindAsync(filter, ct);

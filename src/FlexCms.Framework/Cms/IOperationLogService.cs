@@ -17,6 +17,6 @@ public interface IOperationLogService
     /// <summary>Hard-deletes ALL records from the archive table.</summary>
     Task ClearArchiveAsync(CancellationToken ct = default);
 
-    Task<IReadOnlyList<FcmsOperationLog>> GetRecentAsync(int count = 100, CancellationToken ct = default);
-    Task<IReadOnlyList<FcmsOperationLogArchive>> GetArchiveAsync(int count = 100, CancellationToken ct = default);
+    Task<IReadOnlyList<FcmsLog>> GetRecentAsync(int count = 100, CancellationToken ct = default);
+    Task<IReadOnlyList<FcmsLogArchive>> GetArchiveAsync(int count = 100, CancellationToken ct = default);
 }

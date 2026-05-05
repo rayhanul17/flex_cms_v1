@@ -61,13 +61,48 @@ public class MenuService : IMenuService
     {
         if (items.Count == 0) return;
 
-        // Existing items keyed by URL — URL is the stable identity per module
+        // Two-pass to resolve parent references:
+        //   pass 1 — parents (ParentDefaultName == null) so their IDs exist
+        //   pass 2 — children, resolving ParentId by DefaultName lookup
+        var parents = items.Where(i => i.ParentDefaultName is null).ToList();
+        var children = items.Where(i => i.ParentDefaultName is not null).ToList();
+
+        await SeedBatchAsync(moduleId, parents, parentLookup: null, ct);
+
+        if (children.Count > 0)
+        {
+            // Refresh existing list after pass 1 so newly-inserted parents are findable
+            var afterParents = await _repo.FindAsync(m => m.ModuleId == moduleId, ct, includeDeleted: true);
+            var lookup = afterParents.ToDictionary(
+                m => m.DefaultName,
+                m => m.Id,
+                StringComparer.OrdinalIgnoreCase);
+            await SeedBatchAsync(moduleId, children, lookup, ct);
+        }
+    }
+
+    private async Task SeedBatchAsync(
+        string moduleId,
+        List<FcmsMenuItemDef> batch,
+        Dictionary<string, Guid>? parentLookup,
+        CancellationToken ct)
+    {
+        if (batch.Count == 0) return;
+
         var existing = (await _repo.FindAsync(m => m.ModuleId == moduleId, ct, includeDeleted: true))
             .ToDictionary(m => m.Url, StringComparer.OrdinalIgnoreCase);
 
         var anyChange = false;
-        foreach (var def in items)
+        foreach (var def in batch)
         {
+            Guid? parentId = null;
+            if (def.ParentDefaultName is not null && parentLookup is not null
+                && parentLookup.TryGetValue(def.ParentDefaultName, out var pid))
+            {
+                parentId = pid;
+            }
+
+            // Identity key: Url (stable per module). Parent items use unique "#name" anchors.
             if (existing.TryGetValue(def.Url, out var existingItem))
             {
                 // Refresh code-owned fields on upgrade; preserve CustomName + Order (admin's customizations)
@@ -75,7 +110,8 @@ public class MenuService : IMenuService
                            || existingItem.Icon != def.Icon
                            || existingItem.RequiredPermission != def.RequiredPermission
                            || existingItem.Location != def.Location
-                           || existingItem.IsDeleted; // restore if soft-deleted by deactivation
+                           || existingItem.ParentId != parentId
+                           || existingItem.IsDeleted;
 
                 if (!changed) continue;
 
@@ -83,6 +119,7 @@ public class MenuService : IMenuService
                 existingItem.Icon = def.Icon;
                 existingItem.RequiredPermission = def.RequiredPermission;
                 existingItem.Location = def.Location;
+                existingItem.ParentId = parentId;
                 existingItem.IsDeleted = false;
                 existingItem.DeletedAt = null;
                 await _repo.UpdateAsync(existingItem, ct);
@@ -97,7 +134,7 @@ public class MenuService : IMenuService
                 DefaultName = def.DefaultName,
                 Icon = def.Icon,
                 Url = def.Url,
-                ParentId = def.ParentId,
+                ParentId = parentId,
                 Order = def.Order,
                 RequiredPermission = def.RequiredPermission
             }, ct);
@@ -146,6 +183,40 @@ public class MenuService : IMenuService
         await _repo.UpdateRangeAsync(items, ct);
         await _uow.SaveChangesAsync(ct);
         InvalidateCache();
+    }
+
+    public async Task<List<FcmsMenuItem>> GetAllForAdminAsync(string location, CancellationToken ct = default)
+    {
+        var items = await _repo.FindAsync(m => m.Location == location, ct);
+        return [.. items.OrderBy(m => m.Order).ThenBy(m => m.DefaultName)];
+    }
+
+    public Task<FcmsMenuItem?> GetByIdAsync(Guid id, CancellationToken ct = default)
+        => _repo.GetByIdAsync(id, ct);
+
+    public async Task<FcmsMenuItem> SaveAsync(FcmsMenuItem item, CancellationToken ct = default)
+    {
+        if (item.Id == Guid.Empty)
+        {
+            await _repo.AddAsync(item, ct);
+        }
+        else
+        {
+            await _repo.UpdateAsync(item, ct);
+        }
+        await _uow.SaveChangesAsync(ct);
+        InvalidateCache(item.Location);
+        return item;
+    }
+
+    public async Task DeleteAsync(Guid id, CancellationToken ct = default)
+    {
+        var item = await _repo.GetByIdAsync(id, ct);
+        if (item is null) return;
+
+        await _repo.SoftDeleteAsync(item, ct);
+        await _uow.SaveChangesAsync(ct);
+        InvalidateCache(item.Location);
     }
 
     public void InvalidateCache(string? location = null)

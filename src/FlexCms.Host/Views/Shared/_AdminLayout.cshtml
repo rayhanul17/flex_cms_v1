@@ -4,6 +4,18 @@
 @{
     var menuItems = await MenuService.GetMenuAsync("AdminSidebar");
     var currentPath = Context.Request.Path.Value ?? "";
+
+    bool IsActive(FcmsMenuItem item) =>
+        currentPath.Equals(item.Url, StringComparison.OrdinalIgnoreCase)
+        || (item.Url is not null && item.Url.Length > 1 && !item.Url.StartsWith('#')
+            && item.Url != "/admin"
+            && currentPath.StartsWith(item.Url, StringComparison.OrdinalIgnoreCase));
+
+    var topLevel = menuItems.Where(m => m.ParentId is null).OrderBy(m => m.Order).ToList();
+    var byParent = menuItems
+        .Where(m => m.ParentId is not null)
+        .GroupBy(m => m.ParentId!.Value)
+        .ToDictionary(g => g.Key, g => g.OrderBy(m => m.Order).ToList());
 }
 <!DOCTYPE html>
 <html lang="en">
@@ -24,16 +36,45 @@
         <i class="bi bi-grid-3x3-gap me-2"></i>FlexCMS
     </a>
     <ul class="nav flex-column py-2">
-        @foreach (var item in menuItems)
+        @foreach (var item in topLevel)
         {
-            var isActive = currentPath.Equals(item.Url, StringComparison.OrdinalIgnoreCase)
-                        || (item.Url != "/admin" && currentPath.StartsWith(item.Url, StringComparison.OrdinalIgnoreCase));
-            <li class="nav-item">
-                <a class="nav-link @(isActive ? "active" : "")" href="@item.Url">
-                    <i class="@item.Icon"></i>
-                    @item.DisplayName
-                </a>
-            </li>
+            var children = byParent.TryGetValue(item.Id, out var c) ? c : null;
+
+            if (children is null)
+            {
+                <li class="nav-item">
+                    <a class="nav-link @(IsActive(item) ? "active" : "")" href="@item.Url">
+                        <i class="@item.Icon"></i>
+                        <span>@item.DisplayName</span>
+                    </a>
+                </li>
+            }
+            else
+            {
+                var groupId = "g_" + item.Id.ToString("N");
+                var anyChildActive = children.Any(IsActive);
+                <li class="nav-item nav-group @(anyChildActive ? "open" : "")">
+                    <a class="nav-link nav-toggle" href="#@groupId" data-bs-toggle="collapse"
+                       role="button" aria-expanded="@(anyChildActive ? "true" : "false")">
+                        <i class="@item.Icon"></i>
+                        <span>@item.DisplayName</span>
+                        <i class="bi bi-chevron-right ms-auto chevron"></i>
+                    </a>
+                    <div id="@groupId" class="collapse @(anyChildActive ? "show" : "")">
+                        <ul class="nav flex-column nav-children">
+                            @foreach (var child in children)
+                            {
+                                <li class="nav-item">
+                                    <a class="nav-link @(IsActive(child) ? "active" : "")" href="@child.Url">
+                                        <i class="@child.Icon"></i>
+                                        <span>@child.DisplayName</span>
+                                    </a>
+                                </li>
+                            }
+                        </ul>
+                    </div>
+                </li>
+            }
         }
     </ul>
 </nav>

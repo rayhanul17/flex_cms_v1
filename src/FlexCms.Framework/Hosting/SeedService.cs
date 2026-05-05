@@ -252,20 +252,31 @@ public class SeedService : IHostedService
 
     private static readonly List<FcmsMenuItemDef> CoreMenuItems =
     [
-        new() { DefaultName = "Dashboard",   Icon = "bi bi-speedometer2",    Url = "/admin",               Order = 0  },
-        new() { DefaultName = "Pages",       Icon = "bi bi-file-earmark",    Url = "/admin/pages",         Order = 10, RequiredPermission = "pages.edit" },
-        new() { DefaultName = "Posts",       Icon = "bi bi-newspaper",       Url = "/admin/posts",         Order = 20, RequiredPermission = "posts.edit" },
-        new() { DefaultName = "Categories",  Icon = "bi bi-folder",          Url = "/admin/categories",    Order = 21, RequiredPermission = "categories.edit" },
-        new() { DefaultName = "Media",       Icon = "bi bi-images",          Url = "/admin/media",         Order = 30, RequiredPermission = "media.view" },
-        new() { DefaultName = "Trash",       Icon = "bi bi-trash",           Url = "/admin/trash",         Order = 35 },
-        new() { DefaultName = "Users",       Icon = "bi bi-people",          Url = "/admin/users",         Order = 40, RequiredPermission = "users.manage" },
-        new() { DefaultName = "Roles",       Icon = "bi bi-shield-lock",     Url = "/admin/roles",         Order = 41, RequiredPermission = "roles.manage" },
-        new() { DefaultName = "Permissions", Icon = "bi bi-key",             Url = "/admin/permissions",   Order = 42, RequiredPermission = "roles.permissions" },
-        new() { DefaultName = "Modules",     Icon = "bi bi-puzzle",          Url = "/admin/modules",       Order = 50 },
-        new() { DefaultName = "Menu",        Icon = "bi bi-list-ul",         Url = "/admin/menu",          Order = 55, RequiredPermission = "settings.manage" },
-        new() { DefaultName = "Redirects",   Icon = "bi bi-sign-turn-right", Url = "/admin/redirects",     Order = 60, RequiredPermission = "redirects.edit" },
-        new() { DefaultName = "Audit Log",   Icon = "bi bi-journal-text",    Url = "/admin/audit-log",     Order = 70, RequiredPermission = "audit.view" },
-        new() { DefaultName = "Settings",    Icon = "bi bi-gear",            Url = "/admin/settings",      Order = 80, RequiredPermission = "settings.manage" },
+        new() { DefaultName = "Dashboard",  Icon = "bi bi-speedometer2", Url = "/admin",       Order = 0 },
+
+        // Blog group
+        new() { DefaultName = "Blog",       Icon = "bi bi-journal-richtext", Url = "#blog",   Order = 10 },
+        new() { DefaultName = "Posts",      Icon = "bi bi-newspaper",   Url = "/admin/posts",      Order = 11, ParentDefaultName = "Blog", RequiredPermission = "posts.edit" },
+        new() { DefaultName = "Categories", Icon = "bi bi-folder",      Url = "/admin/categories", Order = 12, ParentDefaultName = "Blog", RequiredPermission = "categories.edit" },
+
+        // Standalone content
+        new() { DefaultName = "Pages",      Icon = "bi bi-file-earmark", Url = "/admin/pages",     Order = 20, RequiredPermission = "pages.edit" },
+        new() { DefaultName = "Media",      Icon = "bi bi-images",       Url = "/admin/media",     Order = 30, RequiredPermission = "media.view" },
+        new() { DefaultName = "Trash",      Icon = "bi bi-trash",        Url = "/admin/trash",     Order = 35 },
+
+        // People group
+        new() { DefaultName = "People",     Icon = "bi bi-people-fill",  Url = "#people",          Order = 40 },
+        new() { DefaultName = "Users",      Icon = "bi bi-person",       Url = "/admin/users",       Order = 41, ParentDefaultName = "People", RequiredPermission = "users.manage" },
+        new() { DefaultName = "Roles",      Icon = "bi bi-shield-lock",  Url = "/admin/roles",       Order = 42, ParentDefaultName = "People", RequiredPermission = "roles.manage" },
+        new() { DefaultName = "Permissions",Icon = "bi bi-key",          Url = "/admin/permissions", Order = 43, ParentDefaultName = "People", RequiredPermission = "roles.permissions" },
+
+        // System group
+        new() { DefaultName = "System",     Icon = "bi bi-sliders",      Url = "#system",            Order = 80 },
+        new() { DefaultName = "Modules",    Icon = "bi bi-puzzle",       Url = "/admin/modules",     Order = 81, ParentDefaultName = "System" },
+        new() { DefaultName = "Menu",       Icon = "bi bi-list-ul",      Url = "/admin/menu",        Order = 82, ParentDefaultName = "System", RequiredPermission = "settings.manage" },
+        new() { DefaultName = "Redirects",  Icon = "bi bi-sign-turn-right", Url = "/admin/redirects", Order = 83, ParentDefaultName = "System", RequiredPermission = "redirects.edit" },
+        new() { DefaultName = "Audit Log",  Icon = "bi bi-journal-text", Url = "/admin/audit-log",   Order = 84, ParentDefaultName = "System", RequiredPermission = "audit.view" },
+        new() { DefaultName = "Settings",   Icon = "bi bi-gear",         Url = "/admin/settings",    Order = 85, ParentDefaultName = "System", RequiredPermission = "settings.manage" },
     ];
 
     private async Task SeedMenuItemsAsync(CancellationToken ct)

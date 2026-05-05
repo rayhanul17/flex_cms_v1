@@ -1,7 +1,10 @@
+using System.Linq.Expressions;
 using FlexCms.Framework.Auth;
 using FlexCms.Framework.Clock;
 using FlexCms.Framework.Cms;
+using FlexCms.Framework.Db.Ef;
 using FlexCms.Framework.Helpers;
+using FlexCms.Framework.Models;
 using FlexCms.Host.Models.Admin;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
@@ -12,29 +15,53 @@ namespace FlexCms.Host.Controllers.Admin;
 public class PageController : BaseAdminController
 {
     private readonly IPageService _pages;
+    private readonly FcmsDbContext _db;
 
-    public PageController(IPageService pages) => _pages = pages;
+    public PageController(IPageService pages, FcmsDbContext db)
+    {
+        _pages = pages;
+        _db = db;
+    }
 
     // ── List ──────────────────────────────────────────────────────────────────
 
     [HttpGet("")]
-    public async Task<IActionResult> Index(CancellationToken ct)
+    public IActionResult Index() => View();
+
+    // ── DataTable AJAX endpoint (server-side processing) ─────────────────────
+
+    [HttpPost("datatable")]
+    [ValidateAntiForgeryToken]
+    public Task<IActionResult> DataTable([FromForm] DataTablesRequest req, CancellationToken ct)
     {
-        var all = await _pages.GetAllAsync(ct);
-        var dict = all.ToDictionary(p => p.Id, p => p.Title);
-
-        var vm = all.Select(p => new PageListItemViewModel
+        var orderColumns = new Expression<Func<FcmsPage, object>>[]
         {
-            Id = p.Id,
-            Title = p.Title,
-            Slug = p.Slug,
-            IsPublished = p.IsPublished,
-            ParentId = p.ParentId,
-            ParentTitle = p.ParentId.HasValue && dict.TryGetValue(p.ParentId.Value, out var t) ? t : null,
-            CreatedAt = p.CreatedAt
-        }).ToList();
-
-        return View(vm);
+            p => p.Title,
+            p => p.Slug,
+            p => p.IsPublished,
+            p => p.Status,
+            p => p.UpdatedAt
+        };
+        return DataTableResult(
+            _db.Pages,
+            req,
+            select: p => new
+            {
+                Id = p.Id,
+                Title = p.Title,
+                Slug = p.Slug,
+                IsPublished = p.IsPublished,
+                Status = (int)p.Status,
+                UpdatedAt = p.UpdatedAt
+            },
+            orderColumns: orderColumns,
+            globalSearch: q => p => p.Title.Contains(q) || p.Slug.Contains(q),
+            permissions: new()
+            {
+                ["edit"]   = FcmsPermissions.PagesEdit,
+                ["delete"] = FcmsPermissions.PagesDelete
+            },
+            ct: ct);
     }
 
     // ── Create ────────────────────────────────────────────────────────────────

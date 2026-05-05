@@ -26,6 +26,7 @@
     <title>@ViewData["Title"] — FlexCMS Admin</title>
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="~/lib/bootstrap-icons/font/bootstrap-icons.min.css" />
+    <link rel="stylesheet" href="~/lib/datatables.net-bs5/css/dataTables.bootstrap5.min.css" />
     <link rel="stylesheet" href="~/css/admin.css" asp-append-version="true" />
 </head>
 <body>
@@ -107,10 +108,13 @@
 
 <script src="~/lib/jquery/dist/jquery.min.js"></script>
 <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+<script src="~/lib/datatables.net/js/jquery.dataTables.min.js"></script>
+<script src="~/lib/datatables.net-bs5/js/dataTables.bootstrap5.min.js"></script>
 <script src="~/js/site.js" asp-append-version="true"></script>
 <script src="~/js/fcms-confirm.js" asp-append-version="true"></script>
 <script src="~/js/fcms-toast.js" asp-append-version="true"></script>
 <script src="~/js/fcms-actions.js" asp-append-version="true"></script>
+<script src="~/js/fcms-datatable.js" asp-append-version="true"></script>
 <script>
     // Server-side TempData toast → fcms.toast on next render
     @if (TempData["Toast.Message"] is string toastMsg)

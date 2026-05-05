@@ -1,3 +1,4 @@
+using FlexCms.Framework.Clock;
 using FlexCms.Framework.Db.Ef;
 using FlexCms.Framework.Setup;
 using FlexCms.Host.Models.Setup;
@@ -267,7 +268,7 @@ public class SetupController : Controller
             AdminPasswordEncrypted = s3.Password,
             AdminSeeded = false,
             SetupVersion = "1.0",
-            SetupCompletedAt = DateTime.UtcNow
+            SetupCompletedAt = FcmsTime.Now
         };
 
         switch (s1.DbProvider)

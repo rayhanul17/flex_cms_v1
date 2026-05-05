@@ -1,3 +1,4 @@
+using FlexCms.Framework.Clock;
 using FlexCms.Framework.Db.Ef;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
@@ -86,7 +87,7 @@ public class ModuleActivationService : IHostedService
                     ModuleId = module.ModuleId,
                     Version = module.Version,
                     Status = "Active",
-                    ActivatedAt = DateTime.UtcNow
+                    ActivatedAt = FcmsTime.Now
                 };
                 await repo.AddAsync(record, ct);
                 await uow.SaveChangesAsync(ct);

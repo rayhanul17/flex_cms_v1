@@ -1,3 +1,4 @@
+using FlexCms.Framework.Clock;
 using FlexCms.Framework.Db;
 using FlexCms.Framework.Storage;
 using Microsoft.AspNetCore.Http;
@@ -60,7 +61,7 @@ public class MediaService : IMediaService
 
         var safeOriginal = Path.GetFileNameWithoutExtension(SanitizeFileName(file.FileName));
         var uniqueName = $"{safeOriginal}_{Guid.NewGuid():N}{ext}";
-        var now = DateTime.UtcNow;
+        var now = FcmsTime.Now;
         var relativePath = $"uploads/media/{now:yyyy/MM}/{uniqueName}";
 
         using var ms = new MemoryStream();

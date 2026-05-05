@@ -1,4 +1,5 @@
 using System.Text.Json;
+using FlexCms.Framework.Clock;
 using FlexCms.Framework.Db;
 using FlexCms.Framework.Services;
 
@@ -69,7 +70,7 @@ public class OperationLogService : IOperationLogService
 
     public async Task ArchiveOlderThanAsync(TimeSpan age, CancellationToken ct = default)
     {
-        var cutoff = DateTime.UtcNow - age;
+        var cutoff = FcmsTime.Now - age;
         var old = await _logs.FindAsync(l => l.CreatedAt < cutoff, ct);
         if (old.Count == 0) return;
 

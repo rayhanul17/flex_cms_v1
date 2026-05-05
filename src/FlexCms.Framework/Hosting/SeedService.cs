@@ -1,4 +1,5 @@
 using FlexCms.Framework.Auth;
+using FlexCms.Framework.Clock;
 using FlexCms.Framework.Db;
 using FlexCms.Framework.Modules;
 using FlexCms.Framework.Services;
@@ -160,7 +161,7 @@ public class SeedService : IHostedService
                     record.Version = module.Manifest.Version;
                     record.Status = expectedStatus;
                     if (expectedStatus == "Active" && record.ActivatedAt is null)
-                        record.ActivatedAt = DateTime.UtcNow;
+                        record.ActivatedAt = FcmsTime.Now;
                     await repo.UpdateAsync(record, ct);
                     anyChange = true;
                 }
@@ -172,7 +173,7 @@ public class SeedService : IHostedService
                 ModuleId = module.ModuleId,
                 Version = module.Manifest.Version,
                 Status = expectedStatus,
-                ActivatedAt = expectedStatus == "Active" ? DateTime.UtcNow : null
+                ActivatedAt = expectedStatus == "Active" ? FcmsTime.Now : null
             }, ct);
             anyChange = true;
             _logger.LogInformation("SeedService: registered module {Id} v{Version} ({Status}).",

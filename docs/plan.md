@@ -14629,6 +14629,50 @@ When saving new memories, follow the format in `~/.claude/CLAUDE.md` (auto-memor
 
 ---
 
+#### ✅ Post-Phase-5 batch 2 (2026-05-05) — EntityStatus + FcmsPermissions + DRY action system + DRY DataTable
+
+> Major foundation work for the upcoming phases — every CRUD page from now on will use this stack.
+
+**Phase A — `IsDeleted` bool → `EntityStatus` enum:**
+- New: `src/FlexCms.Framework/Db/EntityStatus.cs` — `enum { InActive=0, Active=1, Deleted=404 }`
+- `IBaseEntity` / `BaseEfEntity` / `BaseMongoEntity` — `Status` field replaces `IsDeleted`
+- EF query filter: `e.Status != EntityStatus.Deleted`
+- `MongoRepository` auto-filter: same; `MongoDbSerializerSetup` registers EntityStatus as Int32
+- `SoftDeleteAsync` (EF + Mongo) sets `Status = Deleted`
+- 30+ src/ + 16 test-file references migrated mechanically (sed-assisted)
+- `FcmsModuleRecord.Status` (string) renamed to `ActivationStatus` (avoid hiding inherited enum)
+- `FcmsUser.Status` added (Identity user); `ToggleActive` sets it canonically + keeps `LockoutEnd` synced for auth-time blocking
+
+**Phase B — `FcmsPermissions` constants (kill magic strings):**
+- New: `src/FlexCms.Framework/Auth/FcmsPermissions.cs` — public const for every core permission key
+- 61 string literals → `FcmsPermissions.*` across 14 controllers + 6 views + `SeedService.CorePermissions[]` + `SeedService.CoreMenuItems[]`
+- `_ViewImports.cshtml` adds `@using FlexCms.Framework.Auth` + `@using FlexCms.Framework.Db` so views can write `fcms-authorize="@FcmsPermissions.UsersManage"` directly
+
+**Phase C — Reusable row-actions + generic confirm modal + toast:**
+- New: `Views/Shared/_FcmsConfirm.cshtml` — single global modal + toast container (included once in `_AdminLayout`)
+- New: `wwwroot/js/fcms-confirm.js` — `fcms.confirm({...})` / `fcms.alert({...})` / `fcms.dialog({buttons:[]})` Promise APIs
+- New: `wwwroot/js/fcms-toast.js` — `fcms.toast.success/danger/warning/info(msg)`
+- New: `wwwroot/js/fcms-actions.js` — global click handler for `[data-fcms-action]` buttons (delete/toggle-active/restore/custom) → confirm modal → AJAX → toast → row update; zero per-page JS
+- New: `src/FlexCms.Framework/TagHelpers/FcmsRowActionsTagHelper.cs` — `<fcms-row-actions>` + child `<fcms-action>` with server-side permission filter (SuperAdmin bypass)
+- 9 unit tests for TagHelper (`Tests.Unit/Phase6/FcmsRowActionsTagHelperTests.cs`)
+- User Index + Category Index migrated as proof — old per-page JS deleted
+
+**Phase D — DRY DataTable system:**
+- jQuery DataTables 2.1.8 + Bootstrap 5 plugin → `wwwroot/lib/datatables.net{,-bs5}/`
+- New: `src/FlexCms.Framework/Models/DataTablesRequest.cs` + `DataTablesResponse<T>.cs`
+- New: `src/FlexCms.Framework/Db/DataTableQueryExtensions.cs` — `IQueryable<T>.ToDataTableAsync` (EF query filter + ordering + paging)
+- `BaseAdminController.DataTableResult<TEntity, TResult>` — one-call helper that runs the query + injects user permission flags
+- New: `wwwroot/js/fcms-datatable.js` — wraps jQuery DataTables for server-side mode + auto column rendering (status badge / date / bool / code) + auto action column from permission flags
+- New: `src/FlexCms.Framework/TagHelpers/FcmsDataTableTagHelper.cs` — `<fcms-data-table>` + `<fcms-data-column>` + `<fcms-data-actions>` + `<fcms-data-action>` (children)
+- Page Index migrated as proof: ~10 lines Razor + 3-line controller action gives full server-side paginated/sorted/searched table with permission-filtered actions
+- Phase 6 onward: every "manage" page follows this pattern — no boilerplate
+
+**Test count after batch 2:** 170 unit tests (was 161). All integration tests still passing.
+
+**Active branch:** `phase-6-veryfy` — multiple commits pushed, PR pending merge before Phase 6 (Media + File Storage) starts.
+
+---
+
 #### 🧠 Key Architectural Decisions (from 2026-05-05 session)
 
 These were debated and decided in conversation; capturing them so future sessions don't re-litigate.

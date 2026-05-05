@@ -6,22 +6,43 @@ using Microsoft.Extensions.DependencyInjection;
 namespace FlexCms.Framework.Auth;
 
 /// <summary>
-/// Allows a controller action to pass an entity ID to <see cref="FcmsLogAttribute"/>
-/// when the ID is only known after the entity is saved (e.g. create actions).
+/// Allows a controller action to pass an entity ID and/or a value snapshot to
+/// <see cref="FcmsLogAttribute"/> for inclusion in the audit row.
+///
+/// <list type="bullet">
+///   <item><b>EntityId</b> — needed for create actions where the ID is only
+///         known after save (route param hasn't seen it).</item>
+///   <item><b>Value</b> — JSON-serialized snapshot of the entity (or any DTO)
+///         saved into <c>FcmsLog.Value</c>. Caller decides what to include
+///         (omit secrets like password hashes).</item>
+/// </list>
 /// </summary>
 /// <example>
+/// // Create:
 /// FcmsLogContext.SetEntityId(HttpContext, role.Id);
-/// return RedirectToAction(nameof(Index));
+/// FcmsLogContext.SetValue(HttpContext, new { role.Name, role.Priority });
+///
+/// // Edit:
+/// FcmsLogContext.SetValue(HttpContext, new { role.Name, role.Priority });
 /// </example>
 public static class FcmsLogContext
 {
     internal const string EntityIdKey = "FcmsLog.EntityId";
+    internal const string ValueKey    = "FcmsLog.Value";
 
     public static void SetEntityId(Microsoft.AspNetCore.Http.HttpContext httpContext, Guid id)
         => httpContext.Items[EntityIdKey] = id.ToString();
 
     public static void SetEntityId(Microsoft.AspNetCore.Http.HttpContext httpContext, string id)
         => httpContext.Items[EntityIdKey] = id;
+
+    /// <summary>
+    /// Snapshot of the entity (or any object) to be JSON-serialized into
+    /// <c>FcmsLog.Value</c>. Pass an anonymous object to filter which fields
+    /// get logged — never log secrets like password hashes or tokens.
+    /// </summary>
+    public static void SetValue(Microsoft.AspNetCore.Http.HttpContext httpContext, object? value)
+        => httpContext.Items[ValueKey] = value;
 }
 
 /// <summary>
@@ -98,10 +119,14 @@ internal sealed class FcmsLogFilter : IAsyncResultFilter
             ? v?.ToString() ?? ""
             : context.HttpContext.Items[FcmsLogContext.EntityIdKey]?.ToString() ?? "";
 
+        // Optional value snapshot — controller calls FcmsLogContext.SetValue(HttpContext, ...)
+        var value = context.HttpContext.Items[FcmsLogContext.ValueKey];
+
         await _logService.LogAsync(
             _action,
             _entityType,
             entityId,
+            value: value,
             module: _module,
             ct: context.HttpContext.RequestAborted);
     }

@@ -58,6 +58,8 @@ public class MenuController : BaseAdminController
         if (string.IsNullOrWhiteSpace(item.Location)) item.Location = "AdminSidebar";
 
         await _menuService.SaveAsync(item, ct);
+        FcmsLogContext.SetEntityId(HttpContext, item.Id);
+        FcmsLogContext.SetValue(HttpContext, new { item.DefaultName, item.CustomName, item.Url, item.Icon, item.ParentId, item.Order, item.RequiredPermission });
         ShowSuccess(vm.Id == Guid.Empty ? "Menu item created." : "Menu item updated.");
         return RedirectToAction(nameof(Index));
     }
@@ -70,6 +72,9 @@ public class MenuController : BaseAdminController
     [FcmsLog("menu.delete", "FcmsMenuItem")]
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
     {
+        var item = await _menuService.GetByIdAsync(id, ct);
+        if (item is not null)
+            FcmsLogContext.SetValue(HttpContext, new { item.DefaultName, item.Url });
         await _menuService.DeleteAsync(id, ct);
         return FcmsOk("Deleted.");
     }
@@ -82,6 +87,7 @@ public class MenuController : BaseAdminController
     [FcmsLog("menu.rename", "FcmsMenuItem")]
     public async Task<IActionResult> Rename(Guid id, [FromForm] string? customName, CancellationToken ct)
     {
+        FcmsLogContext.SetValue(HttpContext, new { CustomName = customName });
         await _menuService.RenameAsync(id, customName, ct);
         return FcmsOk("Renamed.");
     }

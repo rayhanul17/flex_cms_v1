@@ -147,6 +147,44 @@ public class FcmsLogFilterTests
         Assert.Null(ex);
     }
 
+    // ── Value snapshot ────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Value_set_via_FcmsLogContext_is_passed_to_LogAsync()
+    {
+        var logService = Substitute.For<IFcmsLogService>();
+        var snapshot = new { Title = "Hello", Slug = "hello" };
+        var items = new Dictionary<object, object?> { [FcmsLogContext.ValueKey] = snapshot };
+
+        var (ctx, next) = BuildContext(new RedirectToActionResult("Index", "Home", null), items: items);
+        await MakeFilter(logService).OnResultExecutionAsync(ctx, next);
+
+        await logService.Received(1).LogAsync(
+            "test.action", "TestEntity", "",
+            value: snapshot,
+            module: "core",
+            severity: Arg.Any<FcmsLogSeverity>(),
+            ct: Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Value_omitted_when_FcmsLogContext_SetValue_not_called()
+    {
+        var logService = Substitute.For<IFcmsLogService>();
+
+        var (ctx, next) = BuildContext(new RedirectToActionResult("Index", "Home", null));
+        await MakeFilter(logService).OnResultExecutionAsync(ctx, next);
+
+        await logService.Received(1).LogAsync(
+            action: Arg.Any<string>(),
+            entityType: Arg.Any<string>(),
+            entityId: Arg.Any<string>(),
+            value: Arg.Is<object?>(v => v == null),
+            module: Arg.Any<string>(),
+            severity: Arg.Any<FcmsLogSeverity>(),
+            ct: Arg.Any<CancellationToken>());
+    }
+
     // ── FcmsLogContext helper ─────────────────────────────────────────────────
 
     [Fact]
@@ -164,5 +202,14 @@ public class FcmsLogFilterTests
         var httpContext = new DefaultHttpContext();
         FcmsLogContext.SetEntityId(httpContext, "custom-id-123");
         Assert.Equal("custom-id-123", httpContext.Items[FcmsLogContext.EntityIdKey]);
+    }
+
+    [Fact]
+    public void SetValue_stores_object_in_Items()
+    {
+        var httpContext = new DefaultHttpContext();
+        var snapshot = new { Title = "X" };
+        FcmsLogContext.SetValue(httpContext, snapshot);
+        Assert.Same(snapshot, httpContext.Items[FcmsLogContext.ValueKey]);
     }
 }

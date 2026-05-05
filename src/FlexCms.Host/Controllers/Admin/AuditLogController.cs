@@ -9,10 +9,10 @@ namespace FlexCms.Host.Controllers.Admin;
 [Route("admin/audit-log")]
 public class AuditLogController : BaseAdminController
 {
-    private readonly IOperationLogService _auditLog;
+    private readonly IFcmsLogService _auditLog;
     private readonly IFcmsUnitOfWork _uow;
 
-    public AuditLogController(IOperationLogService auditLog, IFcmsUnitOfWork uow)
+    public AuditLogController(IFcmsLogService auditLog, IFcmsUnitOfWork uow)
     {
         _auditLog = auditLog;
         _uow = uow;

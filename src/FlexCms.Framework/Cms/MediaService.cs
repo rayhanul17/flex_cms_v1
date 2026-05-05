@@ -38,13 +38,13 @@ public class MediaService : IMediaService
     private readonly IRepository<FcmsMedia> _mediaRepo;
     private readonly IFcmsUnitOfWork _uow;
     private readonly IFcmsFileStorage _storage;
-    private readonly IOperationLogService _audit;
+    private readonly IFcmsLogService _audit;
 
     public MediaService(
         IRepository<FcmsMedia> mediaRepo,
         IFcmsUnitOfWork uow,
         IFcmsFileStorage storage,
-        IOperationLogService audit)
+        IFcmsLogService audit)
     {
         _mediaRepo = mediaRepo;
         _uow = uow;

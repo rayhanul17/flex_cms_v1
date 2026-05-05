@@ -18,7 +18,7 @@ public class PostServiceTests : IDisposable
             .Options;
         _db = new FcmsDbContext(opts);
 #pragma warning disable CA2000
-        _svc = new PostService(new EfRepository<FcmsPost>(_db), new EfRepository<FcmsTag>(_db), new EfRepository<FcmsPostTag>(_db), new EfUnitOfWork(_db), Substitute.For<IOperationLogService>());
+        _svc = new PostService(new EfRepository<FcmsPost>(_db), new EfRepository<FcmsTag>(_db), new EfRepository<FcmsPostTag>(_db), new EfUnitOfWork(_db), Substitute.For<IFcmsLogService>());
 #pragma warning restore CA2000
     }
 

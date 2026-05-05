@@ -8,14 +8,14 @@ public class PostService : IPostService
     private readonly IRepository<FcmsTag> _tagRepo;
     private readonly IRepository<FcmsPostTag> _postTagRepo;
     private readonly IFcmsUnitOfWork _uow;
-    private readonly IOperationLogService _audit;
+    private readonly IFcmsLogService _audit;
 
     public PostService(
         IRepository<FcmsPost> postRepo,
         IRepository<FcmsTag> tagRepo,
         IRepository<FcmsPostTag> postTagRepo,
         IFcmsUnitOfWork uow,
-        IOperationLogService audit)
+        IFcmsLogService audit)
     {
         _postRepo = postRepo;
         _tagRepo = tagRepo;

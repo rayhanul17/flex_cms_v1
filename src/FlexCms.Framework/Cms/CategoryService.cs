@@ -7,13 +7,13 @@ public class CategoryService : ICategoryService
     private readonly IRepository<FcmsCategory> _repo;
     private readonly IRepository<FcmsPost> _postRepo;
     private readonly IFcmsUnitOfWork _uow;
-    private readonly IOperationLogService _audit;
+    private readonly IFcmsLogService _audit;
 
     public CategoryService(
         IRepository<FcmsCategory> repo,
         IRepository<FcmsPost> postRepo,
         IFcmsUnitOfWork uow,
-        IOperationLogService audit)
+        IFcmsLogService audit)
     {
         _repo = repo;
         _postRepo = postRepo;

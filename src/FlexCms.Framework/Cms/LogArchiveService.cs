@@ -38,7 +38,7 @@ public class LogArchiveService : BackgroundService
     private async Task ArchiveAsync(CancellationToken ct)
     {
         await using var scope = _scopes.CreateAsyncScope();
-        var svc = scope.ServiceProvider.GetRequiredService<IOperationLogService>();
+        var svc = scope.ServiceProvider.GetRequiredService<IFcmsLogService>();
         var uow = scope.ServiceProvider.GetRequiredService<IFcmsUnitOfWork>();
 
         await svc.ArchiveOlderThanAsync(TimeSpan.FromHours(24), ct);

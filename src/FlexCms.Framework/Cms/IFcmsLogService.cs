@@ -1,6 +1,6 @@
 namespace FlexCms.Framework.Cms;
 
-public interface IOperationLogService
+public interface IFcmsLogService
 {
     Task LogAsync(
         string action,

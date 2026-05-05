@@ -59,7 +59,7 @@ public sealed class FcmsLogAttribute : Attribute, IFilterFactory, IOrderedFilter
 
     public IFilterMetadata CreateInstance(IServiceProvider serviceProvider)
     {
-        var logService = serviceProvider.GetService<IOperationLogService>();
+        var logService = serviceProvider.GetService<IFcmsLogService>();
         return new FcmsLogFilter(Action, EntityType, EntityIdParam, Module, logService);
     }
 }
@@ -70,14 +70,14 @@ internal sealed class FcmsLogFilter : IAsyncResultFilter
     private readonly string _entityType;
     private readonly string _entityIdParam;
     private readonly string _module;
-    private readonly IOperationLogService? _logService;
+    private readonly IFcmsLogService? _logService;
 
     public FcmsLogFilter(
         string action,
         string entityType,
         string entityIdParam,
         string module,
-        IOperationLogService? logService)
+        IFcmsLogService? logService)
     {
         _action = action;
         _entityType = entityType;

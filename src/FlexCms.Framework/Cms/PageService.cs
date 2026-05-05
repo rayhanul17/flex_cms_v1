@@ -6,9 +6,9 @@ public class PageService : IPageService
 {
     private readonly IRepository<FcmsPage> _repo;
     private readonly IFcmsUnitOfWork _uow;
-    private readonly IOperationLogService _audit;
+    private readonly IFcmsLogService _audit;
 
-    public PageService(IRepository<FcmsPage> repo, IFcmsUnitOfWork uow, IOperationLogService audit)
+    public PageService(IRepository<FcmsPage> repo, IFcmsUnitOfWork uow, IFcmsLogService audit)
     {
         _repo = repo;
         _uow = uow;

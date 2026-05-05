@@ -21,8 +21,8 @@ public abstract class BaseAdminController : Controller
     protected IMemoryCache Cache =>
         HttpContext.RequestServices.GetRequiredService<IMemoryCache>();
 
-    protected IOperationLogService OpLog =>
-        HttpContext.RequestServices.GetRequiredService<IOperationLogService>();
+    protected IFcmsLogService OpLog =>
+        HttpContext.RequestServices.GetRequiredService<IFcmsLogService>();
 
     // ── Cache ─────────────────────────────────────────────────────────────────
 

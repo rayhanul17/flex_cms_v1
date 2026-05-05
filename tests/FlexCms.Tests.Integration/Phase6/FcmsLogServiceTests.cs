@@ -8,17 +8,17 @@ using NSubstitute;
 namespace FlexCms.Tests.Integration.Phase6;
 
 /// <summary>
-/// Integration tests for OperationLogService using EF InMemory + real SettingsService.
+/// Integration tests for FcmsLogService using EF InMemory + real SettingsService.
 /// EfRepository follows UoW pattern (no auto-save), so tests call _db.SaveChangesAsync()
 /// after each service write to mirror what the controller/UoW would do.
 /// </summary>
-public class OperationLogServiceTests : IDisposable
+public class FcmsLogServiceTests : IDisposable
 {
     private readonly FcmsDbContext _db;
     private readonly SettingsService _settings;
-    private readonly OperationLogService _svc;
+    private readonly FcmsLogService _svc;
 
-    public OperationLogServiceTests()
+    public FcmsLogServiceTests()
     {
         var opts = new DbContextOptionsBuilder<FcmsDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
@@ -35,7 +35,7 @@ public class OperationLogServiceTests : IDisposable
         context.Browser.Returns("Chrome");
         context.Os.Returns("Windows");
 
-        _svc = new OperationLogService(_db, context, _settings);
+        _svc = new FcmsLogService(_db, context, _settings);
     }
 
     public void Dispose() => _db.Dispose();

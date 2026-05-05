@@ -7,13 +7,13 @@ public class MediaFolderService : IMediaFolderService
     private readonly IRepository<FcmsMediaFolder> _folderRepo;
     private readonly IRepository<FcmsMedia> _mediaRepo;
     private readonly IFcmsUnitOfWork _uow;
-    private readonly IOperationLogService _audit;
+    private readonly IFcmsLogService _audit;
 
     public MediaFolderService(
         IRepository<FcmsMediaFolder> folderRepo,
         IRepository<FcmsMedia> mediaRepo,
         IFcmsUnitOfWork uow,
-        IOperationLogService audit)
+        IFcmsLogService audit)
     {
         _folderRepo = folderRepo;
         _mediaRepo = mediaRepo;

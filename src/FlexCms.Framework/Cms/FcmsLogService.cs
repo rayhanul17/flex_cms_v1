@@ -11,7 +11,7 @@ public static class AuditLogSettings
     public const string Key = "audit:enabled";
 }
 
-public class OperationLogService : IOperationLogService
+public class FcmsLogService : IFcmsLogService
 {
     // Logs use FcmsDbContext directly (not IRepository<T>) — they are
     // append-only, have no Status / DeletedAt columns, and don't need the
@@ -26,7 +26,7 @@ public class OperationLogService : IOperationLogService
         WriteIndented = false
     };
 
-    public OperationLogService(
+    public FcmsLogService(
         FcmsDbContext db,
         IFcmsContextService context,
         ISettingsService settings)

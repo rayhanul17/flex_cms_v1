@@ -34,7 +34,7 @@ public class MediaServiceTests : IDisposable
 
         var mediaRepo = new EfRepository<FcmsMedia>(_db);
 #pragma warning disable CA2000
-        _svc = new MediaService(mediaRepo, new EfUnitOfWork(_db), _storage, Substitute.For<IOperationLogService>());
+        _svc = new MediaService(mediaRepo, new EfUnitOfWork(_db), _storage, Substitute.For<IFcmsLogService>());
 #pragma warning restore CA2000
     }
 

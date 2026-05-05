@@ -36,7 +36,7 @@ public class FcmsLogFilterTests
     }
 
     private static FcmsLogFilter MakeFilter(
-        IOperationLogService? logService,
+        IFcmsLogService? logService,
         string entityIdParam = "id")
         => new("test.action", "TestEntity", entityIdParam, "core", logService);
 
@@ -45,7 +45,7 @@ public class FcmsLogFilterTests
     [Fact]
     public async Task Redirect_logs_entity_id_from_route()
     {
-        var logService = Substitute.For<IOperationLogService>();
+        var logService = Substitute.For<IFcmsLogService>();
         var entityId = Guid.NewGuid();
         var route = new RouteData();
         route.Values["id"] = entityId.ToString();
@@ -62,7 +62,7 @@ public class FcmsLogFilterTests
     [Fact]
     public async Task Redirect_logs_entity_id_from_HttpContext_Items_when_no_route_param()
     {
-        var logService = Substitute.For<IOperationLogService>();
+        var logService = Substitute.For<IFcmsLogService>();
         var entityId = Guid.NewGuid();
         var items = new Dictionary<object, object?> { [FcmsLogContext.EntityIdKey] = entityId.ToString() };
 
@@ -78,7 +78,7 @@ public class FcmsLogFilterTests
     [Fact]
     public async Task Route_param_takes_precedence_over_HttpContext_Items()
     {
-        var logService = Substitute.For<IOperationLogService>();
+        var logService = Substitute.For<IFcmsLogService>();
         var routeId = Guid.NewGuid();
         var itemsId = Guid.NewGuid();
 
@@ -98,7 +98,7 @@ public class FcmsLogFilterTests
     [Fact]
     public async Task OkJson_2xx_logs_entry()
     {
-        var logService = Substitute.For<IOperationLogService>();
+        var logService = Substitute.For<IFcmsLogService>();
         var (ctx, next) = BuildContext(new JsonResult(new { }) { StatusCode = 200 });
 
         await MakeFilter(logService).OnResultExecutionAsync(ctx, next);
@@ -114,7 +114,7 @@ public class FcmsLogFilterTests
     [Fact]
     public async Task ViewResult_does_not_log()
     {
-        var logService = Substitute.For<IOperationLogService>();
+        var logService = Substitute.For<IFcmsLogService>();
         var (ctx, next) = BuildContext(new ViewResult());
 
         await MakeFilter(logService).OnResultExecutionAsync(ctx, next);
@@ -128,7 +128,7 @@ public class FcmsLogFilterTests
     [Fact]
     public async Task FailJson_4xx_does_not_log()
     {
-        var logService = Substitute.For<IOperationLogService>();
+        var logService = Substitute.For<IFcmsLogService>();
         var (ctx, next) = BuildContext(new JsonResult(new { isSuccess = false }) { StatusCode = 400 });
 
         await MakeFilter(logService).OnResultExecutionAsync(ctx, next);

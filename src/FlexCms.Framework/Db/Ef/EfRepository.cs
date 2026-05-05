@@ -120,6 +120,12 @@ public class EfRepository<T> : IRepository<T> where T : BaseEfEntity
         return Task.CompletedTask;
     }
 
+    public Task DeleteRangeAsync(IEnumerable<T> entities, CancellationToken ct = default)
+    {
+        _set.RemoveRange(entities);
+        return Task.CompletedTask;
+    }
+
     // --- New: QueryFilter overloads ---
 
     public async Task<List<T>> FindAsync(QueryFilter<T> filter, CancellationToken ct = default)

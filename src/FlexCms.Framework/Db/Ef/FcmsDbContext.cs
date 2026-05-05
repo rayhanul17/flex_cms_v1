@@ -183,17 +183,23 @@ public class FcmsDbContext : IdentityDbContext<FcmsUser, FcmsRole, Guid>
             .HasForeignKey(m => m.FolderId)
             .OnDelete(DeleteBehavior.SetNull);
 
+        // Audit log entities are append-only — strip the inherited lifecycle
+        // columns and skip the soft-delete query filter (no Status column means
+        // the filter expression would target a missing column).
+        ConfigureLogEntity<FcmsLog>(modelBuilder);
+        ConfigureLogEntity<FcmsLogArchive>(modelBuilder);
+
         // Module builders — each registered IFcmsModelBuilder configures its
         // own entities (tables, indexes, FKs) into this shared DbContext.
         foreach (var builder in _moduleBuilders)
             builder.Build(modelBuilder);
 
-        // Apply soft-delete filter + auto-name table for every BaseEfEntity.
-        // Module entities will follow the same convention with their own prefix
-        // once the module loader (Phase 4 sub-PR 2) is in place.
+        // Apply soft-delete filter + auto-name table for every BaseEfEntity
+        // EXCEPT the log entities (already configured above).
         foreach (var entityType in modelBuilder.Model.GetEntityTypes())
         {
             if (!typeof(BaseEfEntity).IsAssignableFrom(entityType.ClrType)) continue;
+            if (entityType.ClrType == typeof(FcmsLog) || entityType.ClrType == typeof(FcmsLogArchive)) continue;
 
             var method = typeof(FcmsDbContext)
                 .GetMethod(nameof(ApplySoftDeleteFilter),
@@ -208,6 +214,19 @@ public class FcmsDbContext : IdentityDbContext<FcmsUser, FcmsRole, Guid>
     {
         builder.Entity<T>().HasQueryFilter(e => e.Status != EntityStatus.Deleted);
         builder.Entity<T>().ToTable(FcmsHelper.GetTableName<T>(FrameworkPrefix));
+    }
+
+    private static void ConfigureLogEntity<T>(ModelBuilder builder) where T : BaseEfEntity
+    {
+        var entity = builder.Entity<T>();
+        // Strip inherited lifecycle columns — logs are write-once
+        entity.Ignore(e => e.Status);
+        entity.Ignore(e => e.DeletedAt);
+        entity.Ignore(e => e.UpdatedAt);
+        entity.Ignore(e => e.UpdatedBy);
+        entity.Ignore(e => e.CreatedBy);  // UserId field carries the actor
+        entity.ToTable(FcmsHelper.GetTableName<T>(FrameworkPrefix));
+        // No HasQueryFilter — logs are visible regardless of any "deleted" semantics
     }
 
     public override async Task<int> SaveChangesAsync(CancellationToken ct = default)

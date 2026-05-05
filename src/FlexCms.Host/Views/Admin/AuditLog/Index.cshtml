@@ -85,12 +85,12 @@
                                     <span class="badge @badgeClass">@log.Severity</span>
                                 </td>
                                 <td>
-                                    @if (log.NewValue is not null)
+                                    @if (log.Value is not null)
                                     {
-                                        var truncated = log.NewValue.Length > 80
-                                            ? log.NewValue[..80] + "…"
-                                            : log.NewValue;
-                                        <span title="@log.NewValue" style="cursor:help;">@truncated</span>
+                                        var truncated = log.Value.Length > 80
+                                            ? log.Value[..80] + "…"
+                                            : log.Value;
+                                        <span title="@log.Value" style="cursor:help;">@truncated</span>
                                     }
                                 </td>
                             </tr>
@@ -156,12 +156,12 @@
                                     <span class="badge @archiveBadgeClass">@log.Severity</span>
                                 </td>
                                 <td>
-                                    @if (log.NewValue is not null)
+                                    @if (log.Value is not null)
                                     {
-                                        var truncated = log.NewValue.Length > 80
-                                            ? log.NewValue[..80] + "…"
-                                            : log.NewValue;
-                                        <span title="@log.NewValue" style="cursor:help;">@truncated</span>
+                                        var truncated = log.Value.Length > 80
+                                            ? log.Value[..80] + "…"
+                                            : log.Value;
+                                        <span title="@log.Value" style="cursor:help;">@truncated</span>
                                     }
                                 </td>
                             </tr>

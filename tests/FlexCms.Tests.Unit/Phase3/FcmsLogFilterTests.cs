@@ -55,7 +55,7 @@ public class FcmsLogFilterTests
 
         await logService.Received(1).LogAsync(
             "test.action", "TestEntity", entityId.ToString(),
-            newValue: Arg.Any<object?>(), module: "core",
+            value: Arg.Any<object?>(), module: "core",
             severity: Arg.Any<FcmsLogSeverity>(), ct: Arg.Any<CancellationToken>());
     }
 
@@ -71,7 +71,7 @@ public class FcmsLogFilterTests
 
         await logService.Received(1).LogAsync(
             "test.action", "TestEntity", entityId.ToString(),
-            newValue: Arg.Any<object?>(), module: "core",
+            value: Arg.Any<object?>(), module: "core",
             severity: Arg.Any<FcmsLogSeverity>(), ct: Arg.Any<CancellationToken>());
     }
 
@@ -91,7 +91,7 @@ public class FcmsLogFilterTests
 
         await logService.Received(1).LogAsync(
             "test.action", "TestEntity", routeId.ToString(),
-            newValue: Arg.Any<object?>(), module: "core",
+            value: Arg.Any<object?>(), module: "core",
             severity: Arg.Any<FcmsLogSeverity>(), ct: Arg.Any<CancellationToken>());
     }
 
@@ -105,7 +105,7 @@ public class FcmsLogFilterTests
 
         await logService.Received(1).LogAsync(
             Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(),
-            newValue: Arg.Any<object?>(), module: Arg.Any<string>(),
+            value: Arg.Any<object?>(), module: Arg.Any<string>(),
             severity: Arg.Any<FcmsLogSeverity>(), ct: Arg.Any<CancellationToken>());
     }
 
@@ -121,7 +121,7 @@ public class FcmsLogFilterTests
 
         await logService.DidNotReceive().LogAsync(
             Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(),
-            newValue: Arg.Any<object?>(), module: Arg.Any<string>(),
+            value: Arg.Any<object?>(), module: Arg.Any<string>(),
             severity: Arg.Any<FcmsLogSeverity>(), ct: Arg.Any<CancellationToken>());
     }
 
@@ -135,7 +135,7 @@ public class FcmsLogFilterTests
 
         await logService.DidNotReceive().LogAsync(
             Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(),
-            newValue: Arg.Any<object?>(), module: Arg.Any<string>(),
+            value: Arg.Any<object?>(), module: Arg.Any<string>(),
             severity: Arg.Any<FcmsLogSeverity>(), ct: Arg.Any<CancellationToken>());
     }
 

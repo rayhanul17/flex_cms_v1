@@ -2,6 +2,13 @@ using FlexCms.Framework.Db.Ef;
 
 namespace FlexCms.Framework.Cms;
 
+/// <summary>
+/// Append-only audit log entry. Inherits <see cref="BaseEfEntity"/> only
+/// for <see cref="IRepository{T}"/> compatibility — the lifecycle / soft-delete
+/// columns (Status, DeletedAt, UpdatedAt, UpdatedBy, CreatedBy) are
+/// explicitly ignored in <c>FcmsDbContext.OnModelCreating</c> because logs
+/// are never updated or soft-deleted.
+/// </summary>
 public class FcmsLog : BaseEfEntity
 {
     public Guid? UserId { get; set; }
@@ -18,8 +25,8 @@ public class FcmsLog : BaseEfEntity
     /// <summary>Stored as string to handle both Guid and int PKs.</summary>
     public string EntityId { get; set; } = string.Empty;
 
-    /// <summary>JSON snapshot AFTER the operation.</summary>
-    public string? NewValue { get; set; }
+    /// <summary>JSON snapshot of the entity AFTER the operation (current value).</summary>
+    public string? Value { get; set; }
 
     /// <summary>e.g. "core", "blog"</summary>
     public string Module { get; set; } = "core";

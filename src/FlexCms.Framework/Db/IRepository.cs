@@ -35,6 +35,13 @@ public interface IRepository<T> where T : class, IBaseEntity
     Task UpdateRangeAsync(IEnumerable<T> entities, CancellationToken ct = default);
     Task SoftDeleteRangeAsync(IEnumerable<T> entities, CancellationToken ct = default);
 
+    /// <summary>
+    /// Hard-deletes a batch of entities (rows physically removed). Use for
+    /// append-only entities like audit logs. For domain entities prefer
+    /// <see cref="SoftDeleteRangeAsync"/>.
+    /// </summary>
+    Task DeleteRangeAsync(IEnumerable<T> entities, CancellationToken ct = default);
+
     // --- QueryFilter overloads ---
 
     /// <summary>

@@ -215,6 +215,17 @@ public class MongoRepository<T> : IRepository<T>, IMongoSessionAware where T : c
         }
     }
 
+    public async Task DeleteRangeAsync(IEnumerable<T> entities, CancellationToken ct = default)
+    {
+        var ids = entities.Select(e => e.Id).ToList();
+        if (ids.Count == 0) return;
+        var f = Filter.In(e => e.Id, ids);
+        if (_session is not null)
+            await _collection.DeleteManyAsync(_session, f, cancellationToken: ct);
+        else
+            await _collection.DeleteManyAsync(f, cancellationToken: ct);
+    }
+
     public async Task SoftDeleteRangeAsync(IEnumerable<T> entities, CancellationToken ct = default)
     {
         var now = FcmsTime.Now;

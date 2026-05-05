@@ -6,7 +6,7 @@ public interface IOperationLogService
         string action,
         string entityType,
         string entityId,
-        object? newValue = null,
+        object? value = null,
         string module = "core",
         FcmsLogSeverity severity = FcmsLogSeverity.Info,
         CancellationToken ct = default);

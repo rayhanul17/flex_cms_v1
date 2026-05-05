@@ -35,11 +35,7 @@ public class OperationLogServiceTests : IDisposable
         context.Browser.Returns("Chrome");
         context.Os.Returns("Windows");
 
-        var logRepo = new EfRepository<FcmsLog>(_db);
-        var archiveRepo = new EfRepository<FcmsLogArchive>(_db);
-#pragma warning disable CA2000
-        _svc = new OperationLogService(logRepo, archiveRepo, context, _settings, new EfUnitOfWork(_db));
-#pragma warning restore CA2000
+        _svc = new OperationLogService(_db, context, _settings);
     }
 
     public void Dispose() => _db.Dispose();
@@ -54,7 +50,7 @@ public class OperationLogServiceTests : IDisposable
         await _svc.LogAsync("Post.Created", "FcmsPost", Guid.NewGuid().ToString());
         await Save();
 
-        Assert.Equal(1, await _db.Set<FcmsLog>().CountAsync(l => l.Status != EntityStatus.Deleted));
+        Assert.Equal(1, await _db.Set<FcmsLog>().CountAsync());
     }
 
     [Fact]
@@ -75,7 +71,7 @@ public class OperationLogServiceTests : IDisposable
         await _svc.LogAsync("Default.Check", "Entity", "1");
         await Save();
 
-        Assert.Equal(1, await _db.Set<FcmsLog>().CountAsync(l => l.Status != EntityStatus.Deleted));
+        Assert.Equal(1, await _db.Set<FcmsLog>().CountAsync());
     }
 
     // ── LogAsync field correctness ────────────────────────────────────────────
@@ -89,14 +85,14 @@ public class OperationLogServiceTests : IDisposable
         await _svc.LogAsync("Post.Created", "FcmsPost", entityId, new { Title = "Test" }, "blog", FcmsLogSeverity.Warning);
         await Save();
 
-        var log = await _db.Set<FcmsLog>().FirstAsync(l => l.Status != EntityStatus.Deleted);
+        var log = await _db.Set<FcmsLog>().FirstAsync();
         Assert.Equal("Post.Created", log.Action);
         Assert.Equal("FcmsPost", log.EntityType);
         Assert.Equal(entityId, log.EntityId);
         Assert.Equal("blog", log.Module);
         Assert.Equal(FcmsLogSeverity.Warning, log.Severity);
-        Assert.NotNull(log.NewValue);
-        Assert.Contains("Test", log.NewValue);
+        Assert.NotNull(log.Value);
+        Assert.Contains("Test", log.Value);
     }
 
     // ── ArchiveOlderThan ──────────────────────────────────────────────────────
@@ -111,8 +107,8 @@ public class OperationLogServiceTests : IDisposable
         await _svc.ArchiveOlderThanAsync(TimeSpan.FromHours(24));
         await Save();
 
-        var remaining = await _db.Set<FcmsLog>().CountAsync(l => l.Status != EntityStatus.Deleted);
-        var archived = await _db.Set<FcmsLogArchive>().CountAsync(a => a.Status != EntityStatus.Deleted);
+        var remaining = await _db.Set<FcmsLog>().CountAsync();
+        var archived = await _db.Set<FcmsLogArchive>().CountAsync();
         Assert.Equal(1, remaining);
         Assert.Equal(2, archived);
     }
@@ -137,7 +133,7 @@ public class OperationLogServiceTests : IDisposable
         await _svc.ArchiveOlderThanAsync(TimeSpan.FromHours(1));
         await Save();
 
-        var archived = await _db.Set<FcmsLogArchive>().FirstAsync(a => a.Status != EntityStatus.Deleted);
+        var archived = await _db.Set<FcmsLogArchive>().FirstAsync();
         Assert.Equal("User.Deleted", archived.Action);
         Assert.Equal(entityId, archived.EntityId);
         Assert.Equal(log.UserName, archived.UserName);
@@ -146,17 +142,16 @@ public class OperationLogServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task ArchiveOlderThan_archived_logs_are_soft_deleted_from_main()
+    public async Task ArchiveOlderThan_archived_logs_are_hard_deleted_from_main()
     {
         await InsertLogAsync(daysAgo: 2);
 
         await _svc.ArchiveOlderThanAsync(TimeSpan.FromHours(1));
         await Save();
 
-        var visibleLogs = await _db.Set<FcmsLog>().CountAsync(l => l.Status != EntityStatus.Deleted);
-        var rawLogs = await _db.Set<FcmsLog>().IgnoreQueryFilters().CountAsync();
-        Assert.Equal(0, visibleLogs);
-        Assert.Equal(1, rawLogs); // soft-deleted, physically still there
+        // Logs are append-only — archive move physically deletes from main
+        Assert.Equal(0, await _db.Set<FcmsLog>().CountAsync());
+        Assert.Equal(1, await _db.Set<FcmsLogArchive>().CountAsync());
     }
 
     // ── GetRecent ─────────────────────────────────────────────────────────────
@@ -203,7 +198,7 @@ public class OperationLogServiceTests : IDisposable
     // ── ClearArchive ──────────────────────────────────────────────────────────
 
     [Fact]
-    public async Task ClearArchiveAsync_soft_deletes_all_archive_entries()
+    public async Task ClearArchiveAsync_hard_deletes_all_archive_entries()
     {
         await InsertLogAsync(daysAgo: 2);
         await InsertLogAsync(daysAgo: 3);
@@ -213,8 +208,8 @@ public class OperationLogServiceTests : IDisposable
         await _svc.ClearArchiveAsync();
         await Save();
 
-        Assert.Equal(0, await _db.Set<FcmsLogArchive>().CountAsync(a => a.Status != EntityStatus.Deleted));
-        Assert.Equal(2, await _db.Set<FcmsLogArchive>().IgnoreQueryFilters().CountAsync());
+        // ClearArchive is admin-initiated; rows are physically removed.
+        Assert.Equal(0, await _db.Set<FcmsLogArchive>().CountAsync());
     }
 
     [Fact]

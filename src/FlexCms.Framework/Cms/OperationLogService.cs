@@ -1,7 +1,8 @@
 using System.Text.Json;
 using FlexCms.Framework.Clock;
-using FlexCms.Framework.Db;
+using FlexCms.Framework.Db.Ef;
 using FlexCms.Framework.Services;
+using Microsoft.EntityFrameworkCore;
 
 namespace FlexCms.Framework.Cms;
 
@@ -12,11 +13,12 @@ public static class AuditLogSettings
 
 public class OperationLogService : IOperationLogService
 {
-    private readonly IRepository<FcmsLog> _logs;
-    private readonly IRepository<FcmsLogArchive> _archive;
+    // Logs use FcmsDbContext directly (not IRepository<T>) — they are
+    // append-only, have no Status / DeletedAt columns, and don't need the
+    // soft-delete query filter that IRepository injects on every call.
+    private readonly FcmsDbContext _db;
     private readonly IFcmsContextService _context;
     private readonly ISettingsService _settings;
-    private readonly IFcmsUnitOfWork _uow;
 
     private static readonly JsonSerializerOptions JsonOpts = new()
     {
@@ -25,24 +27,20 @@ public class OperationLogService : IOperationLogService
     };
 
     public OperationLogService(
-        IRepository<FcmsLog> logs,
-        IRepository<FcmsLogArchive> archive,
+        FcmsDbContext db,
         IFcmsContextService context,
-        ISettingsService settings,
-        IFcmsUnitOfWork uow)
+        ISettingsService settings)
     {
-        _logs = logs;
-        _archive = archive;
+        _db = db;
         _context = context;
         _settings = settings;
-        _uow = uow;
     }
 
     public async Task LogAsync(
         string action,
         string entityType,
         string entityId,
-        object? newValue = null,
+        object? value = null,
         string module = "core",
         FcmsLogSeverity severity = FcmsLogSeverity.Info,
         CancellationToken ct = default)
@@ -52,6 +50,7 @@ public class OperationLogService : IOperationLogService
 
         var log = new FcmsLog
         {
+            CreatedAt = FcmsTime.Now,
             UserId = _context.UserId,
             UserName = _context.Username ?? string.Empty,
             UserIp = _context.IpAddress,
@@ -59,23 +58,24 @@ public class OperationLogService : IOperationLogService
             Action = action,
             EntityType = entityType,
             EntityId = entityId,
-            NewValue = newValue is null ? null : JsonSerializer.Serialize(newValue, JsonOpts),
+            Value = value is null ? null : JsonSerializer.Serialize(value, JsonOpts),
             Module = module,
             Severity = severity
         };
 
-        await _logs.AddAsync(log, ct);
-        await _uow.SaveChangesAsync(ct);
+        _db.Logs.Add(log);
+        await _db.SaveChangesAsync(ct);
     }
 
     public async Task ArchiveOlderThanAsync(TimeSpan age, CancellationToken ct = default)
     {
         var cutoff = FcmsTime.Now - age;
-        var old = await _logs.FindAsync(l => l.CreatedAt < cutoff, ct);
+        var old = await _db.Logs.Where(l => l.CreatedAt < cutoff).ToListAsync(ct);
         if (old.Count == 0) return;
 
         var archiveEntries = old.Select(log => new FcmsLogArchive
         {
+            CreatedAt = log.CreatedAt,
             UserId = log.UserId,
             UserName = log.UserName,
             UserIp = log.UserIp,
@@ -83,44 +83,41 @@ public class OperationLogService : IOperationLogService
             Action = log.Action,
             EntityType = log.EntityType,
             EntityId = log.EntityId,
-            NewValue = log.NewValue,
+            Value = log.Value,
             Module = log.Module,
-            Severity = log.Severity,
-            CreatedAt = log.CreatedAt,
-            UpdatedAt = log.UpdatedAt,
-            CreatedBy = log.CreatedBy,
-            UpdatedBy = log.UpdatedBy
+            Severity = log.Severity
         }).ToList();
 
-        await _archive.AddRangeAsync(archiveEntries, ct);
-        await _logs.SoftDeleteRangeAsync(old, ct);
-        await _uow.SaveChangesAsync(ct);
+        _db.LogArchives.AddRange(archiveEntries);
+        // Hard-delete originals — they are now in the archive table.
+        _db.Logs.RemoveRange(old);
+        await _db.SaveChangesAsync(ct);
     }
 
     public async Task ClearArchiveAsync(CancellationToken ct = default)
     {
-        var all = await _archive.GetAllAsync(ct);
+        var all = await _db.LogArchives.ToListAsync(ct);
         if (all.Count > 0)
         {
-            await _archive.SoftDeleteRangeAsync(all, ct);
-            await _uow.SaveChangesAsync(ct);
+            _db.LogArchives.RemoveRange(all);
+            await _db.SaveChangesAsync(ct);
         }
     }
 
     public async Task<IReadOnlyList<FcmsLog>> GetRecentAsync(int count = 100, CancellationToken ct = default)
     {
-        var filter = new QueryFilter<FcmsLog>()
+        return await _db.Logs
             .OrderByDescending(l => l.CreatedAt)
-            .Page(1, count);
-        return await _logs.FindAsync(filter, ct);
+            .Take(count)
+            .ToListAsync(ct);
     }
 
     public async Task<IReadOnlyList<FcmsLogArchive>> GetArchiveAsync(int count = 100, CancellationToken ct = default)
     {
-        var filter = new QueryFilter<FcmsLogArchive>()
+        return await _db.LogArchives
             .OrderByDescending(l => l.CreatedAt)
-            .Page(1, count);
-        return await _archive.FindAsync(filter, ct);
+            .Take(count)
+            .ToListAsync(ct);
     }
 
     private sealed class AuditConfig

@@ -18,7 +18,9 @@ public class FcmsUser : IdentityUser<Guid>
     /// User lifecycle status. Source of truth for the admin UI active/deactive toggle.
     /// Auth-time blocking is enforced via Identity's <c>LockoutEnd</c>; the controller
     /// keeps the two in sync (Active ⇔ LockoutEnd null/past).
+    /// MongoDB: stored as <see cref="MongoDB.Bson.BsonType.Int32"/>.
     /// </summary>
+    [BsonRepresentation(BsonType.Int32)]
     public EntityStatus Status { get; set; } = EntityStatus.Active;
 
     public List<string> Roles { get; set; } = [];

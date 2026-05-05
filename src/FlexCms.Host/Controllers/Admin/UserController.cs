@@ -81,6 +81,7 @@ public class UserController : BaseAdminController
                 await _userManager.AddToRoleAsync(user, role.Name);
         }
 
+        await OpLog.LogAsync("users.create", "FcmsUser", user.Id.ToString(), ct: ct);
         ShowSuccess($"User '{model.Email}' created.");
         return RedirectToAction(nameof(Index));
     }
@@ -139,6 +140,7 @@ public class UserController : BaseAdminController
                 await _userManager.AddToRoleAsync(user, role.Name);
         }
 
+        await OpLog.LogAsync("users.edit", "FcmsUser", user.Id.ToString(), ct: ct);
         ShowSuccess($"User '{model.Email}' updated.");
         return RedirectToAction(nameof(Index));
     }
@@ -158,11 +160,13 @@ public class UserController : BaseAdminController
         if (isCurrentlyLocked)
         {
             await _userManager.SetLockoutEndDateAsync(user, null);
+            await OpLog.LogAsync("users.activate", "FcmsUser", user.Id.ToString());
             return FcmsOk("User activated.");
         }
         else
         {
             await _userManager.SetLockoutEndDateAsync(user, DateTimeOffset.UtcNow.AddYears(100));
+            await OpLog.LogAsync("users.deactivate", "FcmsUser", user.Id.ToString());
             return FcmsOk("User deactivated.");
         }
     }
@@ -181,6 +185,7 @@ public class UserController : BaseAdminController
             return FcmsFail("You cannot delete your own account.");
 
         await _userManager.DeleteAsync(user);
+        await OpLog.LogAsync("users.delete", "FcmsUser", user.Id.ToString());
         ShowSuccess("User deleted.");
         return FcmsOk("User deleted.");
     }

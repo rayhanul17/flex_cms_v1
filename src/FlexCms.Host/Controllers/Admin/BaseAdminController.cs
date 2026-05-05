@@ -1,4 +1,5 @@
 using FlexCms.Framework.Auth;
+using FlexCms.Framework.Cms;
 using FlexCms.Framework.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Caching.Memory;
@@ -16,6 +17,9 @@ public abstract class BaseAdminController : Controller
 
     protected IMemoryCache Cache =>
         HttpContext.RequestServices.GetRequiredService<IMemoryCache>();
+
+    protected IOperationLogService OpLog =>
+        HttpContext.RequestServices.GetRequiredService<IOperationLogService>();
 
     // ── Cache ─────────────────────────────────────────────────────────────────
 

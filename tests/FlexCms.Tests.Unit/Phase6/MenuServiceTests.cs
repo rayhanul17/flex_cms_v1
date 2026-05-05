@@ -51,7 +51,7 @@ public class MenuServiceTests
                 .Returns(call =>
                 {
                     foreach (var item in call.Arg<IEnumerable<FcmsMenuItem>>())
-                        item.IsDeleted = true;
+                        item.Status = EntityStatus.Deleted;
                     return Task.CompletedTask;
                 });
 
@@ -63,7 +63,7 @@ public class MenuServiceTests
                     var pred = call.Arg<Expression<Func<FcmsMenuItem, bool>>>().Compile();
                     var includeDeleted = call.ArgAt<bool>(2);
                     var result = Store.Where(pred);
-                    if (!includeDeleted) result = result.Where(m => !m.IsDeleted);
+                    if (!includeDeleted) result = result.Where(m => m.Status != EntityStatus.Deleted);
                     return Task.FromResult(result.ToList());
                 });
 
@@ -149,7 +149,7 @@ public class MenuServiceTests
             Url = "/admin/blog/posts",
             DefaultName = "Posts",
             Icon = "bi bi-newspaper",
-            IsDeleted = true,
+            Status = EntityStatus.Deleted,
             DeletedAt = DateTime.UtcNow
         });
         var svc = s.Build();
@@ -159,7 +159,7 @@ public class MenuServiceTests
         ]);
 
         var item = s.Store.Single();
-        Assert.False(item.IsDeleted);
+        Assert.NotEqual(EntityStatus.Deleted, item.Status);
         Assert.Null(item.DeletedAt);
     }
 
@@ -175,8 +175,8 @@ public class MenuServiceTests
 
         await svc.RemoveModuleItemsAsync("blog");
 
-        Assert.False(s.Store.Single(m => m.ModuleId == "core").IsDeleted);
-        Assert.True(s.Store.Single(m => m.ModuleId == "blog").IsDeleted);
+        Assert.NotEqual(EntityStatus.Deleted, s.Store.Single(m => m.ModuleId == "core").Status);
+        Assert.Equal(EntityStatus.Deleted, s.Store.Single(m => m.ModuleId == "blog").Status);
     }
 
     // ── Permission filtering ──────────────────────────────────────────────────

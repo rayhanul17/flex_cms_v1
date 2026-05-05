@@ -16,7 +16,7 @@ public class QueryFilterTests
     public void Where_returns_same_instance()
     {
         var f = new QueryFilter<FcmsMedia>();
-        Assert.Same(f, f.Where(m => m.IsDeleted == false));
+        Assert.Same(f, f.Where(m => m.Status != EntityStatus.Deleted));
     }
 
     [Fact]

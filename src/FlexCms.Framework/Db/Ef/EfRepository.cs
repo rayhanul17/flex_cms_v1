@@ -16,29 +16,29 @@ public class EfRepository<T> : IRepository<T> where T : BaseEfEntity
     }
 
     public async Task<T?> GetByIdAsync(Guid id, CancellationToken ct = default)
-        => await _set.FirstOrDefaultAsync(e => e.Id == id && !e.IsDeleted, ct);
+        => await _set.FirstOrDefaultAsync(e => e.Id == id && e.Status != EntityStatus.Deleted, ct);
 
     public async Task<List<T>> GetAllAsync(CancellationToken ct = default)
-        => await _set.Where(e => !e.IsDeleted).ToListAsync(ct);
+        => await _set.Where(e => e.Status != EntityStatus.Deleted).ToListAsync(ct);
 
     public async Task<List<T>> FindAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default, bool includeDeleted = false)
     {
-        var query = includeDeleted ? _set.IgnoreQueryFilters() : _set.Where(e => !e.IsDeleted);
+        var query = includeDeleted ? _set.IgnoreQueryFilters() : _set.Where(e => e.Status != EntityStatus.Deleted);
         return await query.Where(predicate).ToListAsync(ct);
     }
 
     public async Task<T?> FirstOrDefaultAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default, bool includeDeleted = false)
     {
-        var query = includeDeleted ? _set.IgnoreQueryFilters() : _set.Where(e => !e.IsDeleted);
+        var query = includeDeleted ? _set.IgnoreQueryFilters() : _set.Where(e => e.Status != EntityStatus.Deleted);
         return await query.FirstOrDefaultAsync(predicate, ct);
     }
 
     public async Task<bool> ExistsAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default)
-        => await _set.Where(e => !e.IsDeleted).AnyAsync(predicate, ct);
+        => await _set.Where(e => e.Status != EntityStatus.Deleted).AnyAsync(predicate, ct);
 
     public async Task<long> CountAsync(Expression<Func<T, bool>>? predicate = null, CancellationToken ct = default)
     {
-        var query = _set.Where(e => !e.IsDeleted);
+        var query = _set.Where(e => e.Status != EntityStatus.Deleted);
         return predicate is null
             ? await query.LongCountAsync(ct)
             : await query.LongCountAsync(predicate, ct);
@@ -64,7 +64,7 @@ public class EfRepository<T> : IRepository<T> where T : BaseEfEntity
 
     public Task SoftDeleteAsync(T entity, CancellationToken ct = default)
     {
-        entity.IsDeleted = true;
+        entity.Status = EntityStatus.Deleted;
         entity.DeletedAt ??= FcmsTime.Now;
         entity.UpdatedAt = FcmsTime.Now;
         _set.Update(entity);
@@ -79,7 +79,7 @@ public class EfRepository<T> : IRepository<T> where T : BaseEfEntity
         bool descending = false,
         CancellationToken ct = default)
     {
-        var query = _set.Where(e => !e.IsDeleted);
+        var query = _set.Where(e => e.Status != EntityStatus.Deleted);
         if (predicate is not null) query = query.Where(predicate);
 
         var total = await query.CountAsync(ct);
@@ -101,7 +101,7 @@ public class EfRepository<T> : IRepository<T> where T : BaseEfEntity
     public async Task<List<T>> GetByIdsAsync(IEnumerable<Guid> ids, CancellationToken ct = default)
     {
         var idList = ids.ToList();
-        return await _set.Where(e => idList.Contains(e.Id) && !e.IsDeleted).ToListAsync(ct);
+        return await _set.Where(e => idList.Contains(e.Id) && e.Status != EntityStatus.Deleted).ToListAsync(ct);
     }
 
     // --- New: Bulk write ---
@@ -115,7 +115,7 @@ public class EfRepository<T> : IRepository<T> where T : BaseEfEntity
     public Task SoftDeleteRangeAsync(IEnumerable<T> entities, CancellationToken ct = default)
     {
         var now = FcmsTime.Now;
-        foreach (var e in entities) { e.IsDeleted = true; e.DeletedAt ??= now; e.UpdatedAt = now; }
+        foreach (var e in entities) { e.Status = EntityStatus.Deleted; e.DeletedAt ??= now; e.UpdatedAt = now; }
         _set.UpdateRange(entities);
         return Task.CompletedTask;
     }
@@ -124,7 +124,7 @@ public class EfRepository<T> : IRepository<T> where T : BaseEfEntity
 
     public async Task<List<T>> FindAsync(QueryFilter<T> filter, CancellationToken ct = default)
     {
-        IQueryable<T> query = _set.Where(e => !e.IsDeleted);
+        IQueryable<T> query = _set.Where(e => e.Status != EntityStatus.Deleted);
 
         foreach (var cond in filter.Conditions)
             query = query.Where(cond);
@@ -144,7 +144,7 @@ public class EfRepository<T> : IRepository<T> where T : BaseEfEntity
 
     public async Task<PagedResponse<T>> FindPagedAsync(QueryFilter<T> filter, CancellationToken ct = default)
     {
-        IQueryable<T> query = _set.Where(e => !e.IsDeleted);
+        IQueryable<T> query = _set.Where(e => e.Status != EntityStatus.Deleted);
 
         foreach (var cond in filter.Conditions)
             query = query.Where(cond);

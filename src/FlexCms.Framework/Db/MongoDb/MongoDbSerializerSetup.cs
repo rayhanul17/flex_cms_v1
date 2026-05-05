@@ -23,6 +23,10 @@ public static class MongoDbSerializerSetup
             // DateTime as Unix milliseconds Int64 (NOT BSON Date)
             BsonSerializer.RegisterSerializer(typeof(DateTime), FcmsDateTimeSerializer.Instance);
 
+            // EntityStatus as Int32 (overrides global enum-as-string convention).
+            // Stable across renames + smaller payload + matches int-based queries.
+            BsonSerializer.RegisterSerializer(typeof(EntityStatus), new EnumSerializer<EntityStatus>(BsonType.Int32));
+
             // DateTimeOffset (used by IdentityUser.LockoutEnd) — store as ISO string
             BsonSerializer.RegisterSerializer(typeof(DateTimeOffset), new DateTimeOffsetSerializer(BsonType.String));
             BsonSerializer.RegisterSerializer(typeof(DateTimeOffset?), new NullableSerializer<DateTimeOffset>(new DateTimeOffsetSerializer(BsonType.String)));

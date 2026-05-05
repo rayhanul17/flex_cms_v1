@@ -34,7 +34,7 @@ public class PageService : IPageService
         => _repo.ExistsAsync(p => p.Slug == slug && p.Id != (excludeId ?? Guid.Empty), ct);
 
     public Task<List<FcmsPage>> GetDeletedAsync(CancellationToken ct = default)
-        => _repo.FindAsync(p => p.IsDeleted, ct, includeDeleted: true);
+        => _repo.FindAsync(p => p.Status == EntityStatus.Deleted, ct, includeDeleted: true);
 
     public async Task<FcmsPage> CreateAsync(FcmsPage page, CancellationToken ct = default)
     {
@@ -59,7 +59,7 @@ public class PageService : IPageService
     {
         var page = await _repo.FirstOrDefaultAsync(p => p.Id == id, ct, includeDeleted: true);
         if (page is null) return;
-        page.IsDeleted = false;
+        page.Status = EntityStatus.Active;
         page.DeletedAt = null;
         page.IsPublished = false; // always restore as draft
         await _repo.UpdateAsync(page, ct);

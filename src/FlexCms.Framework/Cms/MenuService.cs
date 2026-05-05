@@ -111,7 +111,7 @@ public class MenuService : IMenuService
                            || existingItem.RequiredPermission != def.RequiredPermission
                            || existingItem.Location != def.Location
                            || existingItem.ParentId != parentId
-                           || existingItem.IsDeleted;
+                           || existingItem.Status == EntityStatus.Deleted;
 
                 if (!changed) continue;
 
@@ -120,7 +120,7 @@ public class MenuService : IMenuService
                 existingItem.RequiredPermission = def.RequiredPermission;
                 existingItem.Location = def.Location;
                 existingItem.ParentId = parentId;
-                existingItem.IsDeleted = false;
+                existingItem.Status = EntityStatus.Active;
                 existingItem.DeletedAt = null;
                 await _repo.UpdateAsync(existingItem, ct);
                 anyChange = true;

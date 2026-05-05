@@ -47,8 +47,8 @@ public class TrashCleanupService : BackgroundService
         var uow = scope.ServiceProvider.GetRequiredService<Db.IFcmsUnitOfWork>();
         var cutoff = FcmsTime.Now.AddDays(-_opts.RetentionDays);
 
-        var oldPages = await pageRepo.FindAsync(p => p.IsDeleted && p.DeletedAt != null && p.DeletedAt < cutoff, ct: ct, includeDeleted: true);
-        var oldPosts = await postRepo.FindAsync(p => p.IsDeleted && p.DeletedAt != null && p.DeletedAt < cutoff, ct: ct, includeDeleted: true);
+        var oldPages = await pageRepo.FindAsync(p => p.Status == Db.EntityStatus.Deleted && p.DeletedAt != null && p.DeletedAt < cutoff, ct: ct, includeDeleted: true);
+        var oldPosts = await postRepo.FindAsync(p => p.Status == Db.EntityStatus.Deleted && p.DeletedAt != null && p.DeletedAt < cutoff, ct: ct, includeDeleted: true);
 
         foreach (var page in oldPages) await pageRepo.DeleteAsync(page, ct);
 

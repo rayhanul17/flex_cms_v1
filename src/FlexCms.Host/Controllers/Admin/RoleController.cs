@@ -162,7 +162,6 @@ public class RoleController : BaseAdminController
         var allPerms = await _permissions.GetAllAsync(ct);
 
         var groups = allPerms
-            .Where(p => !p.IsDeleted)
             .GroupBy(p => p.Group)
             .OrderBy(g => g.Key)
             .Select(g => new PermissionGroupViewModel

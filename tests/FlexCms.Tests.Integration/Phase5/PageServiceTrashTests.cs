@@ -1,3 +1,4 @@
+using FlexCms.Framework.Db;
 using FlexCms.Framework.Cms;
 using FlexCms.Framework.Db.Ef;
 using Microsoft.EntityFrameworkCore;
@@ -49,7 +50,7 @@ public class PageServiceTrashTests : IDisposable
 
         var found = await _svc.GetByIdAsync(page.Id);
         Assert.NotNull(found);
-        Assert.False(found.IsDeleted);
+        Assert.NotEqual(EntityStatus.Deleted, found.Status);
         Assert.False(found.IsPublished); // restored as draft
         Assert.Null(found.DeletedAt);
     }

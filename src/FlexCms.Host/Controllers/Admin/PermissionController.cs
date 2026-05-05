@@ -25,7 +25,6 @@ public class PermissionController : BaseAdminController
     {
         var all = await _permissions.GetAllAsync(ct);
         var groups = all
-            .Where(p => !p.IsDeleted)
             .GroupBy(p => string.IsNullOrWhiteSpace(p.Group) ? "Other" : p.Group)
             .OrderBy(g => g.Key)
             .ToDictionary(g => g.Key, g => g.OrderBy(p => p.DisplayName).ToList());

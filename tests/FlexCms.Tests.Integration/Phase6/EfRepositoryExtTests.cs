@@ -47,7 +47,7 @@ public class EfRepositoryExtTests : IDisposable
     public async Task GetByIdsAsync_excludes_soft_deleted()
     {
         var a = await AddAsync("a.pdf");
-        a.IsDeleted = true;
+        a.Status = EntityStatus.Deleted;
         await _db.SaveChangesAsync();
 
         var result = await _repo.GetByIdsAsync([a.Id]);
@@ -85,8 +85,8 @@ public class EfRepositoryExtTests : IDisposable
 
         var ra = await _db.Set<FcmsMedia>().IgnoreQueryFilters().FirstOrDefaultAsync(m => m.Id == a.Id);
         var rb = await _db.Set<FcmsMedia>().IgnoreQueryFilters().FirstOrDefaultAsync(m => m.Id == b.Id);
-        Assert.True(ra!.IsDeleted);
-        Assert.True(rb!.IsDeleted);
+        Assert.Equal(EntityStatus.Deleted, ra!.Status);
+        Assert.Equal(EntityStatus.Deleted, rb!.Status);
     }
 
     [Fact]
@@ -199,7 +199,7 @@ public class EfRepositoryExtTests : IDisposable
     {
         await AddAsync("c1.pdf");
         var del = await AddAsync("c2.pdf");
-        del.IsDeleted = true;
+        del.Status = EntityStatus.Deleted;
         await _db.SaveChangesAsync();
 
         Assert.Equal(1, await _repo.CountAsync());

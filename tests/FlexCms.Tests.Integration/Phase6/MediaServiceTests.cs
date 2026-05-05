@@ -1,3 +1,4 @@
+using FlexCms.Framework.Db;
 using FlexCms.Framework.Cms;
 using FlexCms.Framework.Db.Ef;
 using FlexCms.Framework.Storage;
@@ -117,7 +118,7 @@ public class MediaServiceTests : IDisposable
         await _svc.SoftDeleteAsync(media.Id);
 
         var raw = await _db.Set<FcmsMedia>().IgnoreQueryFilters().FirstAsync(m => m.Id == media.Id);
-        Assert.True(raw.IsDeleted);
+        Assert.Equal(EntityStatus.Deleted, raw.Status);
         await _storage.Received().DeleteAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
 

@@ -1,4 +1,5 @@
 using FlexCms.Framework.Cms;
+using FlexCms.Framework.Db;
 using FlexCms.Framework.Db.Ef;
 using Microsoft.EntityFrameworkCore;
 using NSubstitute;
@@ -94,6 +95,6 @@ public class PageServiceTests : IDisposable
 
         Assert.Null(await _svc.GetByIdAsync(page.Id));
         // Row still exists physically
-        Assert.Equal(1, await _db.Pages.IgnoreQueryFilters().CountAsync(p => p.IsDeleted));
+        Assert.Equal(1, await _db.Pages.IgnoreQueryFilters().CountAsync(p => p.Status == EntityStatus.Deleted));
     }
 }

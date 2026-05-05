@@ -7,6 +7,12 @@ public interface IBaseEntity
     DateTime UpdatedAt { get; set; }
     Guid? CreatedBy { get; set; }
     Guid? UpdatedBy { get; set; }
-    bool IsDeleted { get; set; }
+
+    /// <summary>
+    /// Lifecycle status. <see cref="EntityStatus.Active"/> by default.
+    /// Soft-delete sets this to <see cref="EntityStatus.Deleted"/>.
+    /// </summary>
+    EntityStatus Status { get; set; }
+
     DateTime? DeletedAt { get; set; }
 }

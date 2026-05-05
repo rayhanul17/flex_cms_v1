@@ -1,4 +1,5 @@
 using FlexCms.Framework.Cms;
+using FlexCms.Framework.Db;
 using FlexCms.Framework.Db.Ef;
 using Microsoft.EntityFrameworkCore;
 using NSubstitute;
@@ -39,7 +40,7 @@ public class PostServiceTests : IDisposable
         var post = new FcmsPost { Title = "Tagged", Slug = "tagged", Content = "" };
         await _svc.CreateAsync(post, ["dotnet", "csharp"]);
 
-        var tags = await _db.Tags.Where(t => !t.IsDeleted).ToListAsync();
+        var tags = await _db.Tags.Where(t => t.Status != EntityStatus.Deleted).ToListAsync();
         var postTags = await _db.PostTags.ToListAsync();
 
         Assert.Equal(2, tags.Count);
@@ -55,7 +56,7 @@ public class PostServiceTests : IDisposable
         var post = new FcmsPost { Title = "Reuse", Slug = "reuse", Content = "" };
         await _svc.CreateAsync(post, ["dotnet", "csharp"]);
 
-        Assert.Equal(2, await _db.Tags.CountAsync(t => !t.IsDeleted));
+        Assert.Equal(2, await _db.Tags.CountAsync(t => t.Status != EntityStatus.Deleted));
     }
 
     [Fact]
@@ -125,7 +126,7 @@ public class PostServiceTests : IDisposable
         await _svc.DeleteAsync(post.Id);
 
         Assert.Null(await _svc.GetByIdAsync(post.Id));
-        Assert.Equal(1, await _db.Posts.IgnoreQueryFilters().CountAsync(p => p.IsDeleted));
+        Assert.Equal(1, await _db.Posts.IgnoreQueryFilters().CountAsync(p => p.Status == EntityStatus.Deleted));
     }
 
     [Fact]

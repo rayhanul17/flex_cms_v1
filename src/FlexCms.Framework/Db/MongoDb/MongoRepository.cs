@@ -34,8 +34,8 @@ public class MongoRepository<T> : IRepository<T>, IMongoSessionAware where T : c
         return Guid.TryParse(claim, out var id) ? id : null;
     }
 
-    // All queries auto-prepend IsDeleted=false (B3 fix)
-    private FilterDefinition<T> NotDeleted => Filter.Eq(e => e.IsDeleted, false);
+    // All queries auto-exclude soft-deleted entities (Status != Deleted)
+    private FilterDefinition<T> NotDeleted => Filter.Ne(e => e.Status, EntityStatus.Deleted);
 
     public async Task<T?> GetByIdAsync(Guid id, CancellationToken ct = default)
     {
@@ -137,7 +137,7 @@ public class MongoRepository<T> : IRepository<T>, IMongoSessionAware where T : c
 
     public async Task SoftDeleteAsync(T entity, CancellationToken ct = default)
     {
-        entity.IsDeleted = true;
+        entity.Status = EntityStatus.Deleted;
         entity.DeletedAt ??= FcmsTime.Now;
         entity.UpdatedAt = FcmsTime.Now;
         entity.UpdatedBy = CurrentUserId();
@@ -221,7 +221,7 @@ public class MongoRepository<T> : IRepository<T>, IMongoSessionAware where T : c
         var userId = CurrentUserId();
         var models = entities.Select(e =>
         {
-            e.IsDeleted = true;
+            e.Status = EntityStatus.Deleted;
             e.DeletedAt ??= now;
             e.UpdatedAt = now;
             e.UpdatedBy = userId;

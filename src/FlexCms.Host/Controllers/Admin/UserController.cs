@@ -33,7 +33,7 @@ public class UserController : BaseAdminController
                 Id = u.Id,
                 Email = u.Email ?? "",
                 DisplayName = u.UserName,
-                IsActive = !u.LockoutEnabled || u.LockoutEnd == null || u.LockoutEnd < DateTimeOffset.UtcNow,
+                IsActive = u.Status == FlexCms.Framework.Db.EntityStatus.Active,
                 ForcePasswordChange = u.ForcePasswordChange,
                 CreatedAt = u.CreatedAt,
                 Roles = [.. roles]
@@ -155,18 +155,21 @@ public class UserController : BaseAdminController
         var user = await _userManager.FindByIdAsync(id.ToString());
         if (user is null) return FcmsFail("User not found.");
 
-        var isCurrentlyLocked = user.LockoutEnd.HasValue && user.LockoutEnd > DateTimeOffset.UtcNow;
-        if (isCurrentlyLocked)
+        if (user.Status == FlexCms.Framework.Db.EntityStatus.Active)
         {
-            await _userManager.SetLockoutEndDateAsync(user, null);
-            await OpLog.LogAsync("users.activate", "FcmsUser", user.Id.ToString());
-            return FcmsOk("User activated.");
+            user.Status = FlexCms.Framework.Db.EntityStatus.InActive;
+            await _userManager.SetLockoutEndDateAsync(user, DateTimeOffset.UtcNow.AddYears(100));
+            await _userManager.UpdateAsync(user);
+            await OpLog.LogAsync("users.deactivate", "FcmsUser", user.Id.ToString());
+            return FcmsOk("User deactivated.", new { newStatus = "InActive" });
         }
         else
         {
-            await _userManager.SetLockoutEndDateAsync(user, DateTimeOffset.UtcNow.AddYears(100));
-            await OpLog.LogAsync("users.deactivate", "FcmsUser", user.Id.ToString());
-            return FcmsOk("User deactivated.");
+            user.Status = FlexCms.Framework.Db.EntityStatus.Active;
+            await _userManager.SetLockoutEndDateAsync(user, null);
+            await _userManager.UpdateAsync(user);
+            await OpLog.LogAsync("users.activate", "FcmsUser", user.Id.ToString());
+            return FcmsOk("User activated.", new { newStatus = "Active" });
         }
     }
 

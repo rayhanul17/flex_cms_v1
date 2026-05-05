@@ -23,7 +23,7 @@ public class SearchController : Controller
 
         var pages = await _db.Pages
             .AsNoTracking()
-            .Where(p => !p.IsDeleted && p.IsPublished &&
+            .Where(p => p.IsPublished &&
                 (EF.Functions.Like(p.Title, pattern) || EF.Functions.Like(p.Content, pattern)))
             .OrderBy(p => p.Title)
             .Select(p => new SearchResultItem { Title = p.Title, Slug = "/" + p.Slug, Excerpt = p.MetaDescription ?? "" })
@@ -31,7 +31,7 @@ public class SearchController : Controller
 
         var posts = await _db.Posts
             .AsNoTracking()
-            .Where(p => !p.IsDeleted && p.IsPublished &&
+            .Where(p => p.IsPublished &&
                 (EF.Functions.Like(p.Title, pattern) ||
                  EF.Functions.Like(p.Content, pattern) ||
                  (p.Excerpt != null && EF.Functions.Like(p.Excerpt, pattern))))

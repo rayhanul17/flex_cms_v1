@@ -87,7 +87,7 @@ public class FcmsDbContext : IdentityDbContext<FcmsUser, FcmsRole, Guid>
             .IsUnique();
 
         // FK: deleting a role hard-removes its permission rows. Soft-delete
-        // (IsDeleted=true) is a column update and does NOT trigger this cascade.
+        // (Status=Deleted) is a column update and does NOT trigger this cascade.
         modelBuilder.Entity<FcmsRolePermission>()
             .HasOne<FcmsRole>()
             .WithMany()
@@ -206,7 +206,7 @@ public class FcmsDbContext : IdentityDbContext<FcmsUser, FcmsRole, Guid>
 
     private static void ApplySoftDeleteFilter<T>(ModelBuilder builder) where T : BaseEfEntity
     {
-        builder.Entity<T>().HasQueryFilter(e => !e.IsDeleted);
+        builder.Entity<T>().HasQueryFilter(e => e.Status != EntityStatus.Deleted);
         builder.Entity<T>().ToTable(FcmsHelper.GetTableName<T>(FrameworkPrefix));
     }
 

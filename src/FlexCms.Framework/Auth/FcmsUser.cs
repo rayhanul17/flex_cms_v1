@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using FlexCms.Framework.Db;
 using Microsoft.AspNetCore.Identity;
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
@@ -12,6 +13,14 @@ public class FcmsUser : IdentityUser<Guid>
     public bool ForcePasswordChange { get; set; }
     public DateTime CreatedAt { get; set; } = FlexCms.Framework.Clock.FcmsTime.Now;
     public DateTime UpdatedAt { get; set; } = FlexCms.Framework.Clock.FcmsTime.Now;
+
+    /// <summary>
+    /// User lifecycle status. Source of truth for the admin UI active/deactive toggle.
+    /// Auth-time blocking is enforced via Identity's <c>LockoutEnd</c>; the controller
+    /// keeps the two in sync (Active ⇔ LockoutEnd null/past).
+    /// </summary>
+    public EntityStatus Status { get; set; } = EntityStatus.Active;
+
     public List<string> Roles { get; set; } = [];
 
     // Embedded collections for MongoDB

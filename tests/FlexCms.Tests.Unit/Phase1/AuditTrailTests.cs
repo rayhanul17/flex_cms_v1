@@ -1,3 +1,4 @@
+using FlexCms.Framework.Db;
 using FlexCms.Framework.Cms;
 using FlexCms.Framework.Db.Ef;
 using Microsoft.EntityFrameworkCore;
@@ -51,7 +52,7 @@ public class AuditTrailTests : IDisposable
         _db.Pages.Add(page);
         await _db.SaveChangesAsync();
 
-        page.IsDeleted = true;
+        page.Status = EntityStatus.Deleted;
         _db.Pages.Update(page);
         await _db.SaveChangesAsync();
 
@@ -66,13 +67,13 @@ public class AuditTrailTests : IDisposable
         _db.Pages.Add(page);
         await _db.SaveChangesAsync();
 
-        page.IsDeleted = true;
+        page.Status = EntityStatus.Deleted;
         _db.Pages.Update(page);
         await _db.SaveChangesAsync();
 
         var found = await _db.Pages.IgnoreQueryFilters().FirstOrDefaultAsync(p => p.Id == page.Id);
         Assert.NotNull(found);
-        Assert.True(found.IsDeleted);
+        Assert.Equal(EntityStatus.Deleted, found.Status);
     }
 
     [Fact]
@@ -83,7 +84,7 @@ public class AuditTrailTests : IDisposable
         _db.Pages.AddRange(p1, p2);
         await _db.SaveChangesAsync();
 
-        p1.IsDeleted = true;
+        p1.Status = EntityStatus.Deleted;
         _db.Pages.Update(p1);
         await _db.SaveChangesAsync();
 

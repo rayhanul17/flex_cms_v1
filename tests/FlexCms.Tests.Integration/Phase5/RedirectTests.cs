@@ -1,3 +1,4 @@
+using FlexCms.Framework.Db;
 using FlexCms.Framework.Cms;
 using FlexCms.Framework.Db.Ef;
 using Microsoft.EntityFrameworkCore;
@@ -31,7 +32,7 @@ public class RedirectTests : IDisposable
 
         var found = await _db.Redirects
             .AsNoTracking()
-            .FirstOrDefaultAsync(r => !r.IsDeleted && r.IsActive && r.FromPath == "/old");
+            .FirstOrDefaultAsync(r => r.Status != EntityStatus.Deleted && r.IsActive && r.FromPath == "/old");
 
         Assert.NotNull(found);
         Assert.Equal("/new", found.ToPath);
@@ -46,7 +47,7 @@ public class RedirectTests : IDisposable
 
         var found = await _db.Redirects
             .AsNoTracking()
-            .FirstOrDefaultAsync(r => !r.IsDeleted && r.IsActive && r.FromPath == "/inactive");
+            .FirstOrDefaultAsync(r => r.Status != EntityStatus.Deleted && r.IsActive && r.FromPath == "/inactive");
 
         Assert.Null(found);
     }
@@ -83,7 +84,7 @@ public class RedirectTests : IDisposable
     [Fact]
     public async Task SoftDeleted_redirect_is_not_matched()
     {
-        var r = new FcmsRedirect { FromPath = "/del-redirect", ToPath = "/dest", IsActive = true, IsDeleted = true };
+        var r = new FcmsRedirect { FromPath = "/del-redirect", ToPath = "/dest", IsActive = true, Status = EntityStatus.Deleted };
         _db.Redirects.Add(r);
         await _db.SaveChangesAsync();
 

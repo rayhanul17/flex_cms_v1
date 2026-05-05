@@ -1,6 +1,7 @@
 using FlexCms.Framework.Auth;
 using FlexCms.Framework.Cms;
 using FlexCms.Framework.Clock;
+using FlexCms.Framework.Db;
 using FlexCms.Framework.Db.Ef;
 using FlexCms.Host.Models.Admin;
 using Microsoft.AspNetCore.Mvc;
@@ -20,7 +21,6 @@ public class RedirectController : BaseAdminController
     public async Task<IActionResult> Index(CancellationToken ct)
     {
         var redirects = await _db.Redirects
-            .Where(r => !r.IsDeleted)
             .OrderBy(r => r.FromPath)
             .ToListAsync(ct);
 
@@ -46,7 +46,7 @@ public class RedirectController : BaseAdminController
     {
         if (!ModelState.IsValid) return View(model);
 
-        var exists = await _db.Redirects.AnyAsync(r => !r.IsDeleted && r.FromPath == model.FromPath, ct);
+        var exists = await _db.Redirects.AnyAsync(r => r.FromPath == model.FromPath, ct);
         if (exists)
         {
             ModelState.AddModelError(nameof(model.FromPath), "A redirect from this path already exists.");
@@ -71,7 +71,7 @@ public class RedirectController : BaseAdminController
     [FcmsAuthorize("redirects.edit")]
     public async Task<IActionResult> Edit(Guid id, CancellationToken ct)
     {
-        var r = await _db.Redirects.FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted, ct);
+        var r = await _db.Redirects.FirstOrDefaultAsync(x => x.Id == id, ct);
         if (r is null) return NotFound();
 
         return View(new CreateEditRedirectViewModel
@@ -91,10 +91,10 @@ public class RedirectController : BaseAdminController
     {
         if (!ModelState.IsValid) return View(model);
 
-        var r = await _db.Redirects.FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted, ct);
+        var r = await _db.Redirects.FirstOrDefaultAsync(x => x.Id == id, ct);
         if (r is null) return NotFound();
 
-        var exists = await _db.Redirects.AnyAsync(x => !x.IsDeleted && x.FromPath == model.FromPath && x.Id != id, ct);
+        var exists = await _db.Redirects.AnyAsync(x => x.FromPath == model.FromPath && x.Id != id, ct);
         if (exists)
         {
             ModelState.AddModelError(nameof(model.FromPath), "A redirect from this path already exists.");
@@ -115,9 +115,9 @@ public class RedirectController : BaseAdminController
     [FcmsAuthorize("redirects.delete")]
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
     {
-        var r = await _db.Redirects.FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted, ct);
+        var r = await _db.Redirects.FirstOrDefaultAsync(x => x.Id == id, ct);
         if (r is null) return FcmsFail("Not found.");
-        r.IsDeleted = true;
+        r.Status = EntityStatus.Deleted;
         r.DeletedAt = FcmsTime.Now;
         await _db.SaveChangesAsync(ct);
         return FcmsOk("Redirect deleted.");

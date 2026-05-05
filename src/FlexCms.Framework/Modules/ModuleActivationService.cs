@@ -87,7 +87,7 @@ public class ModuleActivationService : IHostedService
                 {
                     ModuleId = module.ModuleId,
                     Version = module.Version,
-                    Status = "Active",
+                    ActivationStatus = "Active",
                     ActivatedAt = FcmsTime.Now
                 };
                 await repo.AddAsync(record, ct);

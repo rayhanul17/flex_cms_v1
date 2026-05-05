@@ -1,3 +1,4 @@
+using FlexCms.Framework.Db;
 using FlexCms.Framework.Cms;
 using FlexCms.Framework.Db.Ef;
 using Microsoft.EntityFrameworkCore;
@@ -85,7 +86,7 @@ public class MediaFolderServiceTests : IDisposable
         var raw = await _db.Set<FcmsMediaFolder>()
             .IgnoreQueryFilters()
             .FirstAsync(f => f.Id == folder.Id);
-        Assert.True(raw.IsDeleted);
+        Assert.Equal(EntityStatus.Deleted, raw.Status);
     }
 
     [Fact]

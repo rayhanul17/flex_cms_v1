@@ -1,3 +1,4 @@
+using FlexCms.Framework.Db;
 using FlexCms.Framework.Auth;
 using FlexCms.Framework.Db.Ef;
 using FlexCms.Framework.Services;
@@ -64,7 +65,7 @@ public class PermissionServicePhase6Tests : IDisposable
 
         var count = _db.RolePermissions
             .IgnoreQueryFilters()
-            .Count(rp => rp.RoleId == role.Id && rp.PermissionKey == "media.upload" && !rp.IsDeleted);
+            .Count(rp => rp.RoleId == role.Id && rp.PermissionKey == "media.upload" && rp.Status != EntityStatus.Deleted);
         Assert.Equal(1, count);
     }
 
@@ -83,7 +84,7 @@ public class PermissionServicePhase6Tests : IDisposable
             .IgnoreQueryFilters()
             .FirstOrDefault(rp => rp.RoleId == role.Id && rp.PermissionKey == "audit.view");
         Assert.NotNull(raw);
-        Assert.True(raw.IsDeleted);
+        Assert.Equal(EntityStatus.Deleted, raw.Status);
     }
 
     [Fact]
@@ -130,7 +131,7 @@ public class PermissionServicePhase6Tests : IDisposable
         await _svc.SeedPermissionsAsync(perms);
         await _svc.SeedPermissionsAsync(perms); // second call — should not duplicate
 
-        var count = _db.Permissions.Count(p => !p.IsDeleted);
+        var count = _db.Permissions.Count(p => p.Status != EntityStatus.Deleted);
         Assert.Equal(4, count);
     }
 
@@ -145,7 +146,7 @@ public class PermissionServicePhase6Tests : IDisposable
             new FcmsPermission { Key = "media.delete", DisplayName = "Media: Delete", Group = "Media" }
         ]);
 
-        var count = _db.Permissions.Count(p => !p.IsDeleted);
+        var count = _db.Permissions.Count(p => p.Status != EntityStatus.Deleted);
         Assert.Equal(2, count);
     }
 

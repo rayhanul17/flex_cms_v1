@@ -1,3 +1,4 @@
+using FlexCms.Framework.Db;
 using FlexCms.Framework.Cms;
 using FlexCms.Framework.Db.Ef;
 using Microsoft.EntityFrameworkCore;
@@ -71,7 +72,7 @@ public class CategoryServiceTests : IDisposable
     {
         var cat = await _svc.CreateAsync(new FcmsCategory { Name = "Tech2", Slug = "tech2" });
         var post = new FcmsPost { Title = "P1", Slug = "p1b", Content = "", CategoryId = cat.Id };
-        var deleted = new FcmsPost { Title = "P2", Slug = "p2b", Content = "", CategoryId = cat.Id, IsDeleted = true };
+        var deleted = new FcmsPost { Title = "P2", Slug = "p2b", Content = "", CategoryId = cat.Id, Status = EntityStatus.Deleted };
         _db.Posts.AddRange(post, deleted);
         await _db.SaveChangesAsync();
 

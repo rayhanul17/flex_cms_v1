@@ -57,7 +57,7 @@ public class ModulesController : BaseAdminController
                     Author = m.Manifest.Author,
                     Description = m.Manifest.Description,
                     TablePrefix = m.Manifest.TablePrefix,
-                    Status = m.IsDeactivated ? "Inactive" : (rec?.Status ?? "Active"),
+                    Status = m.IsDeactivated ? "Inactive" : (rec?.ActivationStatus ?? "Active"),
                     ActivatedAt = rec?.ActivatedAt,
                     DependsOn = m.Manifest.DependsOn
                 };
@@ -95,7 +95,7 @@ public class ModulesController : BaseAdminController
         _state.DeleteWwwroot(_env.WebRootPath, module.ModuleId);
 
         // Hide module menu items so they don't 404 on click after restart.
-        // Restored on next activation by MenuService.SeedAsync (resets IsDeleted=false).
+        // Restored on next activation by MenuService.SeedAsync (Status set back to Active).
         var menuService = HttpContext.RequestServices.GetService<IMenuService>();
         if (menuService is not null)
             await menuService.RemoveModuleItemsAsync(id, ct);
@@ -146,7 +146,8 @@ public class ModulesController : BaseAdminController
             .FirstOrDefault(r => string.Equals(r.ModuleId, id, StringComparison.OrdinalIgnoreCase));
         if (record is not null)
         {
-            record.IsDeleted = true;
+            record.Status = FlexCms.Framework.Db.EntityStatus.Deleted;
+            record.DeletedAt ??= FlexCms.Framework.Clock.FcmsTime.Now;
             await _records.UpdateAsync(record, ct);
             await _uow.SaveChangesAsync(ct);
         }

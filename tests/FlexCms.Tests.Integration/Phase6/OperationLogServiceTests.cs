@@ -1,3 +1,4 @@
+using FlexCms.Framework.Db;
 using FlexCms.Framework.Cms;
 using FlexCms.Framework.Db.Ef;
 using FlexCms.Framework.Services;
@@ -53,7 +54,7 @@ public class OperationLogServiceTests : IDisposable
         await _svc.LogAsync("Post.Created", "FcmsPost", Guid.NewGuid().ToString());
         await Save();
 
-        Assert.Equal(1, await _db.Set<FcmsLog>().CountAsync(l => !l.IsDeleted));
+        Assert.Equal(1, await _db.Set<FcmsLog>().CountAsync(l => l.Status != EntityStatus.Deleted));
     }
 
     [Fact]
@@ -74,7 +75,7 @@ public class OperationLogServiceTests : IDisposable
         await _svc.LogAsync("Default.Check", "Entity", "1");
         await Save();
 
-        Assert.Equal(1, await _db.Set<FcmsLog>().CountAsync(l => !l.IsDeleted));
+        Assert.Equal(1, await _db.Set<FcmsLog>().CountAsync(l => l.Status != EntityStatus.Deleted));
     }
 
     // ── LogAsync field correctness ────────────────────────────────────────────
@@ -88,7 +89,7 @@ public class OperationLogServiceTests : IDisposable
         await _svc.LogAsync("Post.Created", "FcmsPost", entityId, new { Title = "Test" }, "blog", FcmsLogSeverity.Warning);
         await Save();
 
-        var log = await _db.Set<FcmsLog>().FirstAsync(l => !l.IsDeleted);
+        var log = await _db.Set<FcmsLog>().FirstAsync(l => l.Status != EntityStatus.Deleted);
         Assert.Equal("Post.Created", log.Action);
         Assert.Equal("FcmsPost", log.EntityType);
         Assert.Equal(entityId, log.EntityId);
@@ -110,8 +111,8 @@ public class OperationLogServiceTests : IDisposable
         await _svc.ArchiveOlderThanAsync(TimeSpan.FromHours(24));
         await Save();
 
-        var remaining = await _db.Set<FcmsLog>().CountAsync(l => !l.IsDeleted);
-        var archived = await _db.Set<FcmsLogArchive>().CountAsync(a => !a.IsDeleted);
+        var remaining = await _db.Set<FcmsLog>().CountAsync(l => l.Status != EntityStatus.Deleted);
+        var archived = await _db.Set<FcmsLogArchive>().CountAsync(a => a.Status != EntityStatus.Deleted);
         Assert.Equal(1, remaining);
         Assert.Equal(2, archived);
     }
@@ -136,7 +137,7 @@ public class OperationLogServiceTests : IDisposable
         await _svc.ArchiveOlderThanAsync(TimeSpan.FromHours(1));
         await Save();
 
-        var archived = await _db.Set<FcmsLogArchive>().FirstAsync(a => !a.IsDeleted);
+        var archived = await _db.Set<FcmsLogArchive>().FirstAsync(a => a.Status != EntityStatus.Deleted);
         Assert.Equal("User.Deleted", archived.Action);
         Assert.Equal(entityId, archived.EntityId);
         Assert.Equal(log.UserName, archived.UserName);
@@ -152,7 +153,7 @@ public class OperationLogServiceTests : IDisposable
         await _svc.ArchiveOlderThanAsync(TimeSpan.FromHours(1));
         await Save();
 
-        var visibleLogs = await _db.Set<FcmsLog>().CountAsync(l => !l.IsDeleted);
+        var visibleLogs = await _db.Set<FcmsLog>().CountAsync(l => l.Status != EntityStatus.Deleted);
         var rawLogs = await _db.Set<FcmsLog>().IgnoreQueryFilters().CountAsync();
         Assert.Equal(0, visibleLogs);
         Assert.Equal(1, rawLogs); // soft-deleted, physically still there
@@ -212,7 +213,7 @@ public class OperationLogServiceTests : IDisposable
         await _svc.ClearArchiveAsync();
         await Save();
 
-        Assert.Equal(0, await _db.Set<FcmsLogArchive>().CountAsync(a => !a.IsDeleted));
+        Assert.Equal(0, await _db.Set<FcmsLogArchive>().CountAsync(a => a.Status != EntityStatus.Deleted));
         Assert.Equal(2, await _db.Set<FcmsLogArchive>().IgnoreQueryFilters().CountAsync());
     }
 

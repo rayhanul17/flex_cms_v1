@@ -130,7 +130,6 @@ public class MenuController : BaseAdminController
             .Select(m => new MenuItemSelectItem { Id = m.Id, Name = m.DisplayName })];
 
         vm.AvailablePermissions = [.. permissions
-            .Where(p => !p.IsDeleted)
             .OrderBy(p => p.Group).ThenBy(p => p.DisplayName)
             .Select(p => new MenuItemSelectItem { Key = p.Key, Name = $"{p.Group} — {p.DisplayName}" })];
 

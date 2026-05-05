@@ -43,7 +43,7 @@ public class PostService : IPostService
         => _postRepo.ExistsAsync(p => p.Slug == slug && p.Id != (excludeId ?? Guid.Empty), ct);
 
     public Task<List<FcmsPost>> GetDeletedAsync(CancellationToken ct = default)
-        => _postRepo.FindAsync(p => p.IsDeleted, ct, includeDeleted: true);
+        => _postRepo.FindAsync(p => p.Status == EntityStatus.Deleted, ct, includeDeleted: true);
 
     public async Task<FcmsPost> CreateAsync(FcmsPost post, IEnumerable<string> tagSlugs, CancellationToken ct = default)
     {
@@ -70,7 +70,7 @@ public class PostService : IPostService
     {
         var post = await _postRepo.FirstOrDefaultAsync(p => p.Id == id, ct, includeDeleted: true);
         if (post is null) return;
-        post.IsDeleted = false;
+        post.Status = EntityStatus.Active;
         post.DeletedAt = null;
         post.IsPublished = false; // always restore as draft
         await _postRepo.UpdateAsync(post, ct);

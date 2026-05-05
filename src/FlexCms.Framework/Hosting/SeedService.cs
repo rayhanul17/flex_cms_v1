@@ -168,10 +168,10 @@ public class SeedService : IHostedService
 
             if (existing.TryGetValue(module.ModuleId, out var record))
             {
-                if (record.Version != module.Manifest.Version || record.Status != expectedStatus)
+                if (record.Version != module.Manifest.Version || record.ActivationStatus != expectedStatus)
                 {
                     record.Version = module.Manifest.Version;
-                    record.Status = expectedStatus;
+                    record.ActivationStatus = expectedStatus;
                     if (expectedStatus == "Active" && record.ActivatedAt is null)
                         record.ActivatedAt = FcmsTime.Now;
                     await repo.UpdateAsync(record, ct);
@@ -184,7 +184,7 @@ public class SeedService : IHostedService
             {
                 ModuleId = module.ModuleId,
                 Version = module.Manifest.Version,
-                Status = expectedStatus,
+                ActivationStatus = expectedStatus,
                 ActivatedAt = expectedStatus == "Active" ? FcmsTime.Now : null
             }, ct);
             anyChange = true;
@@ -197,8 +197,9 @@ public class SeedService : IHostedService
         foreach (var record in existing.Values)
         {
             if (presentIds.Contains(record.ModuleId)) continue;
-            if (record.IsDeleted) continue;
-            record.IsDeleted = true;
+            if (record.Status == EntityStatus.Deleted) continue;
+            record.Status = EntityStatus.Deleted;
+            record.DeletedAt ??= FcmsTime.Now;
             await repo.UpdateAsync(record, ct);
             anyChange = true;
             _logger.LogInformation("SeedService: marked module record {Id} as removed (folder gone).",

@@ -178,7 +178,7 @@
 | m3 | Editor license — superseded by M23 | Toast UI Editor (MIT) replaces CKEditor and TinyMCE (both GPL) |
 | m4 | Antiforgery header name | `services.AddAntiforgery(o => o.HeaderName = "X-FlexCms-Csrf")` added to AddFlexCms |
 | m5 | escHtml chat XSS | Replaced with full escaping (`&` `<` `>` `"` `'` `` ` ``) |
-| m6 | Singular vs plural table names | Convention: **plural** for all entities (`fcms_users`, `fcms_pages`). `FcmsHelper.GetEntityName<T>()` updated to pluralize |
+| m6 | Singular vs plural table names | Convention: **plural** for all entities (`fcms_users`, `fcms_pages`). `FcmsHelper.GetTableName<T>()` updated to pluralize |
 | m7 | 3 themes duplicate `_FcmsUi.cshtml` | Acceptable — themes are independent. Documented as "by design". |
 | m8 | `dotnet new flexcms-module` template | Phase 4 deliverable — separate template package. Until then, scaffold via Admin UI (dev mode) |
 | m9 | axe-core in production | Confirmed as test-project-only NuGet. Admin "Accessibility Audit" page uses Playwright headless in background CLI runner |
@@ -2676,7 +2676,7 @@ private string ToOnnorokomFormat(string canonical) =>
 ```
 
 ### m6 — Table naming: plural everywhere
-`FcmsHelper.GetEntityName<T>()` produces plural snake_case:
+`FcmsHelper.GetTableName<T>()` produces plural snake_case:
 - `FcmsUser` → `fcms_users`
 - `FcmsPost` → `fcms_posts`
 - `FcmsCategory` → `fcms_categories` (handle -y → -ies)
@@ -3196,13 +3196,13 @@ public interface IRepository<T> where T : class, IBaseEntity
 // দুটো implementation — কিন্তু একটাই register হবে:
 public class EfRepository<T> : IRepository<T> where T : class, IBaseEntity
 {
-    public string TableName => FcmsHelper.GetEntityName<T>(_modulePrefix);
+    public string TableName => FcmsHelper.GetTableName<T>(_modulePrefix);
     // module.json TablePrefix → _modulePrefix — registration-এ inject
 }
 
 public class MongoRepository<T> : IRepository<T> where T : class, IBaseEntity
 {
-    public string TableName => FcmsHelper.GetEntityName<T>(_modulePrefix);
+    public string TableName => FcmsHelper.GetTableName<T>(_modulePrefix);
 }
 
 // Raw query usage:
@@ -4659,8 +4659,8 @@ public class FcmsEntityAttribute : Attribute
     public FcmsEntityAttribute(string? name = null) => Name = name;
 }
 
-// FcmsHelper.GetEntityName<T>(string modulePrefix):
-public static string GetEntityName<T>(string modulePrefix = "")
+// FcmsHelper.GetTableName<T>(string modulePrefix):
+public static string GetTableName<T>(string modulePrefix = "")
 {
     var attr = typeof(T).GetCustomAttribute<FcmsEntityAttribute>();
     if (attr?.Name != null) return attr.Name; // explicit override
@@ -8135,7 +8135,7 @@ FlexCms.Framework/
 │   └── FcmsQueueProcessor.cs              # [FcmsHostedService] — drains channel
 ├── Utils/
 │   ├── FcmsDateTime.cs                    # DateTime wrapper — .Now/.UtcNow/.Today (swap to UTC later)
-│   ├── FcmsHelper.cs                      # GetEntityName<T>(prefix) — snake_case + module prefix convention
+│   ├── FcmsHelper.cs                      # GetTableName<T>(prefix) — snake_case + module prefix convention
 │   ├── FcmsEntityAttribute.cs             # [FcmsEntity("name")] — single attribute for EF table + MongoDB collection
 │   ├── IFcmsContextService.cs             # Current user ID, username, IP, browser — M2Sv3 pattern
 │   ├── FcmsContextService.cs              # [FcmsScoped] HttpContextAccessor + UAParser implementation
@@ -9925,7 +9925,7 @@ Tailwind: layout, light/dark/auto CSS, zones, language switcher
 |---|---|---|
 | `Db\EfCore\BaseEfEntity.cs` | EF base entity | `IBaseEntity + CreateBy, CreateByUsername, CreationDate, ModifyBy, ModifyByUsername, ModificationDate, IsActive, IsDeleted, RowVersion` |
 | `Db\EfCore\FcmsDbContext.cs` | EF DbContext | `NO IdentityDbContext` — plain DbContext. `SaveChangesAsync` override → audit hook. `OnModelCreating` → calls all `IFcmsModelBuilder` + HasQueryFilter(!IsDeleted) + Identity table config + HasIndex(Slug+IsDeleted).IsUnique() |
-| `Db\EfCore\EfRepository.cs` | `IRepository<T>` EF impl | Uses `FcmsDbContext`, `TableName` = `FcmsHelper.GetEntityName<T>(prefix)` |
+| `Db\EfCore\EfRepository.cs` | `IRepository<T>` EF impl | Uses `FcmsDbContext`, `TableName` = `FcmsHelper.GetTableName<T>(prefix)` |
 | `Db\EfCore\EfUnitOfWork.cs` | `IFcmsUnitOfWork` EF impl | Shared `FcmsDbContext`, `IDbContextTransaction` |
 | `Db\EfCore\EfRawQuery.cs` | `IFcmsRawQuery` impl | `_context.Database.SqlQueryRaw<T>()` |
 | `Db\EfCore\DatabaseFactory.cs` | DB connection factory | Creates `FcmsDbContext` with correct provider (MySQL/MSSQL/PostgreSQL) from `setup.json` |
@@ -10060,7 +10060,7 @@ Tailwind: layout, light/dark/auto CSS, zones, language switcher
 | File | Contains | Key Detail |
 |---|---|---|
 | `Utils\FcmsDateTime.cs` | DateTime wrapper | `public static DateTime Now => DateTime.Now` — single swap point for UTC migration |
-| `Utils\FcmsHelper.cs` | Entity name helper | `GetEntityName<T>(prefix)` → snake_case + module prefix. e.g. `FcmsPost` → `fcms_post`, `BlogComment` with prefix "blog" → `blog_comment` |
+| `Utils\FcmsHelper.cs` | Entity name helper | `GetTableName<T>(prefix)` → snake_case + module prefix. e.g. `FcmsPost` → `fcms_post`, `BlogComment` with prefix "blog" → `blog_comment` |
 | `Utils\FcmsEntityAttribute.cs` | `[FcmsEntity("name")]` | Optional explicit table/collection name override |
 | `Utils\IFcmsContextService.cs` | Current user context interface | `CurrentUserId (Guid?), CurrentUsername, IpAddress, UserAgent, Browser, OperatingSystem, IsAuthenticated, IsSuperAdmin` |
 | `Utils\FcmsContextService.cs` | `[FcmsScoped]` impl | `IHttpContextAccessor` + `UAParser` for Browser/OS |

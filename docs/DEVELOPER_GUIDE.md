@@ -636,7 +636,7 @@ More settings will be added here over time (email SMTP, maintenance mode, etc.).
 ### Phase 4 — Module System ✅ Done
 
 **What exists:**
-- **Naming convention** — `FcmsHelper.GetEntityName<T>(modulePrefix)` produces snake_case + plural + prefix. `[FcmsTable("custom_name")]` overrides.
+- **Naming convention** — `FcmsHelper.GetTableName<T>(modulePrefix)` produces snake_case + plural + prefix. `[FcmsTable("custom_name")]` overrides.
 - **Module abstractions** — `IFcmsModule`, `BaseModule`, `ModuleManifest` (deserialized `module.json`).
 - **Lifecycle hooks** — `CreateMigrationContext()` → EF `MigrateAsync()` at startup; `SeedDataAsync()` once per install; `OnUpgradeAsync(fromVersion)` on version change; `DropTablesAsync()` on uninstall with "Drop Tables".
 - **Discovery pipeline** — `ModuleLoader` + `ModuleManager` (topological sort by `DependsOn`, cycle detection) + `ModuleRegistry` singleton.

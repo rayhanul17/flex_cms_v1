@@ -87,6 +87,7 @@ public class RoleController : BaseAdminController
             return View(model);
         }
 
+        await OpLog.LogAsync("roles.create", "FcmsRole", role.Id.ToString());
         ShowSuccess($"Role '{model.Name}' created.");
         return RedirectToAction(nameof(Index));
     }
@@ -142,6 +143,7 @@ public class RoleController : BaseAdminController
             return View(model);
         }
 
+        await OpLog.LogAsync("roles.edit", "FcmsRole", role.Id.ToString());
         ShowSuccess($"Role '{role.Name}' updated.");
         return RedirectToAction(nameof(Detail), new { id });
     }
@@ -202,6 +204,7 @@ public class RoleController : BaseAdminController
         if (!result.Succeeded)
             return FcmsFail(string.Join(", ", result.Errors.Select(e => e.Description)));
 
+        await OpLog.LogAsync("roles.delete", "FcmsRole", role.Id.ToString());
         ShowSuccess($"Role '{role.Name}' deleted.");
         return FcmsOk("Role deleted.");
     }

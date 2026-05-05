@@ -14423,8 +14423,8 @@ When saving new memories, follow the format in `~/.claude/CLAUDE.md` (auto-memor
 | 4  | Module System | ✅ DONE | Merged 2026-04-29 (all sub-PRs) |
 | 5  | CMS: Pages + Posts + Frontend | ✅ DONE | Merged 2026-04-29 |
 | –  | **Post-Phase-5 Enhancements** | ✅ DONE | NuGet updates, GetTableName rename, [FcmsLog] attr, Dynamic Menu System, local CDN libs, error pages polish (branch `phase-6-veryfy`, PR pending) |
-| 6  | Media + File Storage | ❌ NEXT | About to start |
-| 7  | i18n + Translation | ❌ pending | |
+| 6  | Media + File Storage | ✅ DONE | All deliverables + checklist items present (upload, folders, magic-bytes, thumbnails, permissions, audit, tests). Optional polish items (edit-metadata modal, list/grid toggle, search, image compression) deferred to admin UX phase. |
+| 7  | i18n + Translation | ❌ NEXT | About to start |
 | 8  | Email + SMS + Background Jobs | ❌ pending | |
 | 9  | Admin UX + Notifications + Widgets + Audit | ❌ pending | Dynamic Menu System (originally part of this) already done |
 | 10 | Chat (SignalR) | ❌ pending | |
@@ -14789,7 +14789,9 @@ tests/FlexCms.Tests.Unit/Phase3/FcmsAuthorizeFilterTests.cs # +SuperAdmin upperc
 ---
 
 ### Phase 6 — Media + File Storage
-> **❌ NOT STARTED** — next phase to begin
+> **✅ IMPLEMENTED** — verified via audit on 2026-05-05 against the checklist below
+> All core deliverables present: `IFcmsFileStorage` + `LocalFileStorage` (path-traversal safe), `FcmsMedia` + `FcmsMediaFolder` entities, `MediaService` (magic-bytes validation for jpg/png/gif/webp/pdf/mp4/mp3/zip, safe filename sanitization, SkiaSharp thumbnails 300px @ 85% JPEG), `MediaFolderService` (CRUD + media-reparent on delete + breadcrumb), Admin UI (folder tree + grid view + AJAX upload), permission gating (`media.view/upload/edit/delete/folders` seeded), audit logging via `[FcmsLog]`, integration tests (`MediaServiceTests` + `MediaFolderServiceTests`), unit tests (`LocalFileStorageTests`).
+> Optional polish (deferred to admin-UX phase): edit-metadata modal for AltText/Description, list/grid toggle, drag-drop folder tree, search/filter, image compression option.
 **কাজ:**
 - `IFcmsFileStorage`, `LocalFileStorage` (`wwwroot/uploads/`)
 - `FcmsMedia`, `FcmsMediaFolder` entities

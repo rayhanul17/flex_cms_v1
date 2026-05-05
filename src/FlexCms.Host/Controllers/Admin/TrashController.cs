@@ -47,7 +47,7 @@ public class TrashController : BaseAdminController
 
     [HttpPost("pages/{id:guid}/restore")]
     [ValidateAntiForgeryToken]
-    [FcmsAuthorize("pages.edit")]
+    [FcmsAuthorize(FcmsPermissions.PagesEdit)]
     public async Task<IActionResult> RestorePage(Guid id, CancellationToken ct)
     {
         await _pages.RestoreAsync(id, ct);
@@ -56,7 +56,7 @@ public class TrashController : BaseAdminController
 
     [HttpPost("pages/{id:guid}/delete")]
     [ValidateAntiForgeryToken]
-    [FcmsAuthorize("pages.delete")]
+    [FcmsAuthorize(FcmsPermissions.PagesDelete)]
     public async Task<IActionResult> DeletePage(Guid id, CancellationToken ct)
     {
         await _pages.HardDeleteAsync(id, ct);
@@ -65,7 +65,7 @@ public class TrashController : BaseAdminController
 
     [HttpPost("posts/{id:guid}/restore")]
     [ValidateAntiForgeryToken]
-    [FcmsAuthorize("posts.edit")]
+    [FcmsAuthorize(FcmsPermissions.PostsEdit)]
     public async Task<IActionResult> RestorePost(Guid id, CancellationToken ct)
     {
         await _posts.RestoreAsync(id, ct);
@@ -74,7 +74,7 @@ public class TrashController : BaseAdminController
 
     [HttpPost("posts/{id:guid}/delete")]
     [ValidateAntiForgeryToken]
-    [FcmsAuthorize("posts.delete")]
+    [FcmsAuthorize(FcmsPermissions.PostsDelete)]
     public async Task<IActionResult> DeletePost(Guid id, CancellationToken ct)
     {
         await _posts.HardDeleteAsync(id, ct);

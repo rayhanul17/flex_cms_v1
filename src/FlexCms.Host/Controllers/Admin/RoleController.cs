@@ -56,12 +56,12 @@ public class RoleController : BaseAdminController
     // ── Create ────────────────────────────────────────────────────────────────
 
     [HttpGet("create")]
-    [FcmsAuthorize("roles.create")]
+    [FcmsAuthorize(FcmsPermissions.RolesCreate)]
     public IActionResult Create() => View(new CreateRoleViewModel());
 
     [HttpPost("create")]
     [ValidateAntiForgeryToken]
-    [FcmsAuthorize("roles.create")]
+    [FcmsAuthorize(FcmsPermissions.RolesCreate)]
     [FcmsLog("roles.create", "FcmsRole")]
     public async Task<IActionResult> Create(CreateRoleViewModel model)
     {
@@ -96,7 +96,7 @@ public class RoleController : BaseAdminController
     // ── Edit ──────────────────────────────────────────────────────────────────
 
     [HttpGet("{id:guid}/edit")]
-    [FcmsAuthorize("roles.edit")]
+    [FcmsAuthorize(FcmsPermissions.RolesEdit)]
     public async Task<IActionResult> Edit(Guid id)
     {
         var role = await _roleManager.FindByIdAsync(id.ToString());
@@ -113,7 +113,7 @@ public class RoleController : BaseAdminController
 
     [HttpPost("{id:guid}/edit")]
     [ValidateAntiForgeryToken]
-    [FcmsAuthorize("roles.edit")]
+    [FcmsAuthorize(FcmsPermissions.RolesEdit)]
     [FcmsLog("roles.edit", "FcmsRole")]
     public async Task<IActionResult> Edit(Guid id, EditRoleViewModel model)
     {
@@ -191,7 +191,7 @@ public class RoleController : BaseAdminController
 
     [HttpPost("{id:guid}/delete")]
     [ValidateAntiForgeryToken]
-    [FcmsAuthorize("roles.delete")]
+    [FcmsAuthorize(FcmsPermissions.RolesDelete)]
     [FcmsLog("roles.delete", "FcmsRole")]
     public async Task<IActionResult> Delete(Guid id)
     {

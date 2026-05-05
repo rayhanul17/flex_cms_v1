@@ -5,7 +5,7 @@
 
 <div class="d-flex justify-content-between align-items-center mb-3">
     <h4 class="mb-0">Roles</h4>
-    <a asp-action="Create" class="btn btn-primary btn-sm" fcms-authorize="roles.create">
+    <a asp-action="Create" class="btn btn-primary btn-sm" fcms-authorize="@FcmsPermissions.RolesCreate">
         <i class="bi bi-plus-lg"></i> Add Role
     </a>
 </div>
@@ -52,12 +52,12 @@
                                 Permissions
                             </a>
                             <a asp-action="Edit" asp-route-id="@r.Id" class="btn btn-sm btn-outline-primary"
-                               fcms-authorize="roles.edit">Edit</a>
+                               fcms-authorize="@FcmsPermissions.RolesEdit">Edit</a>
                             @if (r.Name != "SuperAdmin")
                             {
                                 <button class="btn btn-sm btn-outline-danger delete-btn"
                                         data-id="@r.Id" data-name="@r.Name"
-                                        fcms-authorize="roles.delete">Delete</button>
+                                        fcms-authorize="@FcmsPermissions.RolesDelete">Delete</button>
                             }
                         </td>
                     </tr>

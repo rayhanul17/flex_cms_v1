@@ -20,7 +20,7 @@ public class PermissionController : BaseAdminController
     // ── List (read-only — assign/revoke happens on Role detail page) ──────────
 
     [HttpGet("")]
-    [FcmsAuthorize("roles.permissions")]
+    [FcmsAuthorize(FcmsPermissions.RolesPermissions)]
     public async Task<IActionResult> Index(CancellationToken ct)
     {
         var all = await _permissions.GetAllAsync(ct);
@@ -35,7 +35,7 @@ public class PermissionController : BaseAdminController
 
     [HttpPost("assign")]
     [ValidateAntiForgeryToken]
-    [FcmsAuthorize("roles.permissions")]
+    [FcmsAuthorize(FcmsPermissions.RolesPermissions)]
     public async Task<IActionResult> Assign([FromBody] PermissionAssignRequest req, CancellationToken ct)
     {
         if (req.RoleId == Guid.Empty || string.IsNullOrWhiteSpace(req.PermissionKey))
@@ -49,7 +49,7 @@ public class PermissionController : BaseAdminController
 
     [HttpPost("revoke")]
     [ValidateAntiForgeryToken]
-    [FcmsAuthorize("roles.permissions")]
+    [FcmsAuthorize(FcmsPermissions.RolesPermissions)]
     public async Task<IActionResult> Revoke([FromBody] PermissionAssignRequest req, CancellationToken ct)
     {
         if (req.RoleId == Guid.Empty || string.IsNullOrWhiteSpace(req.PermissionKey))

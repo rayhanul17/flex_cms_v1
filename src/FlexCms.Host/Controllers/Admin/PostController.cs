@@ -42,13 +42,13 @@ public class PostController : BaseAdminController
     // ── Create ────────────────────────────────────────────────────────────────
 
     [HttpGet("create")]
-    [FcmsAuthorize("posts.create")]
+    [FcmsAuthorize(FcmsPermissions.PostsCreate)]
     public async Task<IActionResult> Create(CancellationToken ct)
         => View(new CreateEditPostViewModel { AvailableCategories = await GetCategorySelectListAsync(ct) });
 
     [HttpPost("create")]
     [ValidateAntiForgeryToken]
-    [FcmsAuthorize("posts.create")]
+    [FcmsAuthorize(FcmsPermissions.PostsCreate)]
     public async Task<IActionResult> Create(CreateEditPostViewModel model, CancellationToken ct)
     {
         if (await _posts.SlugExistsAsync(model.Slug, ct: ct))
@@ -78,7 +78,7 @@ public class PostController : BaseAdminController
     // ── Edit ──────────────────────────────────────────────────────────────────
 
     [HttpGet("{id:guid}/edit")]
-    [FcmsAuthorize("posts.edit")]
+    [FcmsAuthorize(FcmsPermissions.PostsEdit)]
     public async Task<IActionResult> Edit(Guid id, CancellationToken ct)
     {
         var post = await _posts.GetByIdAsync(id, ct);
@@ -106,7 +106,7 @@ public class PostController : BaseAdminController
 
     [HttpPost("{id:guid}/edit")]
     [ValidateAntiForgeryToken]
-    [FcmsAuthorize("posts.edit")]
+    [FcmsAuthorize(FcmsPermissions.PostsEdit)]
     public async Task<IActionResult> Edit(Guid id, CreateEditPostViewModel model, CancellationToken ct)
     {
         if (await _posts.SlugExistsAsync(model.Slug, excludeId: id, ct: ct))
@@ -141,7 +141,7 @@ public class PostController : BaseAdminController
 
     [HttpPost("{id:guid}/delete")]
     [ValidateAntiForgeryToken]
-    [FcmsAuthorize("posts.delete")]
+    [FcmsAuthorize(FcmsPermissions.PostsDelete)]
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
     {
         await _posts.DeleteAsync(id, ct);

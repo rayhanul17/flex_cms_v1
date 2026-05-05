@@ -36,12 +36,12 @@ public class RedirectController : BaseAdminController
     }
 
     [HttpGet("create")]
-    [FcmsAuthorize("redirects.create")]
+    [FcmsAuthorize(FcmsPermissions.RedirectsCreate)]
     public IActionResult Create() => View(new CreateEditRedirectViewModel());
 
     [HttpPost("create")]
     [ValidateAntiForgeryToken]
-    [FcmsAuthorize("redirects.create")]
+    [FcmsAuthorize(FcmsPermissions.RedirectsCreate)]
     public async Task<IActionResult> Create(CreateEditRedirectViewModel model, CancellationToken ct)
     {
         if (!ModelState.IsValid) return View(model);
@@ -68,7 +68,7 @@ public class RedirectController : BaseAdminController
     }
 
     [HttpGet("{id:guid}/edit")]
-    [FcmsAuthorize("redirects.edit")]
+    [FcmsAuthorize(FcmsPermissions.RedirectsEdit)]
     public async Task<IActionResult> Edit(Guid id, CancellationToken ct)
     {
         var r = await _db.Redirects.FirstOrDefaultAsync(x => x.Id == id, ct);
@@ -86,7 +86,7 @@ public class RedirectController : BaseAdminController
 
     [HttpPost("{id:guid}/edit")]
     [ValidateAntiForgeryToken]
-    [FcmsAuthorize("redirects.edit")]
+    [FcmsAuthorize(FcmsPermissions.RedirectsEdit)]
     public async Task<IActionResult> Edit(Guid id, CreateEditRedirectViewModel model, CancellationToken ct)
     {
         if (!ModelState.IsValid) return View(model);
@@ -112,7 +112,7 @@ public class RedirectController : BaseAdminController
 
     [HttpPost("{id:guid}/delete")]
     [ValidateAntiForgeryToken]
-    [FcmsAuthorize("redirects.delete")]
+    [FcmsAuthorize(FcmsPermissions.RedirectsDelete)]
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
     {
         var r = await _db.Redirects.FirstOrDefaultAsync(x => x.Id == id, ct);

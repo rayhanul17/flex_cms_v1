@@ -46,13 +46,13 @@ public class UserController : BaseAdminController
     // ── Create ────────────────────────────────────────────────────────────────
 
     [HttpGet("create")]
-    [FcmsAuthorize("users.create")]
+    [FcmsAuthorize(FcmsPermissions.UsersCreate)]
     public async Task<IActionResult> Create()
         => View(new CreateUserViewModel { AvailableRoles = await GetRoleSelectItemsAsync() });
 
     [HttpPost("create")]
     [ValidateAntiForgeryToken]
-    [FcmsAuthorize("users.create")]
+    [FcmsAuthorize(FcmsPermissions.UsersCreate)]
     [FcmsLog("users.create", "FcmsUser")]
     public async Task<IActionResult> Create(CreateUserViewModel model, CancellationToken ct)
     {
@@ -90,7 +90,7 @@ public class UserController : BaseAdminController
     // ── Edit ──────────────────────────────────────────────────────────────────
 
     [HttpGet("{id:guid}/edit")]
-    [FcmsAuthorize("users.edit")]
+    [FcmsAuthorize(FcmsPermissions.UsersEdit)]
     public async Task<IActionResult> Edit(Guid id)
     {
         var user = await _userManager.FindByIdAsync(id.ToString());
@@ -116,7 +116,7 @@ public class UserController : BaseAdminController
 
     [HttpPost("{id:guid}/edit")]
     [ValidateAntiForgeryToken]
-    [FcmsAuthorize("users.edit")]
+    [FcmsAuthorize(FcmsPermissions.UsersEdit)]
     [FcmsLog("users.edit", "FcmsUser")]
     public async Task<IActionResult> Edit(Guid id, EditUserViewModel model, CancellationToken ct)
     {
@@ -149,7 +149,7 @@ public class UserController : BaseAdminController
 
     [HttpPost("{id:guid}/toggle-active")]
     [ValidateAntiForgeryToken]
-    [FcmsAuthorize("users.edit")]
+    [FcmsAuthorize(FcmsPermissions.UsersEdit)]
     public async Task<IActionResult> ToggleActive(Guid id)
     {
         var user = await _userManager.FindByIdAsync(id.ToString());
@@ -177,7 +177,7 @@ public class UserController : BaseAdminController
 
     [HttpPost("{id:guid}/delete")]
     [ValidateAntiForgeryToken]
-    [FcmsAuthorize("users.delete")]
+    [FcmsAuthorize(FcmsPermissions.UsersDelete)]
     [FcmsLog("users.delete", "FcmsUser")]
     public async Task<IActionResult> Delete(Guid id)
     {

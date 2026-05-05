@@ -35,13 +35,13 @@ public class CategoryController : BaseAdminController
     // ── Create ────────────────────────────────────────────────────────────────
 
     [HttpGet("create")]
-    [FcmsAuthorize("categories.create")]
+    [FcmsAuthorize(FcmsPermissions.CategoriesCreate)]
     public async Task<IActionResult> Create(CancellationToken ct)
         => View(new CreateEditCategoryViewModel { AvailableParents = await GetParentSelectListAsync(ct) });
 
     [HttpPost("create")]
     [ValidateAntiForgeryToken]
-    [FcmsAuthorize("categories.create")]
+    [FcmsAuthorize(FcmsPermissions.CategoriesCreate)]
     public async Task<IActionResult> Create(CreateEditCategoryViewModel model, CancellationToken ct)
     {
         if (await _categories.SlugExistsAsync(model.Slug, ct: ct))
@@ -65,7 +65,7 @@ public class CategoryController : BaseAdminController
     // ── Edit ──────────────────────────────────────────────────────────────────
 
     [HttpGet("{id:guid}/edit")]
-    [FcmsAuthorize("categories.edit")]
+    [FcmsAuthorize(FcmsPermissions.CategoriesEdit)]
     public async Task<IActionResult> Edit(Guid id, CancellationToken ct)
     {
         var cat = await _categories.GetByIdAsync(id, ct);
@@ -84,7 +84,7 @@ public class CategoryController : BaseAdminController
 
     [HttpPost("{id:guid}/edit")]
     [ValidateAntiForgeryToken]
-    [FcmsAuthorize("categories.edit")]
+    [FcmsAuthorize(FcmsPermissions.CategoriesEdit)]
     public async Task<IActionResult> Edit(Guid id, CreateEditCategoryViewModel model, CancellationToken ct)
     {
         if (await _categories.SlugExistsAsync(model.Slug, excludeId: id, ct: ct))
@@ -110,7 +110,7 @@ public class CategoryController : BaseAdminController
 
     [HttpPost("{id:guid}/delete")]
     [ValidateAntiForgeryToken]
-    [FcmsAuthorize("categories.delete")]
+    [FcmsAuthorize(FcmsPermissions.CategoriesDelete)]
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
     {
         await _categories.DeleteAsync(id, ct);

@@ -40,13 +40,13 @@ public class PageController : BaseAdminController
     // ── Create ────────────────────────────────────────────────────────────────
 
     [HttpGet("create")]
-    [FcmsAuthorize("pages.create")]
+    [FcmsAuthorize(FcmsPermissions.PagesCreate)]
     public async Task<IActionResult> Create(CancellationToken ct)
         => View(new CreateEditPageViewModel { AvailableParents = await GetParentSelectListAsync(ct) });
 
     [HttpPost("create")]
     [ValidateAntiForgeryToken]
-    [FcmsAuthorize("pages.create")]
+    [FcmsAuthorize(FcmsPermissions.PagesCreate)]
     public async Task<IActionResult> Create(CreateEditPageViewModel model, CancellationToken ct)
     {
         if (await _pages.SlugExistsAsync(model.Slug, ct: ct))
@@ -78,7 +78,7 @@ public class PageController : BaseAdminController
     // ── Edit ──────────────────────────────────────────────────────────────────
 
     [HttpGet("{id:guid}/edit")]
-    [FcmsAuthorize("pages.edit")]
+    [FcmsAuthorize(FcmsPermissions.PagesEdit)]
     public async Task<IActionResult> Edit(Guid id, CancellationToken ct)
     {
         var page = await _pages.GetByIdAsync(id, ct);
@@ -103,7 +103,7 @@ public class PageController : BaseAdminController
 
     [HttpPost("{id:guid}/edit")]
     [ValidateAntiForgeryToken]
-    [FcmsAuthorize("pages.edit")]
+    [FcmsAuthorize(FcmsPermissions.PagesEdit)]
     public async Task<IActionResult> Edit(Guid id, CreateEditPageViewModel model, CancellationToken ct)
     {
         if (await _pages.SlugExistsAsync(model.Slug, excludeId: id, ct: ct))
@@ -142,7 +142,7 @@ public class PageController : BaseAdminController
 
     [HttpPost("{id:guid}/delete")]
     [ValidateAntiForgeryToken]
-    [FcmsAuthorize("pages.delete")]
+    [FcmsAuthorize(FcmsPermissions.PagesDelete)]
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
     {
         await _pages.DeleteAsync(id, ct);

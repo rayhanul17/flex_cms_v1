@@ -11,7 +11,7 @@ namespace FlexCms.Framework.Auth;
 /// <para>
 /// Usage:<br/>
 /// [FcmsAuthorize]                      — login required only<br/>
-/// [FcmsAuthorize("users.create")]      — login + SuperAdmin OR has permission<br/>
+/// [FcmsAuthorize(FcmsPermissions.UsersCreate)]      — login + SuperAdmin OR has permission<br/>
 /// [FcmsAuthorize("a&amp;b")]           — login + SuperAdmin OR has BOTH a AND b<br/>
 /// [FcmsAuthorize("a|b")]               — login + SuperAdmin OR has a OR b
 /// </para>

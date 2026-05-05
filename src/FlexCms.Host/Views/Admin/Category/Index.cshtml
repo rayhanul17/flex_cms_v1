@@ -5,7 +5,7 @@
 
 <div class="d-flex justify-content-between align-items-center mb-3">
     <h4 class="mb-0">Categories</h4>
-    <a asp-action="Create" class="btn btn-primary btn-sm" fcms-authorize="categories.create">
+    <a asp-action="Create" class="btn btn-primary btn-sm" fcms-authorize="@FcmsPermissions.CategoriesCreate">
         <i class="bi bi-plus-lg"></i> New Category
     </a>
 </div>
@@ -31,8 +31,8 @@
                         <td>@(c.Description ?? "—")</td>
                         <td>@c.PostCount</td>
                         <td class="text-end">
-                            <a asp-action="Edit" asp-route-id="@c.Id" class="btn btn-sm btn-outline-secondary" fcms-authorize="categories.edit">Edit</a>
-                            <button class="btn btn-sm btn-outline-danger btn-delete" data-id="@c.Id" fcms-authorize="categories.delete">Delete</button>
+                            <a asp-action="Edit" asp-route-id="@c.Id" class="btn btn-sm btn-outline-secondary" fcms-authorize="@FcmsPermissions.CategoriesEdit">Edit</a>
+                            <button class="btn btn-sm btn-outline-danger btn-delete" data-id="@c.Id" fcms-authorize="@FcmsPermissions.CategoriesDelete">Delete</button>
                         </td>
                     </tr>
                 }

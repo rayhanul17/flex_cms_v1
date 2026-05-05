@@ -21,7 +21,7 @@ public class MenuController : BaseAdminController
     // ── List ──────────────────────────────────────────────────────────────────
 
     [HttpGet("")]
-    [FcmsAuthorize("settings.manage")]
+    [FcmsAuthorize(FcmsPermissions.SettingsManage)]
     public async Task<IActionResult> Index(CancellationToken ct)
     {
         var items = await _menuService.GetAllForAdminAsync("AdminSidebar", ct);
@@ -31,12 +31,12 @@ public class MenuController : BaseAdminController
     // ── Create / Edit (single combined view) ──────────────────────────────────
 
     [HttpGet("create")]
-    [FcmsAuthorize("settings.manage")]
+    [FcmsAuthorize(FcmsPermissions.SettingsManage)]
     public async Task<IActionResult> Create(CancellationToken ct)
         => View("Edit", await BuildVmAsync(new FcmsMenuItem { ModuleId = "core" }, ct));
 
     [HttpGet("{id:guid}/edit")]
-    [FcmsAuthorize("settings.manage")]
+    [FcmsAuthorize(FcmsPermissions.SettingsManage)]
     public async Task<IActionResult> Edit(Guid id, CancellationToken ct)
     {
         var item = await _menuService.GetByIdAsync(id, ct);
@@ -46,7 +46,7 @@ public class MenuController : BaseAdminController
 
     [HttpPost("save")]
     [ValidateAntiForgeryToken]
-    [FcmsAuthorize("settings.manage")]
+    [FcmsAuthorize(FcmsPermissions.SettingsManage)]
     [FcmsLog("menu.save", "FcmsMenuItem")]
     public async Task<IActionResult> Save(MenuItemEditViewModel vm, CancellationToken ct)
     {
@@ -66,7 +66,7 @@ public class MenuController : BaseAdminController
 
     [HttpPost("{id:guid}/delete")]
     [ValidateAntiForgeryToken]
-    [FcmsAuthorize("settings.manage")]
+    [FcmsAuthorize(FcmsPermissions.SettingsManage)]
     [FcmsLog("menu.delete", "FcmsMenuItem")]
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
     {
@@ -78,7 +78,7 @@ public class MenuController : BaseAdminController
 
     [HttpPost("{id:guid}/rename")]
     [ValidateAntiForgeryToken]
-    [FcmsAuthorize("settings.manage")]
+    [FcmsAuthorize(FcmsPermissions.SettingsManage)]
     [FcmsLog("menu.rename", "FcmsMenuItem")]
     public async Task<IActionResult> Rename(Guid id, [FromForm] string? customName, CancellationToken ct)
     {
@@ -90,7 +90,7 @@ public class MenuController : BaseAdminController
 
     [HttpPost("reorder")]
     [ValidateAntiForgeryToken]
-    [FcmsAuthorize("settings.manage")]
+    [FcmsAuthorize(FcmsPermissions.SettingsManage)]
     [FcmsLog("menu.reorder", "FcmsMenuItem")]
     public async Task<IActionResult> Reorder([FromBody] List<MenuOrderItem> items, CancellationToken ct)
     {

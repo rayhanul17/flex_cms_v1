@@ -20,7 +20,7 @@ public class MediaController : BaseAdminController
     }
 
     [HttpGet("")]
-    [FcmsAuthorize("media.view")]
+    [FcmsAuthorize(FcmsPermissions.MediaView)]
     public async Task<IActionResult> Index(Guid? folderId)
     {
         var allFolders = await _folders.GetAllAsync();
@@ -37,7 +37,7 @@ public class MediaController : BaseAdminController
 
     [HttpPost("upload")]
     [ValidateAntiForgeryToken]
-    [FcmsAuthorize("media.upload")]
+    [FcmsAuthorize(FcmsPermissions.MediaUpload)]
     public async Task<IActionResult> Upload(IFormFile file, Guid? folderId)
     {
         if (file is null || file.Length == 0)
@@ -65,7 +65,7 @@ public class MediaController : BaseAdminController
 
     [HttpPost("folder/create")]
     [ValidateAntiForgeryToken]
-    [FcmsAuthorize("media.folders")]
+    [FcmsAuthorize(FcmsPermissions.MediaFolders)]
     public async Task<IActionResult> CreateFolder(string name, Guid? parentId)
     {
         if (string.IsNullOrWhiteSpace(name))
@@ -88,7 +88,7 @@ public class MediaController : BaseAdminController
 
     [HttpPost("folder/{id:guid}/rename")]
     [ValidateAntiForgeryToken]
-    [FcmsAuthorize("media.folders")]
+    [FcmsAuthorize(FcmsPermissions.MediaFolders)]
     public async Task<IActionResult> RenameFolder(Guid id, string name)
     {
         if (string.IsNullOrWhiteSpace(name))
@@ -116,7 +116,7 @@ public class MediaController : BaseAdminController
 
     [HttpPost("folder/{id:guid}/delete")]
     [ValidateAntiForgeryToken]
-    [FcmsAuthorize("media.folders")]
+    [FcmsAuthorize(FcmsPermissions.MediaFolders)]
     public async Task<IActionResult> DeleteFolder(Guid id)
     {
         try
@@ -141,7 +141,7 @@ public class MediaController : BaseAdminController
 
     [HttpPost("{id:guid}/move")]
     [ValidateAntiForgeryToken]
-    [FcmsAuthorize("media.edit")]
+    [FcmsAuthorize(FcmsPermissions.MediaEdit)]
     public async Task<IActionResult> Move(Guid id, Guid? targetFolderId)
     {
         try
@@ -166,7 +166,7 @@ public class MediaController : BaseAdminController
 
     [HttpPost("{id:guid}/delete")]
     [ValidateAntiForgeryToken]
-    [FcmsAuthorize("media.delete")]
+    [FcmsAuthorize(FcmsPermissions.MediaDelete)]
     public async Task<IActionResult> Delete(Guid id)
     {
         try

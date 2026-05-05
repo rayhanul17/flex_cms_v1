@@ -16,7 +16,7 @@ public class SettingsController : BaseAdminController
     }
 
     [HttpGet("")]
-    [FcmsAuthorize("settings.view")]
+    [FcmsAuthorize(FcmsPermissions.SettingsView)]
     public async Task<IActionResult> Index(CancellationToken ct)
     {
         var audit = await _settings.GetAsync<AuditEnabledDto>(AuditLogSettings.Key, ct: ct);
@@ -28,7 +28,7 @@ public class SettingsController : BaseAdminController
 
     [HttpPost("audit/toggle")]
     [ValidateAntiForgeryToken]
-    [FcmsAuthorize("settings.manage")]
+    [FcmsAuthorize(FcmsPermissions.SettingsManage)]
     public async Task<IActionResult> ToggleAudit(CancellationToken ct)
     {
         var cfg = await _settings.GetAsync<AuditEnabledDto>(AuditLogSettings.Key, ct: ct);

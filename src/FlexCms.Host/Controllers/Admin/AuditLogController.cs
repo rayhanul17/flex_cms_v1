@@ -19,7 +19,7 @@ public class AuditLogController : BaseAdminController
     }
 
     [HttpGet("")]
-    [FcmsAuthorize("audit.view")]
+    [FcmsAuthorize(FcmsPermissions.AuditView)]
     public async Task<IActionResult> Index(CancellationToken ct)
     {
         var recent = await _auditLog.GetRecentAsync(200, ct);
@@ -30,7 +30,7 @@ public class AuditLogController : BaseAdminController
 
     [HttpPost("archive")]
     [ValidateAntiForgeryToken]
-    [FcmsAuthorize("audit.manage")]
+    [FcmsAuthorize(FcmsPermissions.AuditManage)]
     public async Task<IActionResult> Archive(CancellationToken ct)
     {
         await _auditLog.ArchiveOlderThanAsync(TimeSpan.FromHours(24), ct);
@@ -41,7 +41,7 @@ public class AuditLogController : BaseAdminController
 
     [HttpPost("clear-archive")]
     [ValidateAntiForgeryToken]
-    [FcmsAuthorize("audit.manage")]
+    [FcmsAuthorize(FcmsPermissions.AuditManage)]
     public async Task<IActionResult> ClearArchive(CancellationToken ct)
     {
         await _auditLog.ClearArchiveAsync(ct);

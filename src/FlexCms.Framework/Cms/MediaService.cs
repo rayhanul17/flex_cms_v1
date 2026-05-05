@@ -97,7 +97,7 @@ public class MediaService : IMediaService
         await _mediaRepo.AddAsync(media, ct);
         await _uow.SaveChangesAsync(ct);
         await _audit.LogAsync(FcmsAuditActions.MediaUploaded, nameof(FcmsMedia), media.Id.ToString(),
-            new { media.OriginalFileName, media.MimeType, media.FileSize }, ct: ct);
+            value: media, ct: ct);
         return media;
     }
 
@@ -116,7 +116,7 @@ public class MediaService : IMediaService
         }
 
         await _audit.LogAsync(FcmsAuditActions.MediaDeleted, nameof(FcmsMedia), id.ToString(),
-            new { media.OriginalFileName, media.Url }, ct: ct);
+            value: media, ct: ct);
         await _mediaRepo.SoftDeleteAsync(media, ct);
         await _uow.SaveChangesAsync(ct);
     }

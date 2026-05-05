@@ -23,7 +23,12 @@ public class FcmsLogService : IFcmsLogService
     private static readonly JsonSerializerOptions JsonOpts = new()
     {
         PropertyNameCaseInsensitive = true,
-        WriteIndented = false
+        WriteIndented = false,
+        // Strip nav properties + Identity sensitive fields automatically — callers
+        // can pass full entities directly without anonymous projection boilerplate.
+        TypeInfoResolver = new FcmsLogJsonResolver(),
+        // Defensive: in case any nav property slips through, prevent infinite loops.
+        ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles
     };
 
     public FcmsLogService(

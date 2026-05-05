@@ -27,7 +27,7 @@ public class MediaFolderService : IMediaFolderService
         await _folderRepo.AddAsync(folder, ct);
         await _uow.SaveChangesAsync(ct);
         await _audit.LogAsync(FcmsAuditActions.FolderCreated, nameof(FcmsMediaFolder), folder.Id.ToString(),
-            new { folder.Name, ParentId = parentId }, ct: ct);
+            value: folder, ct: ct);
         return folder;
     }
 
@@ -59,7 +59,7 @@ public class MediaFolderService : IMediaFolderService
         }
 
         await _audit.LogAsync(FcmsAuditActions.FolderDeleted, nameof(FcmsMediaFolder), id.ToString(),
-            new { folder.Name }, ct: ct);
+            value: folder, ct: ct);
         await _folderRepo.SoftDeleteAsync(folder, ct);
         await _uow.SaveChangesAsync(ct);
     }

@@ -83,7 +83,7 @@ public class UserController : BaseAdminController
         }
 
         FcmsLogContext.SetEntityId(HttpContext, user.Id);
-        FcmsLogContext.SetValue(HttpContext, new { user.Email, user.UserName, model.ForcePasswordChange, RoleIds = model.SelectedRoleIds });
+        FcmsLogContext.SetValue(HttpContext, user);
         ShowSuccess($"User '{model.Email}' created.");
         return RedirectToAction(nameof(Index));
     }
@@ -142,7 +142,7 @@ public class UserController : BaseAdminController
                 await _userManager.AddToRoleAsync(user, role.Name);
         }
 
-        FcmsLogContext.SetValue(HttpContext, new { user.Email, user.UserName, user.ForcePasswordChange, RoleIds = model.SelectedRoleIds });
+        FcmsLogContext.SetValue(HttpContext, user);
         ShowSuccess($"User '{model.Email}' updated.");
         return RedirectToAction(nameof(Index));
     }
@@ -189,7 +189,7 @@ public class UserController : BaseAdminController
         if (user.Id == FcmsContext.UserId)
             return FcmsFail("You cannot delete your own account.");
 
-        FcmsLogContext.SetValue(HttpContext, new { user.Email, user.UserName });
+        FcmsLogContext.SetValue(HttpContext, user);
         await _userManager.DeleteAsync(user);
         ShowSuccess("User deleted.");
         return FcmsOk("User deleted.");

@@ -89,7 +89,7 @@ public class RoleController : BaseAdminController
         }
 
         FcmsLogContext.SetEntityId(HttpContext, role.Id);
-        FcmsLogContext.SetValue(HttpContext, new { role.Name, role.Priority, role.LoginRedirectUrl });
+        FcmsLogContext.SetValue(HttpContext, role);
         ShowSuccess($"Role '{model.Name}' created.");
         return RedirectToAction(nameof(Index));
     }
@@ -146,7 +146,7 @@ public class RoleController : BaseAdminController
             return View(model);
         }
 
-        FcmsLogContext.SetValue(HttpContext, new { role.Name, role.Priority, role.LoginRedirectUrl });
+        FcmsLogContext.SetValue(HttpContext, role);
         ShowSuccess($"Role '{role.Name}' updated.");
         return RedirectToAction(nameof(Detail), new { id });
     }
@@ -203,7 +203,7 @@ public class RoleController : BaseAdminController
         if (role.Name == FcmsRoles.SuperAdmin)
             return FcmsFail("The SuperAdmin role cannot be deleted.");
 
-        FcmsLogContext.SetValue(HttpContext, new { role.Name, role.Priority });
+        FcmsLogContext.SetValue(HttpContext, role);
         var result = await _roleManager.DeleteAsync(role);
         if (!result.Succeeded)
             return FcmsFail(string.Join(", ", result.Errors.Select(e => e.Description)));

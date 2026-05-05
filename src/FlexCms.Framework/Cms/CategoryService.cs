@@ -41,7 +41,7 @@ public class CategoryService : ICategoryService
         await _repo.AddAsync(category, ct);
         await _uow.SaveChangesAsync(ct);
         await _audit.LogAsync(FcmsAuditActions.CategoryCreated, nameof(FcmsCategory), category.Id.ToString(),
-            new { category.Name, category.Slug }, ct: ct);
+            value: category, ct: ct);
         return category;
     }
 
@@ -50,7 +50,7 @@ public class CategoryService : ICategoryService
         await _repo.UpdateAsync(category, ct);
         await _uow.SaveChangesAsync(ct);
         await _audit.LogAsync(FcmsAuditActions.CategoryUpdated, nameof(FcmsCategory), category.Id.ToString(),
-            new { category.Name, category.Slug }, ct: ct);
+            value: category, ct: ct);
     }
 
     public async Task DeleteAsync(Guid id, CancellationToken ct = default)
@@ -60,6 +60,6 @@ public class CategoryService : ICategoryService
         await _repo.SoftDeleteAsync(category, ct);
         await _uow.SaveChangesAsync(ct);
         await _audit.LogAsync(FcmsAuditActions.CategoryDeleted, nameof(FcmsCategory), id.ToString(),
-            new { category.Name, category.Slug }, ct: ct);
+            value: category, ct: ct);
     }
 }

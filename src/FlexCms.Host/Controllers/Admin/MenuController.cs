@@ -59,7 +59,7 @@ public class MenuController : BaseAdminController
 
         await _menuService.SaveAsync(item, ct);
         FcmsLogContext.SetEntityId(HttpContext, item.Id);
-        FcmsLogContext.SetValue(HttpContext, new { item.DefaultName, item.CustomName, item.Url, item.Icon, item.ParentId, item.Order, item.RequiredPermission });
+        FcmsLogContext.SetValue(HttpContext, item);
         ShowSuccess(vm.Id == Guid.Empty ? "Menu item created." : "Menu item updated.");
         return RedirectToAction(nameof(Index));
     }
@@ -74,7 +74,7 @@ public class MenuController : BaseAdminController
     {
         var item = await _menuService.GetByIdAsync(id, ct);
         if (item is not null)
-            FcmsLogContext.SetValue(HttpContext, new { item.DefaultName, item.Url });
+            FcmsLogContext.SetValue(HttpContext, item);
         await _menuService.DeleteAsync(id, ct);
         return FcmsOk("Deleted.");
     }

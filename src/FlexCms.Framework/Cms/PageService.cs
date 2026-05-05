@@ -42,7 +42,7 @@ public class PageService : IPageService
         await _repo.AddAsync(page, ct);
         await _uow.SaveChangesAsync(ct);
         await _audit.LogAsync(FcmsAuditActions.PageCreated, nameof(FcmsPage), page.Id.ToString(),
-            new { page.Title, page.Slug, page.IsPublished }, ct: ct);
+            value: page, ct: ct);
         return page;
     }
 
@@ -52,7 +52,7 @@ public class PageService : IPageService
         await _repo.UpdateAsync(page, ct);
         await _uow.SaveChangesAsync(ct);
         await _audit.LogAsync(FcmsAuditActions.PageUpdated, nameof(FcmsPage), page.Id.ToString(),
-            new { page.Title, page.Slug, page.IsPublished }, ct: ct);
+            value: page, ct: ct);
     }
 
     public async Task RestoreAsync(Guid id, CancellationToken ct = default)
@@ -73,7 +73,7 @@ public class PageService : IPageService
         if (page is null) return;
         // Log before delete — entity must exist in DB when log is written
         await _audit.LogAsync(FcmsAuditActions.PageHardDeleted, nameof(FcmsPage), id.ToString(),
-            new { page.Title, page.Slug }, severity: FcmsLogSeverity.Warning, ct: ct);
+            value: page, severity: FcmsLogSeverity.Warning, ct: ct);
         await _repo.DeleteAsync(page, ct);
         await _uow.SaveChangesAsync(ct);
     }
@@ -86,6 +86,6 @@ public class PageService : IPageService
         await _repo.SoftDeleteAsync(page, ct);
         await _uow.SaveChangesAsync(ct);
         await _audit.LogAsync(FcmsAuditActions.PageDeleted, nameof(FcmsPage), id.ToString(),
-            new { page.Title, page.Slug }, ct: ct);
+            value: page, ct: ct);
     }
 }

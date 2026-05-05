@@ -1,0 +1,115 @@
+@using FlexCms.Framework.Cms
+@inject IMenuService MenuService
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
+@{
+    var menuItems = await MenuService.GetMenuAsync("AdminSidebar");
+    var currentPath = Context.Request.Path.Value ?? "";
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="csrf-token" content="@Antiforgery.GetAndStoreTokens(Context).RequestToken" />
+    <title>@ViewData["Title"] — FlexCMS Admin</title>
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/lib/bootstrap-icons/font/bootstrap-icons.min.css" />
+    <link rel="stylesheet" href="~/css/admin.css" asp-append-version="true" />
+    <style>
+        body { display: flex; min-height: 100vh; }
+        #sidebar {
+            width: 240px; min-width: 240px; background: #1e2a3a; color: #cdd6e0;
+            display: flex; flex-direction: column; position: fixed; top: 0; bottom: 0; left: 0;
+            overflow-y: auto; z-index: 1000;
+        }
+        #sidebar .sidebar-brand {
+            padding: 1rem 1.25rem; font-size: 1.15rem; font-weight: 700;
+            color: #fff; border-bottom: 1px solid #2d3f53; text-decoration: none;
+        }
+        #sidebar .nav-link {
+            color: #adbccf; padding: .5rem 1.25rem; border-radius: 0;
+            display: flex; align-items: center; gap: .6rem; font-size: .9rem;
+        }
+        #sidebar .nav-link:hover { color: #fff; background: #2d3f53; }
+        #sidebar .nav-link.active { color: #fff; background: #0d6efd; }
+        #sidebar .nav-link i { width: 1.1rem; text-align: center; }
+        #main-content { margin-left: 240px; flex: 1; display: flex; flex-direction: column; min-height: 100vh; }
+        #topbar {
+            background: #fff; border-bottom: 1px solid #dee2e6;
+            padding: .5rem 1.5rem; display: flex; align-items: center; justify-content: space-between;
+        }
+        #page-body { padding: 1.5rem; flex: 1; }
+        .toast-container { z-index: 1100; }
+    </style>
+</head>
+<body>
+
+<!-- ── Sidebar ─────────────────────────────────────────────── -->
+<nav id="sidebar">
+    <a class="sidebar-brand" asp-controller="Dashboard" asp-action="Index">
+        <i class="bi bi-grid-3x3-gap me-2"></i>FlexCMS
+    </a>
+    <ul class="nav flex-column py-2">
+        @foreach (var item in menuItems)
+        {
+            var isActive = currentPath.Equals(item.Url, StringComparison.OrdinalIgnoreCase)
+                        || (item.Url != "/admin" && currentPath.StartsWith(item.Url, StringComparison.OrdinalIgnoreCase));
+            <li class="nav-item">
+                <a class="nav-link @(isActive ? "active" : "")" href="@item.Url">
+                    <i class="@item.Icon"></i>
+                    @item.DisplayName
+                </a>
+            </li>
+        }
+    </ul>
+</nav>
+
+<!-- ── Main content ───────────────────────────────────────── -->
+<div id="main-content">
+    <!-- Topbar -->
+    <div id="topbar">
+        <span class="text-muted small">@ViewData["Title"]</span>
+        <div class="d-flex align-items-center gap-3">
+            <a href="/" target="_blank" class="text-muted small">
+                <i class="bi bi-box-arrow-up-right"></i> View site
+            </a>
+            <form asp-controller="Auth" asp-action="Logout" method="post" class="d-inline">
+                <button type="submit" class="btn btn-sm btn-outline-secondary">
+                    <i class="bi bi-box-arrow-right"></i> Logout
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Toast notifications -->
+    @if (TempData["Toast.Message"] is string toastMsg)
+    {
+        var toastType = TempData["Toast.Type"]?.ToString() ?? "success";
+        <div class="toast-container position-fixed top-0 end-0 p-3">
+            <div class="toast align-items-center text-bg-@toastType border-0 show" role="alert">
+                <div class="d-flex">
+                    <div class="toast-body">@toastMsg</div>
+                    <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- Page body -->
+    <div id="page-body">
+        @RenderBody()
+    </div>
+</div>
+
+<script src="~/lib/jquery/dist/jquery.min.js"></script>
+<script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+<script src="~/js/site.js" asp-append-version="true"></script>
+<script>
+    // Auto-dismiss toasts
+    document.querySelectorAll('.toast').forEach(el => {
+        setTimeout(() => bootstrap.Toast.getOrCreateInstance(el).hide(), 4000);
+    });
+</script>
+@await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

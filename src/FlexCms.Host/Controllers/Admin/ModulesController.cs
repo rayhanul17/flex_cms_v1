@@ -1,4 +1,5 @@
 using FlexCms.Framework.Auth;
+using FlexCms.Framework.Cms;
 using FlexCms.Framework.Db;
 using FlexCms.Framework.Modules;
 using FlexCms.Host.Models.Admin;
@@ -83,7 +84,7 @@ public class ModulesController : BaseAdminController
 
     [HttpPost("deactivate/{id}")]
     [ValidateAntiForgeryToken]
-    public IActionResult Deactivate(string id)
+    public async Task<IActionResult> Deactivate(string id, CancellationToken ct)
     {
         var module = _registry.FindById(id);
         if (module is null) return FcmsFail("Module not found.");
@@ -92,6 +93,13 @@ public class ModulesController : BaseAdminController
             return FcmsFail("Could not deactivate module — folder missing.");
 
         _state.DeleteWwwroot(_env.WebRootPath, module.ModuleId);
+
+        // Hide module menu items so they don't 404 on click after restart.
+        // Restored on next activation by MenuService.SeedAsync (resets IsDeleted=false).
+        var menuService = HttpContext.RequestServices.GetService<IMenuService>();
+        if (menuService is not null)
+            await menuService.RemoveModuleItemsAsync(id, ct);
+
         return FcmsOk("Module deactivated. Restart the app to apply.");
     }
 
@@ -126,6 +134,11 @@ public class ModulesController : BaseAdminController
                 logger.LogError(ex, "Module {Id}: DropTablesAsync failed.", id);
             }
         }
+
+        // Remove module menu items
+        var menuService = HttpContext.RequestServices.GetService<IMenuService>();
+        if (menuService is not null)
+            await menuService.RemoveModuleItemsAsync(id, ct);
 
         // Soft-delete the DB record now (folder will be removed on next startup
         // by ModuleManager.ProcessPendingUninstalls)

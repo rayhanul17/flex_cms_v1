@@ -76,6 +76,9 @@ public static class FcmsServiceExtensions
         services.AddMemoryCache();
         services.AddScoped<IPermissionService, PermissionService>();
 
+        // Menu service — loads items from DB, filters by permission, caches 15 min
+        services.AddScoped<IMenuService, MenuService>();
+
         // Context service — current user + IP + browser/OS via UAParser
         services.AddScoped<IFcmsContextService, FcmsContextService>();
 

@@ -1,3 +1,4 @@
+using FlexCms.Framework.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -28,4 +29,7 @@ public abstract class BaseModule : IFcmsModule
 
     /// <inheritdoc/>
     public virtual Task DropTablesAsync(string connectionString, string provider, CancellationToken ct = default) => Task.CompletedTask;
+
+    /// <inheritdoc/>
+    public virtual List<FcmsMenuItemDef> GetMenuItems() => [];
 }

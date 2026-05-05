@@ -1,10 +1,13 @@
 using FlexCms.Framework.Auth;
 using FlexCms.Framework.Clock;
+using FlexCms.Framework.Cms;
 using FlexCms.Framework.Db;
+using FlexCms.Framework.Models;
 using FlexCms.Framework.Modules;
 using FlexCms.Framework.Services;
 using FlexCms.Framework.Setup;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -48,6 +51,15 @@ public class SeedService : IHostedService
         catch (Exception ex)
         {
             _logger.LogError(ex, "SeedService: failed to seed permissions.");
+        }
+
+        try
+        {
+            await SeedMenuItemsAsync(ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "SeedService: failed to seed menu items.");
         }
 
         var config = _setupHelper.Read();
@@ -236,5 +248,64 @@ public class SeedService : IHostedService
         if (permService is null) return;
 
         await permService.SeedPermissionsAsync(CorePermissions, ct);
+    }
+
+    private static readonly List<FcmsMenuItemDef> CoreMenuItems =
+    [
+        new() { DefaultName = "Dashboard",   Icon = "bi bi-speedometer2",    Url = "/admin",               Order = 0  },
+        new() { DefaultName = "Pages",       Icon = "bi bi-file-earmark",    Url = "/admin/pages",         Order = 10, RequiredPermission = "pages.edit" },
+        new() { DefaultName = "Posts",       Icon = "bi bi-newspaper",       Url = "/admin/posts",         Order = 20, RequiredPermission = "posts.edit" },
+        new() { DefaultName = "Categories",  Icon = "bi bi-folder",          Url = "/admin/categories",    Order = 21, RequiredPermission = "categories.edit" },
+        new() { DefaultName = "Media",       Icon = "bi bi-images",          Url = "/admin/media",         Order = 30, RequiredPermission = "media.view" },
+        new() { DefaultName = "Trash",       Icon = "bi bi-trash",           Url = "/admin/trash",         Order = 35 },
+        new() { DefaultName = "Users",       Icon = "bi bi-people",          Url = "/admin/users",         Order = 40, RequiredPermission = "users.manage" },
+        new() { DefaultName = "Roles",       Icon = "bi bi-shield-lock",     Url = "/admin/roles",         Order = 41, RequiredPermission = "roles.manage" },
+        new() { DefaultName = "Permissions", Icon = "bi bi-key",             Url = "/admin/permissions",   Order = 42, RequiredPermission = "roles.permissions" },
+        new() { DefaultName = "Modules",     Icon = "bi bi-puzzle",          Url = "/admin/modules",       Order = 50 },
+        new() { DefaultName = "Menu",        Icon = "bi bi-list-ul",         Url = "/admin/menu",          Order = 55, RequiredPermission = "settings.manage" },
+        new() { DefaultName = "Redirects",   Icon = "bi bi-sign-turn-right", Url = "/admin/redirects",     Order = 60, RequiredPermission = "redirects.edit" },
+        new() { DefaultName = "Audit Log",   Icon = "bi bi-journal-text",    Url = "/admin/audit-log",     Order = 70, RequiredPermission = "audit.view" },
+        new() { DefaultName = "Settings",    Icon = "bi bi-gear",            Url = "/admin/settings",      Order = 80, RequiredPermission = "settings.manage" },
+    ];
+
+    private async Task SeedMenuItemsAsync(CancellationToken ct)
+    {
+        await using var scope = _scopeFactory.CreateAsyncScope();
+        var menuService = scope.ServiceProvider.GetService<IMenuService>();
+        if (menuService is null) return;
+
+        try
+        {
+            await menuService.SeedAsync("core", CoreMenuItems, ct);
+        }
+        catch (Exception ex) when (
+            ex.Message.Contains("doesn't exist", StringComparison.OrdinalIgnoreCase) ||
+            ex.Message.Contains("does not exist", StringComparison.OrdinalIgnoreCase) ||
+            ex.Message.Contains("Invalid object name", StringComparison.OrdinalIgnoreCase))
+        {
+            // fcms_menu_items table missing on an existing pre-menu install.
+            // Try to create it via the relational creator (EF Core idempotent).
+            try
+            {
+                var ctx = scope.ServiceProvider.GetService<Db.Ef.FcmsDbContext>();
+                if (ctx is not null)
+                {
+                    var creator = ctx.GetService<Microsoft.EntityFrameworkCore.Storage.IRelationalDatabaseCreator>();
+                    await creator.CreateTablesAsync(ct);
+                    await menuService.SeedAsync("core", CoreMenuItems, ct);
+                    _logger.LogInformation("SeedService: created fcms_menu_items table and seeded core items.");
+                    return;
+                }
+            }
+            catch (Exception innerEx)
+            {
+                _logger.LogError(innerEx,
+                    "SeedService: fcms_menu_items table missing and auto-create failed. " +
+                    "Drop+recreate the DB or add the table manually.");
+                return;
+            }
+
+            _logger.LogError(ex, "SeedService: menu seed failed (table missing, no DbContext available).");
+        }
     }
 }

@@ -1,5 +1,5 @@
-using FlexCms.Framework.Cms;
 using FlexCms.Framework.Auth;
+using FlexCms.Framework.Cms;
 using FlexCms.Framework.Clock;
 using FlexCms.Framework.Db;
 using FlexCms.Framework.Helpers;
@@ -43,6 +43,7 @@ public class FcmsDbContext : IdentityDbContext<FcmsUser, FcmsRole, Guid>
     public DbSet<FcmsPermission> Permissions => Set<FcmsPermission>();
     public DbSet<FcmsRolePermission> RolePermissions => Set<FcmsRolePermission>();
     public DbSet<FcmsModuleRecord> ModuleRecords => Set<FcmsModuleRecord>();
+    public DbSet<FcmsMenuItem> MenuItems => Set<FcmsMenuItem>();
 
     // CMS
     public DbSet<FcmsPage> Pages => Set<FcmsPage>();

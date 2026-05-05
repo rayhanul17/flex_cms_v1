@@ -1,3 +1,4 @@
+using FlexCms.Framework.Cms;
 using FlexCms.Framework.Clock;
 using FlexCms.Framework.Db.Ef;
 using Microsoft.AspNetCore.Hosting;
@@ -108,6 +109,23 @@ public class ModuleActivationService : IHostedService
                 {
                     _logger.LogError(ex, "Module {Id}: seed failed.", module.ModuleId);
                 }
+            }
+
+            // Menu items seeded on EVERY activation (idempotent — inserts new,
+            // refreshes existing metadata, restores soft-deleted from deactivation).
+            try
+            {
+                var menuItems = module.GetMenuItems();
+                if (menuItems.Count > 0)
+                {
+                    var menuService = scope.ServiceProvider.GetService<IMenuService>();
+                    if (menuService is not null)
+                        await menuService.SeedAsync(module.ModuleId, menuItems, ct);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Module {Id}: menu seed failed.", module.ModuleId);
             }
 
             // ── 3. OnUpgrade — version changed since last run ─────────────────

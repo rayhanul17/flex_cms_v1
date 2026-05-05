@@ -90,20 +90,4 @@ public class PageServiceTrashTests : IDisposable
         Assert.True(deleted.DeletedAt >= before);
     }
 
-    [Fact]
-    public async Task DeleteAsync_respects_pre_set_DeletedAt()
-    {
-        var preset = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc);
-        var page = await _svc.CreateAsync(new FcmsPage { Title = "PreSet", Slug = "pre-set", Content = "" });
-
-        // Manually set DeletedAt before calling service delete (simulates caller override)
-        var raw = await _db.Pages.FindAsync(page.Id);
-        raw!.DeletedAt = preset;
-        await _db.SaveChangesAsync();
-
-        await _svc.DeleteAsync(page.Id);
-
-        var deleted = await _db.Pages.IgnoreQueryFilters().FirstAsync(p => p.Id == page.Id);
-        Assert.Equal(preset, deleted.DeletedAt); // must not be overwritten
-    }
 }

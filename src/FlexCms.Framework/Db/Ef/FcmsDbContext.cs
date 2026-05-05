@@ -206,7 +206,7 @@ public class FcmsDbContext : IdentityDbContext<FcmsUser, FcmsRole, Guid>
     private static void ApplySoftDeleteFilter<T>(ModelBuilder builder) where T : BaseEfEntity
     {
         builder.Entity<T>().HasQueryFilter(e => !e.IsDeleted);
-        builder.Entity<T>().ToTable(FcmsHelper.GetEntityName<T>(FrameworkPrefix));
+        builder.Entity<T>().ToTable(FcmsHelper.GetTableName<T>(FrameworkPrefix));
     }
 
     public override async Task<int> SaveChangesAsync(CancellationToken ct = default)

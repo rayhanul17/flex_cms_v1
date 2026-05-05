@@ -9,7 +9,7 @@ public class MongoRoleStore : IRoleStore<FcmsRole>, IQueryableRoleStore<FcmsRole
 
     public MongoRoleStore(IMongoDatabase database)
     {
-        _roles = database.GetCollection<FcmsRole>(Helpers.FcmsHelper.GetEntityName<FcmsRole>("fcms"));
+        _roles = database.GetCollection<FcmsRole>(Helpers.FcmsHelper.GetTableName<FcmsRole>("fcms"));
     }
 
     public IQueryable<FcmsRole> Roles => _roles.AsQueryable();

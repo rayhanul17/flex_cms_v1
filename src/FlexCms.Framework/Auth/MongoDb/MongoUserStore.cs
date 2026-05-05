@@ -22,8 +22,8 @@ public class MongoUserStore :
 
     public MongoUserStore(IMongoDatabase database)
     {
-        _users = database.GetCollection<FcmsUser>(Helpers.FcmsHelper.GetEntityName<FcmsUser>("fcms"));
-        _roles = database.GetCollection<FcmsRole>(Helpers.FcmsHelper.GetEntityName<FcmsRole>("fcms"));
+        _users = database.GetCollection<FcmsUser>(Helpers.FcmsHelper.GetTableName<FcmsUser>("fcms"));
+        _roles = database.GetCollection<FcmsRole>(Helpers.FcmsHelper.GetTableName<FcmsRole>("fcms"));
     }
 
     public IQueryable<FcmsUser> Users => _users.AsQueryable();

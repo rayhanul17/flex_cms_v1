@@ -132,5 +132,5 @@ public class MongoIndexService : IHostedService
             cancellationToken: ct);
 
     private IMongoCollection<T> GetCollection<T>()
-        => _db.GetCollection<T>(FcmsHelper.GetEntityName<T>("fcms"));
+        => _db.GetCollection<T>(FcmsHelper.GetTableName<T>("fcms"));
 }

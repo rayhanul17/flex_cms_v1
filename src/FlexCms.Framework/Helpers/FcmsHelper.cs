@@ -21,11 +21,11 @@ public static class FcmsHelper
     /// module). The prefix is only prepended when it is not already part of
     /// the snake-cased name.
     /// </summary>
-    public static string GetEntityName<T>(string modulePrefix = "")
-        => GetEntityName(typeof(T), modulePrefix);
+    public static string GetTableName<T>(string modulePrefix = "")
+        => GetTableName(typeof(T), modulePrefix);
 
-    /// <inheritdoc cref="GetEntityName{T}(string)" />
-    public static string GetEntityName(Type type, string modulePrefix = "")
+    /// <inheritdoc cref="GetTableName{T}(string)" />
+    public static string GetTableName(Type type, string modulePrefix = "")
     {
         var attr = type.GetCustomAttribute<FcmsTableAttribute>();
         if (attr is not null) return attr.Name;
@@ -202,7 +202,7 @@ public static class FcmsHelper
 }
 
 /// <summary>
-/// Override the auto-generated entity name produced by <see cref="FcmsHelper.GetEntityName{T}(string)"/>.
+/// Override the auto-generated entity name produced by <see cref="FcmsHelper.GetTableName{T}(string)"/>.
 /// Use sparingly — the default convention should cover almost everything.
 /// </summary>
 [AttributeUsage(AttributeTargets.Class, Inherited = false)]

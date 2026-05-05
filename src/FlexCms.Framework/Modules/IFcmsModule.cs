@@ -24,7 +24,7 @@ public interface IFcmsModule
 
     /// <summary>
     /// Table-name prefix for this module's entities (e.g. "blog" → "blog_posts").
-    /// Combined with <see cref="Helpers.FcmsHelper.GetEntityName{T}(string)"/>.
+    /// Combined with <see cref="Helpers.FcmsHelper.GetTableName{T}(string)"/>.
     /// </summary>
     string TablePrefix { get; }
 

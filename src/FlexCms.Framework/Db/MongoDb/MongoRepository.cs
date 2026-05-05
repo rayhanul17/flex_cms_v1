@@ -21,7 +21,7 @@ public class MongoRepository<T> : IRepository<T>, IMongoSessionAware where T : c
 
     public MongoRepository(IMongoDatabase database, IHttpContextAccessor? httpContextAccessor = null)
     {
-        var collectionName = Helpers.FcmsHelper.GetEntityName<T>("fcms");
+        var collectionName = Helpers.FcmsHelper.GetTableName<T>("fcms");
         _collection = database.GetCollection<T>(collectionName);
         _httpContextAccessor = httpContextAccessor;
     }

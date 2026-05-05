@@ -12,7 +12,7 @@ public class CmsEntityNamingTests
     [InlineData(typeof(FcmsTag), "fcms_tags")]
     public void Cms_entities_get_correct_table_names(Type entityType, string expected)
     {
-        var actual = FcmsHelper.GetEntityName(entityType, "fcms");
+        var actual = FcmsHelper.GetTableName(entityType, "fcms");
         Assert.Equal(expected, actual);
     }
 }

@@ -10,7 +10,22 @@
     {
         <span class="badge text-bg-danger">System — bypasses all permission checks</span>
     }
+    <a asp-action="Edit" asp-route-id="@Model.Id" class="btn btn-sm btn-outline-primary ms-auto"
+       fcms-authorize="roles.edit">
+        <i class="bi bi-pencil"></i> Edit
+    </a>
 </div>
+
+@if (!string.IsNullOrEmpty(Model.LoginRedirectUrl) || Model.Priority > 0)
+{
+    <div class="alert alert-light border small mb-3 py-2 px-3">
+        @if (!string.IsNullOrEmpty(Model.LoginRedirectUrl))
+        {
+            <span class="me-3"><strong>Redirect after login:</strong> <code>@Model.LoginRedirectUrl</code></span>
+        }
+        <span><strong>Priority:</strong> @Model.Priority</span>
+    </div>
+}
 
 <ul class="nav nav-tabs mb-3" id="roleTabs">
     <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#tab-perms">Permissions (@Model.AssignedPermissionKeys.Count)</a></li>

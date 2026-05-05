@@ -32,8 +32,7 @@ public class RoleController : BaseAdminController
     [HttpGet("")]
     public async Task<IActionResult> Index(CancellationToken ct)
     {
-        var roles = _roleManager.Roles.OrderBy(r => r.Name).ToList();
-        var allPerms = await _permissions.GetAllAsync(ct);
+        var roles = _roleManager.Roles.OrderByDescending(r => r.Priority).ThenBy(r => r.Name).ToList();
         var list = new List<RoleListItemViewModel>();
 
         foreach (var role in roles)
@@ -45,7 +44,9 @@ public class RoleController : BaseAdminController
                 Id = role.Id,
                 Name = role.Name ?? "",
                 UserCount = users.Count,
-                PermissionCount = assigned.Count
+                PermissionCount = assigned.Count,
+                Priority = role.Priority,
+                LoginRedirectUrl = role.LoginRedirectUrl
             });
         }
 
@@ -71,7 +72,14 @@ public class RoleController : BaseAdminController
             return View(model);
         }
 
-        var result = await _roleManager.CreateAsync(new FcmsRole { Name = model.Name });
+        var role = new FcmsRole
+        {
+            Name = model.Name,
+            LoginRedirectUrl = model.LoginRedirectUrl.Trim(),
+            Priority = model.Priority
+        };
+
+        var result = await _roleManager.CreateAsync(role);
         if (!result.Succeeded)
         {
             foreach (var err in result.Errors)
@@ -83,7 +91,62 @@ public class RoleController : BaseAdminController
         return RedirectToAction(nameof(Index));
     }
 
-    // ── Detail (Info + Users + Permissions tabs) ──────────────────────────────
+    // ── Edit ──────────────────────────────────────────────────────────────────
+
+    [HttpGet("{id:guid}/edit")]
+    [FcmsAuthorize("roles.edit")]
+    public async Task<IActionResult> Edit(Guid id)
+    {
+        var role = await _roleManager.FindByIdAsync(id.ToString());
+        if (role is null) return NotFound();
+
+        return View(new EditRoleViewModel
+        {
+            Id = role.Id,
+            Name = role.Name ?? "",
+            LoginRedirectUrl = role.LoginRedirectUrl,
+            Priority = role.Priority
+        });
+    }
+
+    [HttpPost("{id:guid}/edit")]
+    [ValidateAntiForgeryToken]
+    [FcmsAuthorize("roles.edit")]
+    public async Task<IActionResult> Edit(Guid id, EditRoleViewModel model)
+    {
+        if (!ModelState.IsValid) return View(model);
+
+        var role = await _roleManager.FindByIdAsync(id.ToString());
+        if (role is null) return NotFound();
+
+        // SuperAdmin name is immutable
+        if (role.Name != FcmsRoles.SuperAdmin)
+        {
+            var conflict = await _roleManager.FindByNameAsync(model.Name);
+            if (conflict is not null && conflict.Id != id)
+            {
+                ModelState.AddModelError(nameof(model.Name), "A role with this name already exists.");
+                return View(model);
+            }
+            role.Name = model.Name;
+        }
+
+        role.LoginRedirectUrl = model.LoginRedirectUrl.Trim();
+        role.Priority = model.Priority;
+
+        var result = await _roleManager.UpdateAsync(role);
+        if (!result.Succeeded)
+        {
+            foreach (var err in result.Errors)
+                ModelState.AddModelError("", err.Description);
+            return View(model);
+        }
+
+        ShowSuccess($"Role '{role.Name}' updated.");
+        return RedirectToAction(nameof(Detail), new { id });
+    }
+
+    // ── Detail (Permissions + Users tabs) ─────────────────────────────────────
 
     [HttpGet("{id:guid}")]
     public async Task<IActionResult> Detail(Guid id, CancellationToken ct)
@@ -114,6 +177,8 @@ public class RoleController : BaseAdminController
         {
             Id = role.Id,
             Name = role.Name ?? "",
+            LoginRedirectUrl = role.LoginRedirectUrl,
+            Priority = role.Priority,
             Users = users.Select(u => new RoleUserItem { Id = u.Id, Email = u.Email ?? "" }).ToList(),
             PermissionGroups = groups,
             AssignedPermissionKeys = [.. assignedKeys]

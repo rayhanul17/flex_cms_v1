@@ -10,16 +10,11 @@ namespace FlexCms.Host.Controllers.Admin;
 public class AuditLogController : BaseAdminController
 {
     private readonly IOperationLogService _auditLog;
-    private readonly ISettingsService _settings;
     private readonly IFcmsUnitOfWork _uow;
 
-    public AuditLogController(
-        IOperationLogService auditLog,
-        ISettingsService settings,
-        IFcmsUnitOfWork uow)
+    public AuditLogController(IOperationLogService auditLog, IFcmsUnitOfWork uow)
     {
         _auditLog = auditLog;
-        _settings = settings;
         _uow = uow;
     }
 
@@ -29,11 +24,7 @@ public class AuditLogController : BaseAdminController
     {
         var recent = await _auditLog.GetRecentAsync(200, ct);
         var archive = await _auditLog.GetArchiveAsync(200, ct);
-
-        var cfg = await _settings.GetAsync<AuditEnabledSettings>(AuditLogSettings.Key, ct: ct);
-        ViewBag.AuditEnabled = cfg.Enabled;
         ViewBag.Archive = archive;
-
         return View(recent);
     }
 
@@ -57,23 +48,5 @@ public class AuditLogController : BaseAdminController
         await _uow.SaveChangesAsync(ct);
         ShowSuccess("Archive cleared.");
         return RedirectToAction(nameof(Index));
-    }
-
-    [HttpPost("toggle")]
-    [ValidateAntiForgeryToken]
-    [FcmsAuthorize("audit.manage")]
-    public async Task<IActionResult> Toggle(CancellationToken ct)
-    {
-        var cfg = await _settings.GetAsync<AuditEnabledSettings>(AuditLogSettings.Key, ct: ct);
-        cfg.Enabled = !cfg.Enabled;
-        await _settings.SaveAsync(AuditLogSettings.Key, cfg, ct);
-        return FcmsOk(cfg.Enabled ? "Audit logging enabled." : "Audit logging disabled.", new { enabled = cfg.Enabled });
-    }
-
-    // ── Inner settings POCO ───────────────────────────────────────────────────
-
-    private sealed class AuditEnabledSettings
-    {
-        public bool Enabled { get; set; } = true;
     }
 }

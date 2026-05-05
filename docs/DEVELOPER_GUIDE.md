@@ -582,6 +582,57 @@ return FcmsFail("User not found.", errors: new[] { "ID invalid" });
 
 ---
 
+### Phase 3.5 — Role Redirect + CMS Settings ✅ Done
+
+**What exists:**
+
+#### Role-based login redirect
+Every `FcmsRole` now has two new fields:
+
+| Field | Type | Purpose |
+|---|---|---|
+| `LoginRedirectUrl` | `string` | Where users with this role go after login. Empty = "/" |
+| `Priority` | `int` | Tie-breaker when user has multiple roles. Higher wins. |
+
+**Rules:**
+- **SuperAdmin** always goes to `/admin` — hard-coded, ignores `LoginRedirectUrl`
+- **`returnUrl` query param** takes priority over role redirect (e.g. `/auth/login?returnUrl=/admin/posts`)
+- **Multiple roles** → highest `Priority` wins. If tied — first match from `UserManager.GetRolesAsync` wins
+- **No roles / empty URL** → falls back to `"/"`
+
+**Admin UI:** `/admin/roles` — new Priority + Login Redirect columns. Edit button per role. Create form now includes both fields.
+
+#### CMS Settings page (`/admin/settings`)
+A central settings page where per-installation configuration lives. Currently contains:
+
+| Setting | Key | Default |
+|---|---|---|
+| Audit logging on/off | `audit:enabled` | `true` |
+
+More settings will be added here over time (email SMTP, maintenance mode, etc.).
+
+**Audit log toggle** was moved from the Audit Log page to Settings. The Audit Log page (`/admin/audit-log`) now has a "Settings" button that links there.
+
+**Permissions used:**
+
+| Permission | What it guards |
+|---|---|
+| `settings.view` | Can open `/admin/settings` |
+| `settings.manage` | Can toggle audit logging (and future settings changes) |
+| `roles.edit` | Can edit role name / redirect URL / priority |
+
+#### Integration tests
+7 new tests in `Phase6/LoginRedirectTests.cs` — no Docker needed (EF InMemory):
+- `SuperAdmin_redirects_to_admin_regardless_of_redirect_url`
+- `Single_role_with_redirect_url_uses_that_url`
+- `Single_role_with_empty_redirect_url_falls_back_to_slash`
+- `Multiple_roles_highest_priority_wins`
+- `Multiple_roles_same_priority_first_non_empty_url_used`
+- `No_roles_falls_back_to_slash`
+- `SuperAdmin_wins_even_with_lower_priority_than_other_role`
+
+---
+
 ### Phase 4 — Module System ✅ Done
 
 **What exists:**

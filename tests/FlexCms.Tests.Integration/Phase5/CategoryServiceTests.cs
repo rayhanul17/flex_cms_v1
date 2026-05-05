@@ -52,4 +52,31 @@ public class CategoryServiceTests : IDisposable
         Assert.Null(await _svc.GetByIdAsync(cat.Id));
         Assert.Empty(await _svc.GetAllAsync());
     }
+
+    [Fact]
+    public async Task GetPostCountAsync_returns_correct_count()
+    {
+        var cat = await _svc.CreateAsync(new FcmsCategory { Name = "Tech", Slug = "tech" });
+        _db.Posts.Add(new FcmsPost { Title = "P1", Slug = "p1", Content = "", CategoryId = cat.Id });
+        _db.Posts.Add(new FcmsPost { Title = "P2", Slug = "p2", Content = "", CategoryId = cat.Id });
+        await _db.SaveChangesAsync();
+
+        var count = await _svc.GetPostCountAsync(cat.Id);
+
+        Assert.Equal(2, count);
+    }
+
+    [Fact]
+    public async Task GetPostCountAsync_excludes_deleted_posts()
+    {
+        var cat = await _svc.CreateAsync(new FcmsCategory { Name = "Tech2", Slug = "tech2" });
+        var post = new FcmsPost { Title = "P1", Slug = "p1b", Content = "", CategoryId = cat.Id };
+        var deleted = new FcmsPost { Title = "P2", Slug = "p2b", Content = "", CategoryId = cat.Id, IsDeleted = true };
+        _db.Posts.AddRange(post, deleted);
+        await _db.SaveChangesAsync();
+
+        var count = await _svc.GetPostCountAsync(cat.Id);
+
+        Assert.Equal(1, count);
+    }
 }

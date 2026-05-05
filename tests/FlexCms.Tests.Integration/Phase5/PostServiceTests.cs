@@ -97,6 +97,28 @@ public class PostServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task GetTagSlugsAsync_returns_slugs_for_post()
+    {
+        var post = await _svc.CreateAsync(new FcmsPost { Title = "Tagged", Slug = "tagged", Content = "" }, ["dotnet", "csharp"]);
+
+        var slugs = await _svc.GetTagSlugsAsync(post.Id);
+
+        Assert.Equal(2, slugs.Count);
+        Assert.Contains("dotnet", slugs);
+        Assert.Contains("csharp", slugs);
+    }
+
+    [Fact]
+    public async Task GetTagSlugsAsync_returns_empty_for_post_without_tags()
+    {
+        var post = await _svc.CreateAsync(new FcmsPost { Title = "NoTags", Slug = "no-tags", Content = "" }, []);
+
+        var slugs = await _svc.GetTagSlugsAsync(post.Id);
+
+        Assert.Empty(slugs);
+    }
+
+    [Fact]
     public async Task DeleteAsync_soft_deletes_post()
     {
         var post = await _svc.CreateAsync(new FcmsPost { Title = "Del", Slug = "del", Content = "" }, []);

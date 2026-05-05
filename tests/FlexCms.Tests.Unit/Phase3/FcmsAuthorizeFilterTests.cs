@@ -164,6 +164,24 @@ public class FcmsAuthorizeFilterTests
         Assert.Equal(StatusCodes.Status403Forbidden, result.StatusCode);
     }
 
+    // ── SuperAdmin normalized name fallback (regression: ffa759e) ────────────
+    // MongoDB stored role names in uppercase ("SUPERADMIN") due to NormalizedName
+    // being used instead of Name. Filter must accept both casings.
+
+    [Fact]
+    public async Task SuperAdmin_uppercase_role_claim_also_passes()
+    {
+        var attr = new FcmsAuthorizeAttribute("users.create");
+        var filter = (IAsyncAuthorizationFilter)attr.CreateInstance(
+            BuildServiceProvider(permService: PermService(false)));
+
+        // Simulate MongoDB storing "SUPERADMIN" instead of "SuperAdmin"
+        var ctx = BuildContext(AuthenticatedUser(FcmsRoles.SuperAdmin.ToUpperInvariant()));
+        await filter.OnAuthorizationAsync(ctx);
+
+        Assert.Null(ctx.Result); // must still be allowed
+    }
+
     // ── Helper: build minimal IServiceProvider ────────────────────────────────
 
     private static IServiceProvider BuildServiceProvider(IPermissionService? permService)

@@ -8799,6 +8799,55 @@ public override List<FcmsMenuItemDef> GetMenuItems() => new() {
 
 ---
 
+### ✅ IMPLEMENTED (post-Phase-5, 2026-05-05) — Dynamic Menu System
+
+> Built ahead of original schedule (was planned for Phase 9 admin UX) so all subsequent Phases (6–10) can be manually verified by clicking through the dynamically-rendered admin sidebar. Theme-agnostic — Phase 11 (themes) will replace the placeholder `_AdminLayout.cshtml` with AdminLTE without touching menu data.
+
+**Files added:**
+- `src/FlexCms.Framework/Cms/FcmsMenuItem.cs` — entity (BaseEfEntity), table `fcms_menu_items`
+- `src/FlexCms.Framework/Models/FcmsMenuItemDef.cs` — module-declared definition DTO
+- `src/FlexCms.Framework/Cms/IMenuService.cs` + `MenuService.cs` — load/seed/remove/rename/reorder + 15min IMemoryCache + per-request permission filter
+- `src/FlexCms.Host/Controllers/Admin/MenuController.cs` — `/admin/menu` (list + AJAX rename + AJAX reorder)
+- `src/FlexCms.Host/Controllers/Admin/DashboardController.cs` + `Views/Admin/Dashboard/Index.cshtml` — `/admin` placeholder dashboard
+- `src/FlexCms.Host/Views/Shared/_AdminLayout.cshtml` — placeholder dark sidebar (will be replaced by AdminLTE in Phase 11)
+- `src/FlexCms.Host/Views/Admin/_ViewStart.cshtml` — auto-applies `_AdminLayout` to all admin views
+- `src/FlexCms.Host/Views/Admin/Menu/Index.cshtml` — drag-drop reorder (SortableJS) + inline rename
+- `src/FlexCms.Host/wwwroot/lib/bootstrap-icons/` — local Bootstrap Icons 1.11.3 (CSS + woff/woff2)
+- `src/FlexCms.Host/wwwroot/lib/sortablejs/` — local SortableJS 1.15.2
+- `tests/FlexCms.Tests.Unit/Phase6/MenuServiceTests.cs` — 15 unit tests (seed insert/refresh/restore, soft-delete, permission filter, ordering, rename, reorder)
+
+**Files modified:**
+- `IFcmsModule.cs` + `BaseModule.cs` — added `List<FcmsMenuItemDef> GetMenuItems()` (default `[]`)
+- `FcmsDbContext.cs` — added `DbSet<FcmsMenuItem> MenuItems`
+- `FcmsServiceExtensions.cs` — registered `IMenuService` (Scoped)
+- `SeedService.cs` — seeds 13 core menu items on every startup; auto-creates `fcms_menu_items` table on existing DBs via `IRelationalDatabaseCreator` (graceful fallback for pre-menu installs)
+- `ModuleActivationService.cs` — calls `MenuService.SeedAsync(moduleId, GetMenuItems())` on every activation (idempotent — handles insert/update/restore)
+- `ModulesController.cs` — `Deactivate` and `Uninstall` both call `MenuService.RemoveModuleItemsAsync(moduleId)` to soft-delete module items
+- `Error.cshtml` / `Error404.cshtml` / `AccessDenied.cshtml` — replaced CDN bootstrap-icons with local; added `noindex` meta + "Go Back" + image-load fallback icon
+
+**Core menu items seeded by `SeedService`:**
+Dashboard / Pages / Posts / Categories / Media / Trash / Users / Roles / Permissions / Modules / Menu / Redirects / Audit Log / Settings — each with proper `RequiredPermission` key from `CorePermissions[]`.
+
+**Identity key for upgrade:** `ModuleId + Url` (URL is stable per module). On re-seed:
+- New URL → insert
+- Existing URL with changed `DefaultName/Icon/RequiredPermission/Location` → refresh code-owned fields, **preserve admin's `CustomName` and `Order`**
+- Soft-deleted item with same URL → restore (`IsDeleted = false`) — handles deactivate→reactivate
+
+**Differences from the original plan above:**
+- `MenuService.GetMenuAsync(location)` (not `GetMenuItemsForArea`)
+- Permission filter calls `IPermissionService.HasPermissionAsync(ClaimsPrincipal, expr)` — supports AND/OR expressions (not just single keys)
+- Cache invalidated automatically by `MenuService` itself on seed/rename/reorder/remove (not via `GlobalContext.InvalidateAllCaches()`)
+- `FcmsLogContext.SetEntityId` pattern is used to attribute-log create operations where entity ID is only known after save (see `[FcmsLog]` filter)
+
+**Audit logging:** `[FcmsLog("menu.rename", "FcmsMenuItem")]` and `[FcmsLog("menu.reorder", "FcmsMenuItem")]` on `MenuController` actions.
+
+**Known limitations / Phase 11 follow-ups:**
+- `_AdminLayout.cshtml` is a placeholder — Phase 11 will swap to AdminLTE 3 + dark/light toggle. Menu data unchanged.
+- Hierarchical menu (`ParentId` → submenus) — entity supports it; rendering only flat for now.
+- "MainMenu" / "FooterMenu" locations defined in entity but not yet rendered (waiting on public theme phase).
+
+---
+
 ## 6. i18n (EN + BN)
 
 ### Layer 1 — UI Strings (.resx)
@@ -14298,7 +14347,104 @@ Daily background check → POST /marketplace/check-updates with installed list
 
 ---
 
+### 🔧 Working Preferences (Standing Instructions)
+
+These rules apply to every session. If memory is not auto-loaded (because chat started outside `D:\OSL`), read these directly from this file.
+
+**Git workflow:**
+- **Auto-push after every commit** — User expects `git push` to be chained immediately after `git commit`. No need to wait for the user to ask. **Why:** push is part of the commit flow.
+- **Commit + push BEFORE giving PR title/description** — When user asks for PR title or description, first run `git status`. If there are uncommitted changes, commit and push them, *then* provide the PR details. **Why:** Past incident — PR was opened with uncommitted changes still local; merge happened with incomplete code.
+- Never use `--no-verify`, `--no-gpg-sign`, or skip pre-commit hooks unless the user explicitly says so.
+- Never amend pushed commits or force-push without explicit confirmation.
+
+**Code style:**
+- `FcmsTime.Now` everywhere — never `DateTime.UtcNow` directly in `src/`. Tests can use `DateTime.UtcNow`.
+- Table names via `FcmsHelper.GetTableName<T>(prefix)` — never hand-roll table names.
+- `[FcmsLog("action", "EntityType")]` attribute — never call `OpLog.LogAsync` manually unless entity ID isn't available post-route (then use `FcmsLogContext.SetEntityId`).
+- Frontend libs → download to `wwwroot/lib/{name}/`, never CDN.
+- `BaseEfEntity` / `BaseMongoEntity` for all entities (gives audit fields + soft-delete).
+- Permission keys via `[FcmsAuthorize("perm.key")]` on actions; `<elem fcms-authorize="perm.key">` in views.
+
+**Testing:**
+- After any code change, run `dotnet build --no-restore -v q` then `dotnet test tests/FlexCms.Tests.Unit --no-build -v q`. Both must be green before reporting "done".
+- Use Testcontainers with **explicit version**: `new MySqlBuilder("mysql:8.4")`, `new MongoDbBuilder("mongo:7")` — match `docker-compose.yml`.
+
+**Communication:**
+- Bengali + English mix is fine — match user's tone.
+- Don't summarize what just happened in long form — user reads the diff.
+- Avoid headers/sections for simple answers — direct answer first, details only if asked.
+
+---
+
+### 🌐 External Project References
+
+When user references "NetCoreCMS", "M2Sv3", "M2S.Framework", or "CoreAdmin" — the codebases are at the paths below. Read them when copying patterns or architecture decisions.
+
+| Project | Path | When to reference |
+|---|---|---|
+| **NetCoreCMS** (legacy v1 CMS, ASP.NET Core 2.2) | `D:\OSL\NetCoreCMS_v1.0.1.x\` | CMS patterns: module/plugin system, hooks, `BaseAdminController` helpers, menu system, theme architecture, audit log |
+| **M2Sv3 — EduPro/Payment/SMS APIs** | `D:\OSL\M2Sv3_Full\Dev\api\` | Multi-tenant API patterns, `[M2sApiEndpoint]` discovery, MongoDB usage, payment gateway abstractions (bKash, SSLCommerz) |
+| **M2Sv3 — CoreAdmin + Gateway** | `D:\OSL\M2Sv3_Full\Dev\core\` | Admin portal API, JWT custom headers, ClickHouse audit, YARP gateway |
+| **M2S.Framework** (shared library) | `D:\OSL\M2Sv3_Full\Dev\lib\` | Auto-registration attributes (`[M2sAddScoped]`), Mongo/MySQL base entities, RabbitMQ pub/sub, S3/MinIO/Cloudflare R2 storage abstraction, RedLock distributed lock |
+
+**Rule of thumb:** FlexCMS adapts NetCoreCMS's CMS-domain patterns + M2S.Framework's modern .NET 10 infrastructure patterns. When in doubt, prefer the M2S.Framework approach (newer stack).
+
+**Frequently-borrowed patterns:**
+- NetCoreCMS → menu system architecture (hybrid code+DB, `IMenuService`); `BaseAdminController` helpers; module hooks; trash/restore
+- M2S.Framework → `BaseEfEntity`/`BaseMongoEntity` audit fields; auto-registration attributes; clean `IRepository<T>` abstraction; setup wizard pattern
+
+---
+
+### 📁 Memory File Locations (read directly if not auto-loaded)
+
+If this chat is started from a directory other than `D:\OSL`, the auto-memory system won't load. Read these files manually:
+
+```
+C:\Users\rayha\.claude\projects\d--OSL\memory\MEMORY.md           # Index of all memories
+C:\Users\rayha\.claude\projects\d--OSL\memory\flexcms_project.md  # Project status (this plan is canonical, memory is a pointer)
+C:\Users\rayha\.claude\projects\d--OSL\memory\project_osl_overview.md  # All 4 OSL projects overview
+C:\Users\rayha\.claude\projects\d--OSL\memory\feedback_auto_push.md    # Auto-push after commit
+C:\Users\rayha\.claude\projects\d--OSL\memory\feedback_pr_commit_first.md  # Commit before PR
+```
+
+**Note:** `flexcms_project.md` content is now mirrored into this `plan.md` (Implementation Status Snapshot + Working Preferences sections above). Memory is the source of truth for cross-session preferences (auto-push, etc.); plan.md is the source of truth for code/architecture state.
+
+When saving new memories, follow the format in `~/.claude/CLAUDE.md` (auto-memory section).
+
+---
+
+### 📊 Implementation Status Snapshot (as of 2026-05-05)
+
+| # | Phase | Status | Notes |
+|---|---|---|---|
+| 1  | Project Scaffold + DB Layer | ✅ DONE | Merged 2026-04-28 |
+| 2  | Auth + Security Core | ✅ DONE | Merged 2026-04-28 |
+| 3  | User / Role / Permission | ✅ DONE | Merged 2026-04-28 |
+| 4  | Module System | ✅ DONE | Merged 2026-04-29 (all sub-PRs) |
+| 5  | CMS: Pages + Posts + Frontend | ✅ DONE | Merged 2026-04-29 |
+| –  | **Post-Phase-5 Enhancements** | ✅ DONE | NuGet updates, GetTableName rename, [FcmsLog] attr, Dynamic Menu System, local CDN libs, error pages polish (branch `phase-6-veryfy`, PR pending) |
+| 6  | Media + File Storage | ❌ NEXT | About to start |
+| 7  | i18n + Translation | ❌ pending | |
+| 8  | Email + SMS + Background Jobs | ❌ pending | |
+| 9  | Admin UX + Notifications + Widgets + Audit | ❌ pending | Dynamic Menu System (originally part of this) already done |
+| 10 | Chat (SignalR) | ❌ pending | |
+| 11 | Themes + Setup Wizard | 🔄 partial | Setup ✅ DONE; Themes ❌ pending (AdminLte / Bootstrap / Tailwind) |
+| 12 | Payment + PDF + Excel + Export | ❌ pending | |
+| 13 | Auth Hardening + Account Lifecycle | ❌ pending | |
+| 14 | API + Integrations + Engagement | ❌ pending | |
+| 15 | SEO + Performance + Operations + Compliance | ❌ pending | |
+| 16 | Performance Critical + Accessibility + Editorial | ❌ pending | |
+| 17 | Modern UX + AI + Marketplace | ❌ pending | |
+
+**Test count:** 161 unit + integration tests passing (146 pre-menu + 15 new MenuService tests).
+**Active branch:** `phase-6-veryfy`
+**Next milestone:** Merge current branch → start Phase 6 (Media + File Storage)
+
+---
+
 ### Phase 1 — Project Scaffold + DB Layer
+> **✅ IMPLEMENTED — 2026-04-28** (PR merged to main)
+
 **কাজ:**
 - Solution + projects তৈরি (`dotnet new sln`, classlib, mvc)
 - Project references + NuGet install (Framework NuGet list)
@@ -14321,6 +14467,8 @@ Daily background check → POST /marketplace/check-updates with installed list
 ---
 
 ### Phase 2 — Auth + Security Core
+> **✅ IMPLEMENTED — 2026-04-28** (PR merged to main)
+
 **কাজ:**
 - `FcmsUser` (IdentityUser&lt;Guid&gt;), `FcmsRole` (IdentityRole&lt;Guid&gt;)
 - `EfUserStore`, `EfRoleStore`, `MongoUserStore`, `MongoRoleStore`
@@ -14351,16 +14499,19 @@ Daily background check → POST /marketplace/check-updates with installed list
 ---
 
 ### Phase 3 — User / Role / Permission
+> **✅ IMPLEMENTED — 2026-04-28** (PR merged to main)
+
 **কাজ:**
-- `FcmsPermission`, `FcmsRolePermission` entities
-- `PermissionService` (15min IMemoryCache + DB fallback)
-- `FcmsAuthorizeAttribute` + `FcmsAuthorizeFilter` (AND `&`, OR `|`, single, SuperAdmin bypass)
-- `FcmsAuthorizeTagHelper` (`fcms-authorize="key"`)
-- Admin controllers: `UserController`, `RoleController`, `PermissionController`
-- Admin views: User list (DataTables), Create/Edit (two-col), Role detail (Info+Users+Permissions tabs)
-- Permission accordion (search, group select-all, AJAX save)
-- `BaseAdminController` (all helpers: _T, cache, session, ShowMessage/Alert*, etc.)
-- `IFcmsContextService` + `FcmsContextService` (UAParser)
+- [x] `FcmsRoles` constants (`SuperAdmin`)
+- [x] `FcmsPermission`, `FcmsRolePermission` entities + DbContext DbSets + unique indexes
+- [x] `IPermissionService` + `PermissionService` (15min IMemoryCache, DB fallback, role name→ID cache 1h)
+- [x] `FcmsAuthorizeAttribute` + `FcmsAuthorizeFilter` — SuperAdmin bypass, AND `&` / OR `|` syntax, AJAX → 403 JSON
+- [x] `FcmsAuthorizeTagHelper` (`fcms-authorize="key"`) — registered via `_ViewImports.cshtml`
+- [x] `IFcmsContextService` + `FcmsContextService` (UAParser 3.1.x — browser/OS/IP)
+- [x] `BaseAdminController` — cache, session, ShowMessage/ShowSuccess/ShowError/ShowWarning/ShowInfo, FcmsOk/FcmsFail, RedirectToErrorPage
+- [x] `UserController` + views (Index list, Create, Edit, toggle-active AJAX, delete AJAX)
+- [x] `RoleController` + views (Index list, Create, Detail with Permissions accordion + Users tab)
+- [x] `PermissionController` (AJAX assign/revoke — `POST /admin/permissions/assign|revoke`)
 
 **✅ Confirm করো:**
 - [ ] Create user (email) → assign Editor role → login → Editor panel visible
@@ -14378,6 +14529,8 @@ Daily background check → POST /marketplace/check-updates with installed list
 ---
 
 ### Phase 4 — Module System
+> **✅ IMPLEMENTED — 2026-04-29** (all sub-PRs merged to main)
+
 **কাজ:**
 - `IFcmsModule`, `BaseModule`
 - `module.json` embedded resource + `ModuleLoader`
@@ -14404,6 +14557,8 @@ Daily background check → POST /marketplace/check-updates with installed list
 ---
 
 ### Phase 5 — CMS: Pages + Posts + Frontend
+> **✅ IMPLEMENTED — 2026-04-29** (all features implemented, merged to main)
+
 **কাজ:**
 - `FcmsPage`, `FcmsPageTranslation`, `FcmsPost`, `FcmsPostTranslation`, `FcmsCategory`, `FcmsTag`, `FcmsPostTag`
 - `PageService`, `PostService` (HTML sanitize, slug uniqueness, soft delete)
@@ -14436,7 +14591,161 @@ Daily background check → POST /marketplace/check-updates with installed list
 
 ---
 
+### ✅ Post-Phase-5 Enhancements (2026-05-05)
+
+> Quality + early-feature work done after Phases 1–5 merged, before starting Phase 6.
+> Branch: `phase-6-veryfy` (PR pending). All built ahead of schedule for QA convenience.
+
+**Quality / maintenance:**
+- NuGet packages updated to latest compatible (EF Core 9.0.7, Pomelo 9.0.0, MongoDB.Driver 3.8.0, SkiaSharp 3.119.2, UAParser 3.1.47, Serilog 10.x, Testcontainers 4.11)
+- `FcmsHelper.GetEntityName<T>` → `GetTableName<T>` (rename — name was misleading)
+- All `DateTime.UtcNow` in `src/` replaced with `FcmsTime.Now` (clock wrapper, respects site timezone)
+- Phase 1 Mongo tests: hardcoded collection name `"mongotestentitys"` → `FcmsHelper.GetTableName<T>("fcms")`
+- Testcontainers obsolete `MySqlBuilder()` → `MySqlBuilder("mysql:8.4")` + same for `MongoDbBuilder("mongo:7")` — version aligned with `docker-compose.yml`
+- CA2000 warnings in test constructors suppressed with documented `#pragma`
+- Regression tests added: SuperAdmin uppercase role claim (Mongo normalized name bug), `PostService.GetTagSlugsAsync`, `CategoryService.GetPostCountAsync`
+
+**Operation logging architecture (NetCoreCMS-inspired):**
+- `[FcmsLog("action", "EntityType")]` attribute + `FcmsLogFilter` (`IAsyncResultFilter`, runs after action, only logs on success — redirect/2xx)
+- `FcmsLogContext.SetEntityId(HttpContext, entity.Id)` — controller helper for create actions where entity ID is only known after save
+- All admin controllers (User/Role/Menu) migrated from manual `OpLog.LogAsync` to attribute-based pattern
+- 9 unit tests covering filter behavior
+
+**Dynamic Menu System** — see "✅ IMPLEMENTED (post-Phase-5, 2026-05-05) — Dynamic Menu System" section under "5. Menu Render System" above for full file list.
+
+**Frontend assets localized (CSP-safe, offline-ready):**
+- `wwwroot/lib/bootstrap-icons/` — Bootstrap Icons 1.11.3 (CSS + woff/woff2)
+- `wwwroot/lib/sortablejs/` — SortableJS 1.15.2
+- All 4 views (`_AdminLayout`, `Menu/Index`, `Error`, `Error404`, `AccessDenied`) migrated CDN → local
+
+**Error pages polish:**
+- `noindex, nofollow` meta on Error / 404 / AccessDenied (search engines won't index)
+- Error.cshtml: "Go Back" button + error ID copy button + UTC timestamp
+- Error404 + AccessDenied: image-load fallback icon (`bi-compass`, `bi-shield-lock-fill`)
+- AccessDenied: route case fix `/auth/login` → `/Auth/Login` + "Go Back" button
+- All CDN bootstrap-icons references → local `~/lib/bootstrap-icons/`
+
+**Test count after this batch:** 161 unit + integration tests passing (was 146 pre-menu).
+
+---
+
+#### 🧠 Key Architectural Decisions (from 2026-05-05 session)
+
+These were debated and decided in conversation; capturing them so future sessions don't re-litigate.
+
+**1. Dynamic Menu — hybrid (code-declared, DB-stored, permission-filtered) chosen over alternatives**
+- ❌ Pure code-driven → admin can't rename/reorder
+- ❌ Pure DB-driven (admin manually adds) → out-of-sync with module routes, error-prone
+- ✅ Hybrid: module declares via `IFcmsModule.GetMenuItems()`, seeded to DB, admin edits `CustomName + Order`, code re-seed refreshes `DefaultName/Icon/Permission` while preserving admin customizations
+
+**2. `[FcmsLog]` attribute over manual `OpLog.LogAsync` calls** (NetCoreCMS-inspired)
+- User feedback: "log likhle developer er hassale hobe — base e thaka uchit"
+- Solution: attribute + `IAsyncResultFilter` that runs after action result, logs only on success (redirect/2xx)
+- Special case: create actions where entity ID is only known post-save → `FcmsLogContext.SetEntityId(HttpContext, entity.Id)` helper writes ID to `HttpContext.Items`, attribute reads route param first then falls back to Items
+- Rejected alternatives: base service intercept (can't intercept Microsoft's `UserManager`/`RoleManager`); per-controller manual calls (rejected as boilerplate)
+
+**3. Menu identity key = `ModuleId + Url`** (not DefaultName, not synthetic slug)
+- URL is stable per module, unique per location, naturally maps to admin route
+- Re-seed behavior: same URL exists → refresh code-owned fields (`DefaultName/Icon/RequiredPermission/Location`), preserve admin's `CustomName + Order`
+- Soft-deleted item with same URL → restore (`IsDeleted = false`) — handles deactivate→reactivate cycle
+
+**4. `_AdminLayout.cshtml` is a placeholder (Phase 11 will replace)**
+- Built minimal dark sidebar so Phases 6–10 can be manually QA'd via clickable menu
+- All menu data is layout-agnostic; Phase 11 will swap to AdminLTE 3 without touching DB
+- Default font in this placeholder is `Inter, system-ui, sans-serif` — Phase 11 will add proper Inter woff2 + Bangla `Kalpurush.ttf`
+
+**5. CDN dependencies localized now (not deferred to CSP phase)**
+- Originally suggested deferring; user override: download all third-party assets to `wwwroot/lib/` immediately
+- Why: offline dev support, no CSP retrofit later, no vendor outage risk
+- Pattern set: `wwwroot/lib/{package-name}/{file}` — module devs should follow this convention
+
+**6. DB schema upgrade strategy (no EF migrations)**
+- Project does not use `dotnet ef migrations` (intentional — setup wizard uses `EnsureCreatedAsync`)
+- Adding new entities (like `FcmsMenuItem`) requires `IRelationalDatabaseCreator.CreateTablesAsync()` fallback in `SeedService` for existing installs
+- Pattern: try the new feature → catch table-missing → run creator → retry. Logged as info on first run.
+
+---
+
+#### 📂 File Inventory (this batch)
+
+**NEW files:**
+```
+src/FlexCms.Framework/Auth/FcmsLogAttribute.cs              # [FcmsLog] + FcmsLogContext + FcmsLogFilter
+src/FlexCms.Framework/Cms/FcmsMenuItem.cs                   # Entity (BaseEfEntity)
+src/FlexCms.Framework/Cms/IMenuService.cs
+src/FlexCms.Framework/Cms/MenuService.cs                    # Scoped service
+src/FlexCms.Framework/Models/FcmsMenuItemDef.cs             # Module-declared DTO
+src/FlexCms.Framework/Properties/AssemblyInfo.cs            # InternalsVisibleTo("FlexCms.Tests.Unit")
+src/FlexCms.Host/Controllers/Admin/DashboardController.cs   # /admin placeholder
+src/FlexCms.Host/Controllers/Admin/MenuController.cs        # /admin/menu — list/rename/reorder
+src/FlexCms.Host/Views/Admin/Dashboard/Index.cshtml
+src/FlexCms.Host/Views/Admin/Menu/Index.cshtml              # SortableJS drag-drop + inline rename
+src/FlexCms.Host/Views/Admin/_ViewStart.cshtml              # Auto-applies _AdminLayout
+src/FlexCms.Host/Views/Shared/_AdminLayout.cshtml           # Placeholder dark sidebar
+src/FlexCms.Host/wwwroot/lib/bootstrap-icons/font/*         # Bootstrap Icons 1.11.3
+src/FlexCms.Host/wwwroot/lib/sortablejs/Sortable.min.js     # SortableJS 1.15.2
+tests/FlexCms.Tests.Unit/Phase3/FcmsLogFilterTests.cs       # 9 tests
+tests/FlexCms.Tests.Unit/Phase6/MenuServiceTests.cs         # 15 tests
+```
+
+**MODIFIED files:**
+```
+src/FlexCms.Framework/Modules/IFcmsModule.cs                # +GetMenuItems()
+src/FlexCms.Framework/Modules/BaseModule.cs                 # +virtual GetMenuItems() => []
+src/FlexCms.Framework/Modules/ModuleActivationService.cs    # Idempotent menu seed every activation
+src/FlexCms.Framework/Db/Ef/FcmsDbContext.cs                # +DbSet<FcmsMenuItem> MenuItems
+src/FlexCms.Framework/Hosting/SeedService.cs                # +SeedMenuItemsAsync (13 core items + auto-CREATE TABLE fallback)
+src/FlexCms.Framework/Extensions/FcmsServiceExtensions.cs   # +AddScoped<IMenuService, MenuService>
+src/FlexCms.Framework/Helpers/FcmsHelper.cs                 # GetEntityName → GetTableName rename
+src/FlexCms.Framework/Cms/OperationLogService.cs            # FcmsTime.Now
+src/FlexCms.Framework/Cms/MediaService.cs                   # FcmsTime.Now
+src/FlexCms.Framework/Cms/SeedService.cs (Modules folder)   # FcmsTime.Now
+src/FlexCms.Framework/Modules/ModuleActivationService.cs    # FcmsTime.Now
+src/FlexCms.Framework/Modules/ModuleStateService.cs         # FcmsTime.Now
+src/FlexCms.Host/Controllers/SetupController.cs             # FcmsTime.Now
+src/FlexCms.Host/Controllers/Admin/UserController.cs        # [FcmsLog] migration + FcmsLogContext.SetEntityId
+src/FlexCms.Host/Controllers/Admin/RoleController.cs        # [FcmsLog] migration on Create/Edit/Delete
+src/FlexCms.Host/Controllers/Admin/BaseAdminController.cs   # +OpLog property (service locator)
+src/FlexCms.Host/Controllers/Admin/ModulesController.cs     # Deactivate/Uninstall → MenuService.RemoveModuleItemsAsync
+src/FlexCms.Host/Views/Shared/Error.cshtml                  # noindex + Go Back + copy ID + timestamp + local CDN
+src/FlexCms.Host/Views/Home/Error404.cshtml                 # noindex + Go Back + image fallback + local CDN
+src/FlexCms.Host/Views/Auth/AccessDenied.cshtml             # noindex + Go Back + image fallback + /Auth/Login fix + local CDN
+tests/FlexCms.Tests.Integration/Phase1VerificationTests.cs  # Mongo collection name fix + Testcontainer image versions
+tests/FlexCms.Tests.Integration/Phase5/PostServiceTests.cs  # +GetTagSlugsAsync regression tests
+tests/FlexCms.Tests.Integration/Phase5/CategoryServiceTests.cs  # +GetPostCountAsync regression tests
+tests/FlexCms.Tests.Unit/Phase3/FcmsAuthorizeFilterTests.cs # +SuperAdmin uppercase role claim regression test
+```
+
+---
+
+#### ▶️ Starting Point for Next Session (Phase 6)
+
+**Pre-flight before starting Phase 6:**
+1. Current branch: `phase-6-veryfy` — open PR for it first, merge to main, then branch `feature/phase-6-media`
+2. `dotnet build` should be clean (0 warnings, 0 errors)
+3. `dotnet test tests/FlexCms.Tests.Unit` should report 161 passed
+4. Visit `/admin` → dashboard renders → sidebar shows 14 menu items (Dashboard, Pages, Posts, Categories, Media, Trash, Users, Roles, Permissions, Modules, Menu, Redirects, Audit Log, Settings)
+5. Visit `/admin/menu` → drag-drop reorders persist after refresh; rename input on blur persists
+
+**Phase 6 scope** (see "Phase 6 — Media + File Storage" section below):
+- `IFcmsFileStorage` + `LocalFileStorage` (under `wwwroot/uploads/`)
+- `FcmsMedia` + `FcmsMediaFolder` entities (already exist as DbSets — review)
+- `MediaService` — magic bytes validation, safe filename, SkiaSharp thumbnails
+- `MediaFolderService` — folder CRUD + media-move
+- Admin UI: jQuery file upload + folder tree + grid/list view
+- Permission-gated: `media.view / upload / edit / delete / folders` (already in `CorePermissions`)
+
+**What to inherit from this session for Phase 6:**
+- Use `[FcmsLog("media.upload", "FcmsMedia")]` etc. attribute pattern (do NOT manually call `OpLog.LogAsync`)
+- For create actions where Media ID isn't in route: `FcmsLogContext.SetEntityId(HttpContext, media.Id)` after save
+- Module entities: ensure media-related entities follow `BaseEfEntity` + table prefix convention (`FcmsHelper.GetTableName<T>(prefix)`)
+- Use `FcmsTime.Now` everywhere, never `DateTime.UtcNow`
+- All third-party JS/CSS → download to `wwwroot/lib/{name}/`, never CDN
+
+---
+
 ### Phase 6 — Media + File Storage
+> **❌ NOT STARTED** — next phase to begin
 **কাজ:**
 - `IFcmsFileStorage`, `LocalFileStorage` (`wwwroot/uploads/`)
 - `FcmsMedia`, `FcmsMediaFolder` entities
@@ -14458,6 +14767,7 @@ Daily background check → POST /marketplace/check-updates with installed list
 ---
 
 ### Phase 7 — i18n + Translation
+> **❌ NOT STARTED**
 **কাজ:**
 - `LanguageMiddleware` (cookie `fcms_ui_lang` → `CultureInfo`)
 - `IFcmsTranslator` + `FcmsTranslator` (module → Core resx fallback)
@@ -14480,6 +14790,7 @@ Daily background check → POST /marketplace/check-updates with installed list
 ---
 
 ### Phase 8 — Email + SMS + Background Jobs
+> **❌ NOT STARTED**
 **কাজ:**
 - `IFcmsEmailService` + `SmtpEmailService` (MailKit, IDataProtector for password)
 - `FcmsSmsSender` dispatcher (Alpha / MRAM / Onnorokom)
@@ -14506,6 +14817,7 @@ Daily background check → POST /marketplace/check-updates with installed list
 ---
 
 ### Phase 9 — Admin UX + Notifications + Widgets + Audit
+> **❌ NOT STARTED** (Note: Dynamic Menu System — originally part of this phase — built ahead of schedule. See Post-Phase-5 Enhancements section)
 **কাজ:**
 - `FcmsAuditLog` (MongoDB, fire-and-forget from `SaveChangesAsync`)
 - `AuditLogService` ([FcmsSingleton], own MongoDB connection)
@@ -14535,6 +14847,7 @@ Daily background check → POST /marketplace/check-updates with installed list
 ---
 
 ### Phase 10 — Chat (SignalR)
+> **❌ NOT STARTED**
 **কাজ:**
 - `FcmsChatThread`, `FcmsChatMessage` entities
 - `ChatService` (GetOrCreateThread, AddMessage, ResolveThread, CreateNewThread)
@@ -14569,6 +14882,10 @@ Daily background check → POST /marketplace/check-updates with installed list
 ---
 
 ### Phase 11 — Themes + Setup Wizard
+> **🔄 IN PROGRESS — 2026-04-28**
+> Setup Wizard ✅ DONE (4-step: DB → Site Info → Admin Account → Done; two-path Program.cs; SeedService; EnsureCreatedAsync migration; restart on completion)
+> Themes ❌ NOT STARTED (AdminLte, Bootstrap, Tailwind)
+
 **কাজ:**
 - `ThemeViewLocationExpander` — theme paths in Razor engine
 - `ThemeManager` + `ThemeManifest` (theme.json)
@@ -14604,6 +14921,7 @@ Daily background check → POST /marketplace/check-updates with installed list
 ---
 
 ### Phase 12 — Payment + PDF + Excel + Export
+> **❌ NOT STARTED**
 **কাজ:**
 - `IFcmsPaymentGateway` + `FcmsPaymentGatewayResolver`
 - `BkashPaymentGateway`, `SslcommerzPaymentGateway`, `NagadPaymentGateway`
@@ -14630,6 +14948,7 @@ Daily background check → POST /marketplace/check-updates with installed list
 ---
 
 ### Phase 13 — Auth Hardening + Account Lifecycle (Issues 67-72, 91-92, 102-103)
+> **❌ NOT STARTED**
 **কাজ:**
 - `IFcmsHealthCheck` + built-in checks (DB, Audit, Queue, Disk) → `/health`, `/health/ready`, `/health/live` (Issue 67)
 - `FcmsUserSession` entity + `SessionService` + `FcmsSessionValidationMiddleware` — active sessions + force logout (Issue 68)
@@ -14679,6 +14998,7 @@ Daily background check → POST /marketplace/check-updates with installed list
 ---
 
 ### Phase 14 — API + Integrations + Engagement (Issues 73-83)
+> **❌ NOT STARTED**
 **কাজ:**
 - `FcmsApiToken` + `FcmsApiTokenAuthenticationHandler` (Bearer scheme) — Profile UI generate/revoke (Issue 73)
 - `FcmsWebhookEndpoint` + `FcmsWebhookDelivery` + `FcmsWebhookDispatcher` — outbound webhooks (Issue 74)
@@ -14718,6 +15038,7 @@ Daily background check → POST /marketplace/check-updates with installed list
 ---
 
 ### Phase 15 — SEO + Performance + Operations + Compliance (Issues 84-101)
+> **❌ NOT STARTED**
 **কাজ:**
 - SEO Pack: `FcmsSeoMeta` + JSON-LD auto-generation + OG/Twitter tags + canonical (Issue 84)
 - Robots.txt admin UI + dynamic content from SiteSettings (Issue 85)
@@ -14771,6 +15092,7 @@ Daily background check → POST /marketplace/check-updates with installed list
 ---
 
 ### Phase 16 — Performance Critical + Accessibility + Editorial (Issues 104-109)
+> **❌ NOT STARTED**
 **কাজ:**
 - `IFcmsCacheService` — SemaphoreSlim per-key cache stampede protection. Refactor PermissionService, MenuService, RedirectService, all settings reads to use it (Issue 104)
 - Image optimization pipeline — SkiaSharp WebP conversion + responsive sizes (640w/1024w/1920w) + `<picture>` srcset Razor helper + lazy loading + backfill job (Issue 105)
@@ -14811,6 +15133,7 @@ Daily background check → POST /marketplace/check-updates with installed list
 ---
 
 ### Phase 17 — Modern UX + AI + Marketplace (Issues 110-118)
+> **❌ NOT STARTED**
 **কাজ:**
 - `IFcmsModuleApiRegistry` — controlled cross-module API exposure with `[FcmsModuleApi("1.0.0")]` versioning (Issue 110)
 - Universal admin search (Cmd+K) — `IFcmsAdminSearchProvider` per category + recently visited tracking (Issue 111)

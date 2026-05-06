@@ -1,0 +1,71 @@
+@using FlexCms.Framework.Messaging
+@model FlexCms.Host.Models.Admin.BroadcastViewModel
+@{
+    ViewData["Title"] = "Broadcast";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="mb-0">Broadcast</h4>
+    <a asp-action="History" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-clock-history"></i> History
+    </a>
+</div>
+
+<form method="post" asp-action="Send">
+    @Html.AntiForgeryToken()
+
+    <div asp-validation-summary="ModelOnly" class="alert alert-danger"
+         style="display:@(ViewData.ModelState.IsValid ? "none" : "block")"></div>
+
+    <div class="card shadow-sm mb-3">
+        <div class="card-header fw-semibold">Recipients</div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label asp-for="Channel" class="form-label"></label>
+                    <select asp-for="Channel" class="form-select"
+                            asp-items="@Html.GetEnumSelectList<MessageChannel>()"></select>
+                </div>
+                <div class="col-md-4">
+                    <label asp-for="Target" class="form-label"></label>
+                    <select asp-for="Target" class="form-select"
+                            asp-items="@Html.GetEnumSelectList<BroadcastTarget>()"></select>
+                </div>
+                <div class="col-md-4">
+                    <label asp-for="RoleName" class="form-label"></label>
+                    <select asp-for="RoleName" class="form-select">
+                        <option value="">— select role —</option>
+                        @foreach (var r in Model.AvailableRoles)
+                        {
+                            <option value="@r">@r</option>
+                        }
+                    </select>
+                    <small class="text-muted">Used only when "Send to" = By role.</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm mb-3">
+        <div class="card-header fw-semibold">Content</div>
+        <div class="card-body">
+            <div class="mb-3">
+                <label asp-for="Subject" class="form-label"></label>
+                <input asp-for="Subject" class="form-control" placeholder="Required for email; ignored for SMS" />
+            </div>
+            <div class="mb-3">
+                <label asp-for="Body" class="form-label"></label>
+                <textarea asp-for="Body" class="form-control" rows="8" required></textarea>
+                <span asp-validation-for="Body" class="text-danger small"></span>
+            </div>
+            <div class="form-check form-switch">
+                <input asp-for="IsHtml" class="form-check-input" role="switch" />
+                <label asp-for="IsHtml" class="form-check-label"></label>
+            </div>
+        </div>
+    </div>
+
+    <button type="submit" class="btn btn-primary">
+        <i class="bi bi-send"></i> Queue Broadcast
+    </button>
+</form>

@@ -1,6 +1,7 @@
 using FlexCms.Framework.Auth;
 using FlexCms.Framework.Cms;
 using FlexCms.Framework.Helpers;
+using FlexCms.Framework.Messaging;
 using FlexCms.Framework.Modules;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -133,6 +134,17 @@ public class MongoIndexService : IHostedService
                 .Ascending(t => t.LanguageCode)
                 .Ascending(t => t.Slug),
             "ux_post_translations_lang_slug", ct);
+
+        // ── Pending message queue (Phase 8) ───────────────────────────────────
+        await IndexAsync<FcmsPendingMessage>(
+            Builders<FcmsPendingMessage>.IndexKeys
+                .Ascending(m => m.DeliveryStatus)
+                .Ascending(m => m.RetryCount),
+            "ix_pending_messages_status_retry", ct);
+
+        await IndexAsync<FcmsPendingMessage>(
+            Builders<FcmsPendingMessage>.IndexKeys.Ascending(m => m.BroadcastId),
+            "ix_pending_messages_broadcast_id", ct);
 
         // ── Modules ───────────────────────────────────────────────────────────
 

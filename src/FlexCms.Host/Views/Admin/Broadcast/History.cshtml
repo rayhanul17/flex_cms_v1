@@ -1,0 +1,62 @@
+@using FlexCms.Framework.Clock
+@using FlexCms.Framework.Messaging
+@model List<FlexCms.Framework.Messaging.FcmsPendingMessage>
+@{
+    ViewData["Title"] = "Broadcast History";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="mb-0">Broadcast History (most recent 100)</h4>
+    <a asp-action="Index" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> Back
+    </a>
+</div>
+
+<div class="card shadow-sm">
+    <div class="table-responsive">
+        <table class="table mb-0 align-middle">
+            <thead>
+                <tr>
+                    <th>Created</th>
+                    <th>Channel</th>
+                    <th>To</th>
+                    <th>Subject</th>
+                    <th>Status</th>
+                    <th>Retries</th>
+                    <th>Last error</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (Model.Count == 0)
+                {
+                    <tr><td colspan="7" class="text-center text-muted py-4">No broadcasts yet.</td></tr>
+                }
+                @foreach (var m in Model)
+                {
+                    <tr>
+                        <td><small>@FcmsTime.Format(m.CreatedAt)</small></td>
+                        <td>@m.Channel</td>
+                        <td><code>@m.To</code></td>
+                        <td>@m.Subject</td>
+                        <td>
+                            @switch (m.DeliveryStatus)
+                            {
+                                case MessageDeliveryStatus.Sent:
+                                    <span class="badge text-bg-success">Sent</span>
+                                    break;
+                                case MessageDeliveryStatus.Failed:
+                                    <span class="badge text-bg-danger">Failed</span>
+                                    break;
+                                default:
+                                    <span class="badge text-bg-warning">Pending</span>
+                                    break;
+                            }
+                        </td>
+                        <td>@m.RetryCount</td>
+                        <td><small class="text-muted">@(m.LastError ?? "—")</small></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>

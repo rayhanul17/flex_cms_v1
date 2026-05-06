@@ -59,4 +59,8 @@ public static class FcmsPermissions
     // ── Admin: Settings ──────────────────────────────────────────────────────
     public const string SettingsManage = "settings.manage";
     public const string SettingsView = "settings.view";
+
+    // ── Admin: Messaging (Phase 8) ───────────────────────────────────────────
+    public const string MessagingBroadcast = "messaging.broadcast";
+    public const string MessagingView = "messaging.view";
 }

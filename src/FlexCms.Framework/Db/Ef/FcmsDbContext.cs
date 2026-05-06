@@ -3,6 +3,7 @@ using FlexCms.Framework.Cms;
 using FlexCms.Framework.Clock;
 using FlexCms.Framework.Db;
 using FlexCms.Framework.Helpers;
+using FlexCms.Framework.Messaging;
 using FlexCms.Framework.Modules;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
@@ -60,6 +61,9 @@ public class FcmsDbContext : IdentityDbContext<FcmsUser, FcmsRole, Guid>
     // Audit logs
     public DbSet<FcmsLog> Logs => Set<FcmsLog>();
     public DbSet<FcmsLogArchive> LogArchives => Set<FcmsLogArchive>();
+
+    // Phase 8 — restart-safe message queue
+    public DbSet<FcmsPendingMessage> PendingMessages => Set<FcmsPendingMessage>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -216,6 +220,15 @@ public class FcmsDbContext : IdentityDbContext<FcmsUser, FcmsRole, Guid>
         modelBuilder.Entity<FcmsPostTranslation>()
             .HasIndex(t => new { t.LanguageCode, t.Slug })
             .IsUnique();
+
+        // ── Pending message queue (Phase 8) ───────────────────────────────────
+        // Index supports the Pending|Failed-with-retries-left scan that
+        // MessageProcessorService runs every 30 seconds.
+        modelBuilder.Entity<FcmsPendingMessage>()
+            .HasIndex(m => new { m.DeliveryStatus, m.RetryCount });
+
+        modelBuilder.Entity<FcmsPendingMessage>()
+            .HasIndex(m => m.BroadcastId);
 
         // Audit log entities are append-only — strip the inherited lifecycle
         // columns and skip the soft-delete query filter (no Status column means

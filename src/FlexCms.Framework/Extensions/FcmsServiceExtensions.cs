@@ -10,6 +10,9 @@ using FlexCms.Framework.Db.Migration;
 using FlexCms.Framework.Db.MongoDb;
 using FlexCms.Framework.Hosting;
 using FlexCms.Framework.I18n;
+using FlexCms.Framework.Messaging;
+using FlexCms.Framework.Messaging.Gateways;
+using FlexCms.Framework.Messaging.Services;
 using FlexCms.Framework.Middleware;
 using FlexCms.Framework.Modules;
 using FlexCms.Framework.Services;
@@ -83,6 +86,33 @@ public static class FcmsServiceExtensions
         services.AddHostedService<TrashCleanupService>();
         services.AddScoped<IFcmsLogService, FcmsLogService>();
         services.AddHostedService<LogArchiveService>();
+
+        // ── Messaging (Phase 8) ──────────────────────────────────────────────
+        // Settings facades wrap ISettingsService with IDataProtector to keep
+        // SMTP password / SMS API key encrypted at rest.
+        services.AddScoped<ISmtpSettingsService, SmtpSettingsService>();
+        services.AddScoped<ISmsSettingsService, SmsSettingsService>();
+        services.AddScoped<IFcmsEmailService, SmtpEmailService>();
+
+        // SMS gateway pool — DispatchingSmsSender picks one per send via SmsSettings.Gateway.
+        services.AddHttpClient<AlphaSmsGateway>();
+        services.AddHttpClient<MramSmsGateway>();
+        services.AddHttpClient<OnnorokomSmsGateway>();
+        services.AddScoped<ISmsGateway>(sp => sp.GetRequiredService<AlphaSmsGateway>());
+        services.AddScoped<ISmsGateway>(sp => sp.GetRequiredService<MramSmsGateway>());
+        services.AddScoped<ISmsGateway>(sp => sp.GetRequiredService<OnnorokomSmsGateway>());
+        services.AddScoped<IFcmsSmsSender, DispatchingSmsSender>();
+
+        // In-memory bounded queue + worker (instant fire-and-forget).
+        services.AddSingleton(new FcmsBackgroundQueueOptions { Capacity = 1000 });
+        services.AddSingleton<IFcmsBackgroundQueue, FcmsBackgroundQueue>();
+        services.AddHostedService<FcmsQueueProcessor>();
+
+        // Restart-safe pending-message drainer (30s poll, retry 3x).
+        services.AddSingleton(new MessageProcessorOptions());
+        services.AddHostedService<MessageProcessorService>();
+
+        services.AddScoped<IBroadcastService, BroadcastService>();
 
         // Permission service (15min IMemoryCache — requires IRepository<> to be registered)
         services.AddMemoryCache();

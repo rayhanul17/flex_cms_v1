@@ -14841,17 +14841,22 @@ tests/FlexCms.Tests.Unit/Phase3/FcmsAuthorizeFilterTests.cs # +SuperAdmin upperc
 ---
 
 ### Phase 8 — Email + SMS + Background Jobs
-> **❌ NOT STARTED**
+> **✅ DONE** (2026-05-06) — see [phase-8-test-cases.md](phase-8-test-cases.md)
 **কাজ:**
-- `IFcmsEmailService` + `SmtpEmailService` (MailKit, IDataProtector for password)
-- `FcmsSmsSender` dispatcher (Alpha / MRAM / Onnorokom)
-- `SmsSettings` typed + IDataProtector API key encrypt
-- `IFcmsBackgroundQueue` + `FcmsQueueProcessor` (instant channel)
-- `FcmsPendingMessage` entity + `MessageProcessorService` (30s poll, retry 3×)
-- `BroadcastService` + `BroadcastController` (Email/SMS to All/Role/Selected)
-- Admin Settings: SMTP config UI + [Test Email] button
-- Admin Settings: SMS gateway select UI + [Test SMS] button
-- `FcmsOtpEntry` (IMemoryCache OTP — already used in Phase 2 auth)
+- `IFcmsEmailService` + `SmtpEmailService` (MailKit 4.16, returns `EmailSendResult` instead of throwing)
+- `SmtpSettings` + `ISmtpSettingsService` (IDataProtector encrypts password; "leave blank to keep" pattern)
+- `IFcmsSmsSender` + `DispatchingSmsSender` + per-gateway `ISmsGateway` impls: `AlphaSmsGateway`, `MramSmsGateway`, `OnnorokomSmsGateway` (each via typed HttpClient)
+- `SmsSettings` + `ISmsSettingsService` (IDataProtector encrypts API key)
+- `IFcmsBackgroundQueue` + `FcmsBackgroundQueue` (bounded `Channel<T>`, capacity 1000, full → TryEnqueue=false) + `FcmsQueueProcessor` (BackgroundService, scope-per-item, exception isolation)
+- `FcmsPendingMessage` entity (EF + Mongo) with `(DeliveryStatus, RetryCount)` + `(BroadcastId)` indexes
+- `MessageProcessorService` (30s poll, batch 50, retry 3×; uses `await using` async scope so `EfUnitOfWork` disposes cleanly)
+- `BroadcastService` + `/admin/broadcast` (channel × target = Email/SMS × All/Role/Selected; one row per recipient with `BroadcastId` grouping)
+- Admin: `/admin/messaging-settings` SMTP + SMS form with `[Send test email]` / `[Send test SMS]` AJAX buttons; `/admin/broadcast` + `/admin/broadcast/history`
+- Menu items: Messaging > Broadcast / SMTP-SMS (gated by `MessagingView` / `SettingsManage`)
+- Permissions: `MessagingView`, `MessagingBroadcast` (seeded by `SeedService`)
+- Wiring: `AuthController.ForgotPassword` enqueues the reset email through `IFcmsBackgroundQueue` → request stays fast even if SMTP is slow
+- `FcmsOtpEntry` (IMemoryCache OTP — already in Phase 2 auth, no Phase 8 work needed)
+- Tests: 20 unit + 9 integration (3 Mongo via Testcontainers + 6 EF in-memory). Project total 223 unit + 190 integration.
 
 **✅ Confirm করো:**
 - [ ] SMTP config → [Test Email] → email received at admin address

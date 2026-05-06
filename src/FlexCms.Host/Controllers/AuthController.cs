@@ -1,4 +1,5 @@
 using FlexCms.Framework.Auth;
+using FlexCms.Framework.Messaging;
 using FlexCms.Host.Models.Auth;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
@@ -11,15 +12,18 @@ public class AuthController : Controller
     private readonly UserManager<FcmsUser> _userManager;
     private readonly SignInManager<FcmsUser> _signInManager;
     private readonly RoleManager<FcmsRole> _roleManager;
+    private readonly IFcmsBackgroundQueue _queue;
 
     public AuthController(
         UserManager<FcmsUser> userManager,
         SignInManager<FcmsUser> signInManager,
-        RoleManager<FcmsRole> roleManager)
+        RoleManager<FcmsRole> roleManager,
+        IFcmsBackgroundQueue queue)
     {
         _userManager = userManager;
         _signInManager = signInManager;
         _roleManager = roleManager;
+        _queue = queue;
     }
 
     [HttpGet]
@@ -81,8 +85,26 @@ public class AuthController : Controller
             return View("ForgotPasswordConfirmation");
 
         var token = await _userManager.GeneratePasswordResetTokenAsync(user);
-        TempData["ResetToken"] = token;
-        TempData["UserId"] = user.Id.ToString();
+        var resetUrl = Url.Action(nameof(ResetPassword), "Auth",
+            new { token, userId = user.Id }, protocol: Request.Scheme) ?? "";
+
+        var html = $"""
+            <p>Hi {System.Net.WebUtility.HtmlEncode(user.UserName ?? "")},</p>
+            <p>You (or someone using your email) requested a password reset.
+            Click the link below to choose a new password — it expires shortly:</p>
+            <p><a href="{resetUrl}">Reset my password</a></p>
+            <p>If you didn't request this, you can safely ignore this email.</p>
+            """;
+
+        // Fire-and-forget through the in-memory queue. The processor opens its
+        // own scope and resolves IFcmsEmailService — keeps this request fast.
+        var to = user.Email ?? "";
+        _queue.TryEnqueue(async (sp, ct) =>
+        {
+            var email = sp.GetRequiredService<IFcmsEmailService>();
+            await email.SendAsync(new EmailMessage(to, "Reset your password", html), ct);
+        });
+
         return View("ForgotPasswordConfirmation");
     }
 

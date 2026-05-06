@@ -1,0 +1,142 @@
+@using FlexCms.Framework.Messaging
+@model FlexCms.Host.Models.Admin.MessagingSettingsViewModel
+@{
+    ViewData["Title"] = "Messaging Settings";
+}
+
+<h4 class="mb-3">Messaging Settings</h4>
+
+<form method="post" asp-action="Index">
+    @Html.AntiForgeryToken()
+    <div asp-validation-summary="ModelOnly" class="alert alert-danger"
+         style="display:@(ViewData.ModelState.IsValid ? "none" : "block")"></div>
+
+    @* ── SMTP ───────────────────────────────────────────────────── *@
+    <div class="card shadow-sm mb-3">
+        <div class="card-header fw-semibold">SMTP (Email)</div>
+        <div class="card-body">
+            <div class="form-check form-switch mb-3">
+                <input asp-for="SmtpEnabled" class="form-check-input" role="switch" />
+                <label asp-for="SmtpEnabled" class="form-check-label"></label>
+            </div>
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label asp-for="SmtpHost" class="form-label"></label>
+                    <input asp-for="SmtpHost" class="form-control" placeholder="smtp.gmail.com" />
+                </div>
+                <div class="col-md-3">
+                    <label asp-for="SmtpPort" class="form-label"></label>
+                    <input asp-for="SmtpPort" class="form-control" />
+                </div>
+                <div class="col-md-3 d-flex align-items-end">
+                    <div class="form-check form-switch mb-2">
+                        <input asp-for="SmtpUseSsl" class="form-check-input" role="switch" />
+                        <label asp-for="SmtpUseSsl" class="form-check-label"></label>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <label asp-for="SmtpUsername" class="form-label"></label>
+                    <input asp-for="SmtpUsername" class="form-control" autocomplete="off" />
+                </div>
+                <div class="col-md-6">
+                    <label asp-for="SmtpPassword" class="form-label"></label>
+                    <input asp-for="SmtpPassword" class="form-control" autocomplete="new-password"
+                           placeholder="@(Model.SmtpHasPassword ? "•••••••• (set — leave blank to keep)" : "Enter password")" />
+                </div>
+                <div class="col-md-6">
+                    <label asp-for="SmtpFromAddress" class="form-label"></label>
+                    <input asp-for="SmtpFromAddress" class="form-control" />
+                </div>
+                <div class="col-md-6">
+                    <label asp-for="SmtpFromName" class="form-label"></label>
+                    <input asp-for="SmtpFromName" class="form-control" />
+                </div>
+            </div>
+            <hr />
+            <div class="d-flex gap-2 align-items-center">
+                <input id="testEmailTo" type="email" class="form-control" style="max-width:300px"
+                       placeholder="recipient@example.com" />
+                <button type="button" id="btnTestEmail" class="btn btn-outline-primary">
+                    <i class="bi bi-send-check"></i> Send test email
+                </button>
+                <span id="testEmailStatus" class="small text-muted"></span>
+            </div>
+        </div>
+    </div>
+
+    @* ── SMS ────────────────────────────────────────────────────── *@
+    <div class="card shadow-sm mb-3">
+        <div class="card-header fw-semibold">SMS</div>
+        <div class="card-body">
+            <div class="form-check form-switch mb-3">
+                <input asp-for="SmsEnabled" class="form-check-input" role="switch" />
+                <label asp-for="SmsEnabled" class="form-check-label"></label>
+            </div>
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label asp-for="SmsGateway" class="form-label"></label>
+                    <select asp-for="SmsGateway" class="form-select">
+                        @foreach (var gw in SmsGateways.All)
+                        {
+                            <option value="@gw">@gw</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label asp-for="SmsSenderId" class="form-label"></label>
+                    <input asp-for="SmsSenderId" class="form-control" />
+                </div>
+                <div class="col-md-4">
+                    <label asp-for="SmsUsername" class="form-label"></label>
+                    <input asp-for="SmsUsername" class="form-control" />
+                </div>
+                <div class="col-md-6">
+                    <label asp-for="SmsApiKey" class="form-label"></label>
+                    <input asp-for="SmsApiKey" class="form-control" autocomplete="new-password"
+                           placeholder="@(Model.SmsHasApiKey ? "•••••••• (set — leave blank to keep)" : "Enter API key")" />
+                </div>
+                <div class="col-md-6">
+                    <label asp-for="SmsEndpointOverride" class="form-label"></label>
+                    <input asp-for="SmsEndpointOverride" class="form-control"
+                           placeholder="Default endpoint will be used if blank" />
+                </div>
+            </div>
+            <hr />
+            <div class="d-flex gap-2 align-items-center">
+                <input id="testSmsTo" type="text" class="form-control" style="max-width:300px"
+                       placeholder="01XXXXXXXXX" />
+                <button type="button" id="btnTestSms" class="btn btn-outline-primary">
+                    <i class="bi bi-chat-dots"></i> Send test SMS
+                </button>
+                <span id="testSmsStatus" class="small text-muted"></span>
+            </div>
+        </div>
+    </div>
+
+    <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg"></i> Save settings</button>
+</form>
+
+@section Scripts {
+<script>
+    function csrf() { return document.querySelector('input[name="__RequestVerificationToken"]').value; }
+    async function testSend(url, to, statusEl) {
+        statusEl.textContent = 'Sending…';
+        const fd = new FormData();
+        fd.append('to', to);
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: { 'X-FlexCms-Csrf': csrf() },
+            body: fd
+        });
+        const json = await res.json().catch(() => ({}));
+        statusEl.textContent = json.message || (res.ok ? 'Sent' : 'Failed');
+        statusEl.className = 'small ' + (json.isSuccess ? 'text-success' : 'text-danger');
+    }
+    document.getElementById('btnTestEmail').onclick = () =>
+        testSend('@Url.Action("TestEmail")', document.getElementById('testEmailTo').value,
+                 document.getElementById('testEmailStatus'));
+    document.getElementById('btnTestSms').onclick = () =>
+        testSend('@Url.Action("TestSms")', document.getElementById('testSmsTo').value,
+                 document.getElementById('testSmsStatus'));
+</script>
+}

@@ -14813,15 +14813,20 @@ tests/FlexCms.Tests.Unit/Phase3/FcmsAuthorizeFilterTests.cs # +SuperAdmin upperc
 ---
 
 ### Phase 7 — i18n + Translation
-> **❌ NOT STARTED**
+> **✅ DONE** (2026-05-06) — see [phase-7-test-cases.md](phase-7-test-cases.md)
 **কাজ:**
-- `LanguageMiddleware` (cookie `fcms_ui_lang` → `CultureInfo`)
-- `IFcmsTranslator` + `FcmsTranslator` (module → Core resx fallback)
-- `Resources/Strings.en.resx` + `Resources/Strings.bn.resx` (100+ keys)
-- `FcmsPageTranslation`, `FcmsPostTranslation` content translation
-- Language switcher (`POST /lang/set`)
+- `LanguageMiddleware` (cookie `fcms_ui_lang` → `CultureInfo`, also strips `/{lang}/` prefix in url-prefix mode)
+- `IFcmsTranslator` + `FcmsTranslator` (singleton; module → Framework JSON fallback)
+- `Resources/i18n/en.json` + `Resources/i18n/bn.json` (100+ keys; embedded resources, JSON instead of .resx for module-friendly merging via `LoadEmbeddedFromAssembly`)
+- `FcmsPageTranslation`, `FcmsPostTranslation` entities (EF + Mongo) with `(EntityId, Lang)` and `(Lang, Slug)` unique indexes
+- `PageService.ResolveBySlugAsync(slug, lang)` + `PostService.ResolveBySlugAsync` — translation slug match wins, base slug + overlay second, base-only fallback last; `null` only if no slug match anywhere (no 404 when only translation is missing)
+- Frontend (`FrontendController.Page`, `BlogController.Post`) overlays translation onto base entity before render
+- Language switcher (`POST /lang/set` with antiforgery + LocalRedirect) wired to `_AdminLayout` topbar partial `_LangSwitcher`
+- Razor: `@Html.T(key)` and `@Html.TR(key)` extension helpers; `_ViewImports` adds `@using FlexCms.Framework.I18n`
 - `SiteSettings.LanguageMode` — cookie vs url-prefix
 - `SiteSettings.DefaultLanguage`
+- Settings UI: dropdown for both fields
+- Tests: 23 unit + 18 integration (5 Mongo via Testcontainers + 13 EF in-memory). Total 203 unit + 181 integration project-wide.
 
 **✅ Confirm করো:**
 - [ ] Admin: toggle to BN → all labels (Save, Cancel, Delete, etc.) in Bengali

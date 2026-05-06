@@ -1,0 +1,41 @@
+@using FlexCms.Framework.I18n
+@inject IFcmsTranslator Translator
+@{
+    var current = Translator.CurrentLanguage;
+    var supported = Translator.SupportedLanguages;
+    var returnUrl = Context.Request.Path + Context.Request.QueryString;
+    var labels = new Dictionary<string, string>
+    {
+        ["en"] = "English",
+        ["bn"] = "বাংলা"
+    };
+}
+
+@if (supported.Count > 1)
+{
+    <div class="dropdown lang-switcher">
+        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button"
+                data-bs-toggle="dropdown" aria-expanded="false" title="@Translator.T("nav.languages")">
+            <i class="bi bi-translate"></i>
+            <span class="ms-1 text-uppercase">@current</span>
+        </button>
+        <ul class="dropdown-menu dropdown-menu-end">
+            @foreach (var code in supported)
+            {
+                var label = labels.TryGetValue(code, out var l) ? l : code.ToUpperInvariant();
+                var active = string.Equals(code, current, StringComparison.OrdinalIgnoreCase);
+                <li>
+                    <form asp-controller="Language" asp-action="Set" method="post" class="m-0">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="lang" value="@code" />
+                        <input type="hidden" name="returnUrl" value="@returnUrl" />
+                        <button type="submit" class="dropdown-item @(active ? "active" : "")">
+                            <span class="text-uppercase fw-semibold me-2">@code</span>
+                            @label
+                        </button>
+                    </form>
+                </li>
+            }
+        </ul>
+    </div>
+}

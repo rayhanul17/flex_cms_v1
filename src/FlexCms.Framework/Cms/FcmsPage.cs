@@ -25,4 +25,6 @@ public class FcmsPage : BaseEfEntity
     public Guid? AuthorId { get; set; }
     public PageAccessControl AccessControl { get; set; } = PageAccessControl.Public;
     public string? PasswordHash { get; set; }
+
+    public ICollection<FcmsPageTranslation> Translations { get; set; } = [];
 }

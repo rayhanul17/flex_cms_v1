@@ -29,12 +29,20 @@
                     <label asp-for="SiteBaseUrl" class="form-label"></label>
                     <input asp-for="SiteBaseUrl" class="form-control" placeholder="https://example.com" />
                 </div>
-                <div class="col-md-6">
+                <div class="col-md-3">
                     <label asp-for="DefaultLanguage" class="form-label"></label>
                     <select asp-for="DefaultLanguage" class="form-select">
                         <option value="en">English</option>
-                        <option value="bn">Bangla</option>
+                        <option value="bn">বাংলা</option>
                     </select>
+                </div>
+                <div class="col-md-3">
+                    <label asp-for="LanguageMode" class="form-label"></label>
+                    <select asp-for="LanguageMode" class="form-select">
+                        <option value="cookie">Cookie (URL stays the same)</option>
+                        <option value="url-prefix">URL prefix (/en/, /bn/)</option>
+                    </select>
+                    <small class="text-muted">Cookie: visitors see content in their preferred language at the same URL. URL prefix: each language gets its own path (better for SEO).</small>
                 </div>
             </div>
         </div>

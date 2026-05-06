@@ -9,6 +9,7 @@ using FlexCms.Framework.Db.Ef;
 using FlexCms.Framework.Db.Migration;
 using FlexCms.Framework.Db.MongoDb;
 using FlexCms.Framework.Hosting;
+using FlexCms.Framework.I18n;
 using FlexCms.Framework.Middleware;
 using FlexCms.Framework.Modules;
 using FlexCms.Framework.Services;
@@ -56,6 +57,17 @@ public static class FcmsServiceExtensions
 
         // Settings service (DB-backed; only useful when a DB provider is configured)
         services.AddScoped<ISettingsService, SettingsService>();
+
+        // i18n — singleton translator preloaded with embedded Framework JSONs.
+        // LanguageMiddleware writes the per-request current + site-default
+        // language into HttpContext.Items so the translator never has to call
+        // the (scoped) ISettingsService directly.
+        services.AddSingleton<IFcmsTranslator>(sp =>
+        {
+            var http = sp.GetService<IHttpContextAccessor>();
+            var logger = sp.GetService<Microsoft.Extensions.Logging.ILogger<FcmsTranslator>>();
+            return new FcmsTranslator(http, logger);
+        });
 
         // File storage — local by default; swap for cloud implementation without changing services
         services.AddScoped<IFcmsFileStorage, LocalFileStorage>();

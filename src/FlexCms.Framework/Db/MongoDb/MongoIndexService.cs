@@ -104,6 +104,36 @@ public class MongoIndexService : IHostedService
             Builders<FcmsRedirect>.IndexKeys.Ascending(r => r.FromPath),
             "ux_redirects_from_path", ct);
 
+        // ── Translations (Phase 7) ────────────────────────────────────────────
+
+        // (PageId, LanguageCode) unique
+        await UniqueAsync<FcmsPageTranslation>(
+            Builders<FcmsPageTranslation>.IndexKeys
+                .Ascending(t => t.PageId)
+                .Ascending(t => t.LanguageCode),
+            "ux_page_translations_page_lang", ct);
+
+        // (LanguageCode, Slug) unique
+        await UniqueAsync<FcmsPageTranslation>(
+            Builders<FcmsPageTranslation>.IndexKeys
+                .Ascending(t => t.LanguageCode)
+                .Ascending(t => t.Slug),
+            "ux_page_translations_lang_slug", ct);
+
+        // (PostId, LanguageCode) unique
+        await UniqueAsync<FcmsPostTranslation>(
+            Builders<FcmsPostTranslation>.IndexKeys
+                .Ascending(t => t.PostId)
+                .Ascending(t => t.LanguageCode),
+            "ux_post_translations_post_lang", ct);
+
+        // (LanguageCode, Slug) unique
+        await UniqueAsync<FcmsPostTranslation>(
+            Builders<FcmsPostTranslation>.IndexKeys
+                .Ascending(t => t.LanguageCode)
+                .Ascending(t => t.Slug),
+            "ux_post_translations_lang_slug", ct);
+
         // ── Modules ───────────────────────────────────────────────────────────
 
         // FcmsModuleRecord.ModuleId unique

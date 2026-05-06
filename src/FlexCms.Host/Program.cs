@@ -122,6 +122,7 @@ app.UseStatusCodePagesWithReExecute("/Home/Error/{0}");
 app.UseHttpsRedirection();
 app.UseStaticFiles();
 app.UseMiddleware<RedirectMiddleware>();   // after static files — no DB hit per asset
+app.UseMiddleware<FlexCms.Framework.I18n.LanguageMiddleware>();   // sets culture + strips /{lang}/ prefix BEFORE routing
 app.UseRouting();
 app.UseSession();
 app.UseRateLimiter();

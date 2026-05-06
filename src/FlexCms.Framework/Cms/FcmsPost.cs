@@ -18,4 +18,6 @@ public class FcmsPost : BaseEfEntity
     public Guid? AuthorId { get; set; }
     public int ViewCount { get; set; }
     public ICollection<FcmsPostTag> PostTags { get; set; } = [];
+
+    public ICollection<FcmsPostTranslation> Translations { get; set; } = [];
 }

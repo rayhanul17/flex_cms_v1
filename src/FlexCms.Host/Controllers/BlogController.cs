@@ -1,4 +1,5 @@
 using FlexCms.Framework.Cms;
+using FlexCms.Framework.I18n;
 using Microsoft.AspNetCore.Mvc;
 
 namespace FlexCms.Host.Controllers;
@@ -8,11 +9,13 @@ public class BlogController : Controller
 {
     private readonly IPostService _posts;
     private readonly ICategoryService _categories;
+    private readonly IFcmsTranslator _translator;
 
-    public BlogController(IPostService posts, ICategoryService categories)
+    public BlogController(IPostService posts, ICategoryService categories, IFcmsTranslator translator)
     {
         _posts = posts;
         _categories = categories;
+        _translator = translator;
     }
 
     [HttpGet("")]
@@ -40,8 +43,19 @@ public class BlogController : Controller
     [HttpGet("{slug}")]
     public async Task<IActionResult> Post(string slug, CancellationToken ct)
     {
-        var post = await _posts.GetBySlugAsync(slug, ct);
-        if (post is null || !post.IsPublished) return NotFound();
+        var resolved = await _posts.ResolveBySlugAsync(slug, _translator.CurrentLanguage, ct);
+        if (resolved is null) return NotFound();
+        var (post, translation) = resolved.Value;
+        if (!post.IsPublished) return NotFound();
+
+        if (translation is not null)
+        {
+            post.Title = translation.Title;
+            post.Excerpt = translation.Excerpt;
+            post.Content = translation.Content;
+            post.MetaTitle = translation.MetaTitle;
+            post.MetaDescription = translation.MetaDescription;
+        }
 
         await _posts.IncrementViewCountAsync(post.Id, ct);
         return View(post);

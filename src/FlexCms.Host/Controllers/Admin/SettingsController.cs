@@ -45,6 +45,7 @@ public class SettingsController : BaseAdminController
         site.Tagline = vm.SiteTagline?.Trim() ?? "";
         site.BaseUrl = vm.SiteBaseUrl?.Trim() ?? "";
         site.DefaultLanguage = vm.DefaultLanguage ?? "en";
+        site.LanguageMode = (vm.LanguageMode ?? "cookie").ToLowerInvariant();
         site.TimeZone = vm.TimeZoneId ?? site.TimeZone;
         site.DateTimeFormat = string.IsNullOrWhiteSpace(vm.DateTimeFormat) ? "yyyy-MM-dd HH:mm" : vm.DateTimeFormat.Trim();
         site.TrashRetentionDays = vm.TrashRetentionDays;
@@ -80,6 +81,7 @@ public class SettingsController : BaseAdminController
             SiteTagline = site.Tagline,
             SiteBaseUrl = site.BaseUrl,
             DefaultLanguage = site.DefaultLanguage,
+            LanguageMode = site.LanguageMode,
             TimeZoneId = site.TimeZone,
             DateTimeFormat = site.DateTimeFormat,
             TrashRetentionDays = site.TrashRetentionDays,

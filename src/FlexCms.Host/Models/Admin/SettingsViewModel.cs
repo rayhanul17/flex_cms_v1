@@ -16,6 +16,9 @@ public class SettingsViewModel
     [Display(Name = "Default Language")]
     public string DefaultLanguage { get; set; } = "en";
 
+    [Display(Name = "Language mode")]
+    public string LanguageMode { get; set; } = "cookie";
+
     [Display(Name = "Time Zone")]
     public string TimeZoneId { get; set; } = "";
 

@@ -17,4 +17,18 @@ public interface IPostService
     Task HardDeleteAsync(Guid id, CancellationToken ct = default);
     /// <summary>Returns tag slugs for a post without relying on navigation-property loading.</summary>
     Task<List<string>> GetTagSlugsAsync(Guid postId, CancellationToken ct = default);
+
+    // ── Translations (Phase 7) ───────────────────────────────────────────────
+
+    /// <summary>
+    /// Resolve a post by language-aware slug. Translation slug match wins, then
+    /// base slug. Returns the base post (for routing/access) and the matching
+    /// translation if any.
+    /// </summary>
+    Task<(FcmsPost Post, FcmsPostTranslation? Translation)?> ResolveBySlugAsync(string slug, string lang, CancellationToken ct = default);
+
+    Task<List<FcmsPostTranslation>> GetTranslationsAsync(Guid postId, CancellationToken ct = default);
+    Task<FcmsPostTranslation?> GetTranslationAsync(Guid postId, string lang, CancellationToken ct = default);
+    Task<FcmsPostTranslation> SaveTranslationAsync(FcmsPostTranslation tr, CancellationToken ct = default);
+    Task DeleteTranslationAsync(Guid translationId, CancellationToken ct = default);
 }

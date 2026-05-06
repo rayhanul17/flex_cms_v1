@@ -1,5 +1,6 @@
 using FlexCms.Framework.Cms;
 using FlexCms.Framework.Helpers;
+using FlexCms.Framework.I18n;
 using Microsoft.AspNetCore.Mvc;
 
 namespace FlexCms.Host.Controllers;
@@ -7,16 +8,33 @@ namespace FlexCms.Host.Controllers;
 public class FrontendController : Controller
 {
     private readonly IPageService _pages;
+    private readonly IFcmsTranslator _translator;
 
-    public FrontendController(IPageService pages) => _pages = pages;
+    public FrontendController(IPageService pages, IFcmsTranslator translator)
+    {
+        _pages = pages;
+        _translator = translator;
+    }
 
     [HttpGet]
     public async Task<IActionResult> Page(string slug, CancellationToken ct)
     {
-        var page = await _pages.GetBySlugAsync(slug, ct);
+        var resolved = await _pages.ResolveBySlugAsync(slug, _translator.CurrentLanguage, ct);
+        if (resolved is null) return NotFound();
+        var (page, translation) = resolved.Value;
 
-        if (page is null || !page.IsPublished)
+        if (!page.IsPublished)
             return NotFound();
+
+        // Overlay translation fields onto the page so the view shows the correct
+        // language; routing/access decisions still come from the base entity.
+        if (translation is not null)
+        {
+            page.Title = translation.Title;
+            page.Content = translation.Content;
+            page.MetaTitle = translation.MetaTitle;
+            page.MetaDescription = translation.MetaDescription;
+        }
 
         switch (page.AccessControl)
         {

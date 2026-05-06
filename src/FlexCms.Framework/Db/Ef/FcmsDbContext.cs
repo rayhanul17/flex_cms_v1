@@ -54,6 +54,8 @@ public class FcmsDbContext : IdentityDbContext<FcmsUser, FcmsRole, Guid>
     public DbSet<FcmsRedirect> Redirects => Set<FcmsRedirect>();
     public DbSet<FcmsMediaFolder> MediaFolders => Set<FcmsMediaFolder>();
     public DbSet<FcmsMedia> Media => Set<FcmsMedia>();
+    public DbSet<FcmsPageTranslation> PageTranslations => Set<FcmsPageTranslation>();
+    public DbSet<FcmsPostTranslation> PostTranslations => Set<FcmsPostTranslation>();
 
     // Audit logs
     public DbSet<FcmsLog> Logs => Set<FcmsLog>();
@@ -182,6 +184,38 @@ public class FcmsDbContext : IdentityDbContext<FcmsUser, FcmsRole, Guid>
             .WithMany(f => f.Media)
             .HasForeignKey(m => m.FolderId)
             .OnDelete(DeleteBehavior.SetNull);
+
+        // ── Translations (Phase 7) ────────────────────────────────────────────
+
+        modelBuilder.Entity<FcmsPageTranslation>()
+            .HasOne(t => t.Page)
+            .WithMany(p => p.Translations)
+            .HasForeignKey(t => t.PageId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        // (PageId, LanguageCode) unique → at most one translation per language
+        modelBuilder.Entity<FcmsPageTranslation>()
+            .HasIndex(t => new { t.PageId, t.LanguageCode })
+            .IsUnique();
+
+        // (LanguageCode, Slug) unique → /bn/about-us and /en/about-us coexist
+        modelBuilder.Entity<FcmsPageTranslation>()
+            .HasIndex(t => new { t.LanguageCode, t.Slug })
+            .IsUnique();
+
+        modelBuilder.Entity<FcmsPostTranslation>()
+            .HasOne(t => t.Post)
+            .WithMany(p => p.Translations)
+            .HasForeignKey(t => t.PostId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<FcmsPostTranslation>()
+            .HasIndex(t => new { t.PostId, t.LanguageCode })
+            .IsUnique();
+
+        modelBuilder.Entity<FcmsPostTranslation>()
+            .HasIndex(t => new { t.LanguageCode, t.Slug })
+            .IsUnique();
 
         // Audit log entities are append-only — strip the inherited lifecycle
         // columns and skip the soft-delete query filter (no Status column means

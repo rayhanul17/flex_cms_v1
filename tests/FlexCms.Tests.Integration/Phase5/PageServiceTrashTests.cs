@@ -21,7 +21,11 @@ public class PageServiceTrashTests : IDisposable
             .Options;
         _db = new FcmsDbContext(opts);
 #pragma warning disable CA2000
-        _svc = new PageService(new EfRepository<FcmsPage>(_db), new EfUnitOfWork(_db), Substitute.For<IFcmsLogService>());
+        _svc = new PageService(
+            new EfRepository<FcmsPage>(_db),
+            new EfRepository<FcmsPageTranslation>(_db),
+            new EfUnitOfWork(_db),
+            Substitute.For<IFcmsLogService>());
 #pragma warning restore CA2000
     }
 

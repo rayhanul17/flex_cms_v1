@@ -14873,19 +14873,19 @@ tests/FlexCms.Tests.Unit/Phase3/FcmsAuthorizeFilterTests.cs # +SuperAdmin upperc
 ---
 
 ### Phase 9 — Admin UX + Notifications + Widgets + Audit
-> **❌ NOT STARTED** (Note: Dynamic Menu System — originally part of this phase — built ahead of schedule. See Post-Phase-5 Enhancements section)
+> **✅ DONE** (2026-05-06) — see [phase-9-test-cases.md](phase-9-test-cases.md)
+> Items already shipped earlier: audit log + `FcmsLogService` (Phase 6), toast/confirm/dialog JS APIs (Phase 6), DataTable helper (Phase 6), Dynamic Menu System (Phase 6).
 **কাজ:**
-- `FcmsAuditLog` (MongoDB, fire-and-forget from `SaveChangesAsync`)
-- `AuditLogService` ([FcmsSingleton], own MongoDB connection)
-- `FcmsNotification` entity + `IFcmsNotificationService`
-- Admin bell icon (60s AJAX poll) + dropdown + mark read
-- Admin dashboard: stats cards + recent activity + quick actions + system info
-- `FcmsWidget` + `IFcmsWidgetManager` + `FcmsWidgetPlacement` entity
-- Admin Widget Manager (drag-drop placement, per-widget config)
-- `_FcmsMessages.cshtml` partial (TempData toast + ViewBag inline alert)
-- `fcms.js` (toast, confirm, loader, handleResponse, datatable helper)
-- Honeypot (`IFcmsHoneypotService`, `_Honeypot.cshtml`, hidden `fcms_hp` field)
-- `IFcmsViewRenderService` (Razor → HTML string for widgets + email templates)
+- `FcmsNotification` entity (EF + Mongo) with `(UserId, IsRead, CreatedAt)` composite index
+- `IFcmsNotificationService` + `FcmsNotificationService`: `NotifyUserAsync`, `NotifyAllAsync` (per-user expansion), `GetRecentAsync`, `GetUnreadCountAsync`, `MarkReadAsync` (ownership check), `MarkAllReadAsync`
+- Admin bell icon `_NotificationBell.cshtml` partial wired into `_AdminLayout` topbar (60s AJAX poll, dropdown render client-side, mark-read on item click, "Mark all read" button)
+- `NotificationController` (`/admin/notifications/{recent,mark-read/{id},mark-all-read}`) — JSON only, CSRF via `X-FlexCms-Csrf` from existing `<meta name="csrf-token">`
+- Admin dashboard rebuilt: 8 stat cards (Pages, Posts, Users, Media, Categories, Roles, Pending+Failed messages) + Recent Activity table (last 10 audit-log rows) + System panel (version, runtime, OS); 5-minute `IMemoryCache` on the heavy COUNT sweep
+- `IFcmsHoneypotService` + `FcmsHoneypotService` (field name `fcms_hp`) + `<fcms-honeypot />` TagHelper rendering an off-screen, `aria-hidden="true"`, `tabindex="-1"` input pair
+- `IFcmsViewRenderService` + `FcmsViewRenderService` (renders Razor to string from any context — widgets, email templates, scheduled exports)
+- Widget system: `IFcmsWidget` interface, `FcmsWidgetPlacement` entity (`Zone` + `SortOrder` + `Enabled` + `ConfigJson`), `IFcmsWidgetManager` + `FcmsWidgetManager` with `RenderZoneAsync(zone)` (orders by SortOrder, skips disabled, ignores unknown widget ids, isolates per-widget exceptions), `AddAsync` / `UpdateAsync` / `DeleteAsync` / `ReorderZoneAsync` for the admin placement editor
+- DI wired in `FcmsServiceExtensions`; Mongo indexes added to `MongoIndexService`
+- Tests: 12 unit (honeypot + widget manager full coverage) + 9 integration (3 Mongo via Testcontainers + 6 EF in-memory). Project total 235 unit + 199 integration.
 
 **✅ Confirm করো:**
 - [ ] Page edit → SaveChangesAsync → MongoDB audit entry with OldValueJson + NewValueJson

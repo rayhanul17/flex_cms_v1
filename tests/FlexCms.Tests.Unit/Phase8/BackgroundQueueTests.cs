@@ -39,10 +39,14 @@ public class BackgroundQueueTests
         var scopes = sp.GetRequiredService<IServiceScopeFactory>();
 
         var q = new FcmsBackgroundQueue(new FcmsBackgroundQueueOptions { Capacity = 10 });
+#pragma warning disable CA2000
         var processor = new FcmsQueueProcessor(q, scopes, NullLogger<FcmsQueueProcessor>.Instance);
+#pragma warning restore CA2000
 
         var seenIds = new List<Guid>();
+#pragma warning disable CA2000
         var sync = new SemaphoreSlim(0);
+#pragma warning restore CA2000
 
         q.TryEnqueue((sp1, _) => { seenIds.Add(sp1.GetRequiredService<MarkerService>().Id); sync.Release(); return Task.CompletedTask; });
         q.TryEnqueue((sp2, _) => { seenIds.Add(sp2.GetRequiredService<MarkerService>().Id); sync.Release(); return Task.CompletedTask; });
@@ -66,7 +70,9 @@ public class BackgroundQueueTests
         var sp = new ServiceCollection().BuildServiceProvider();
         var scopes = sp.GetRequiredService<IServiceScopeFactory>();
         var q = new FcmsBackgroundQueue(new FcmsBackgroundQueueOptions { Capacity = 5 });
+#pragma warning disable CA2000
         var processor = new FcmsQueueProcessor(q, scopes, NullLogger<FcmsQueueProcessor>.Instance);
+#pragma warning restore CA2000
 
         var second = new TaskCompletionSource();
         q.TryEnqueue((_, _) => throw new InvalidOperationException("boom"));

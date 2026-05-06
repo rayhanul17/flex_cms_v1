@@ -1,18 +1,21 @@
+@using FlexCms.Framework.Clock
+@model FlexCms.Host.Models.Admin.DashboardViewModel
 @{
     ViewData["Title"] = "Dashboard";
 }
 
 <h4 class="mb-4">Dashboard</h4>
 
-<div class="row g-3">
+@* ── Stats cards ────────────────────────────────────────────── *@
+<div class="row g-3 mb-4">
     <div class="col-md-6 col-xl-3">
         <a href="/admin/pages" class="card text-decoration-none shadow-sm h-100">
             <div class="card-body">
                 <div class="d-flex align-items-center">
-                    <i class="bi bi-file-earmark fs-3 text-primary me-3"></i>
+                    <i class="bi bi-file-earmark fs-2 text-primary me-3"></i>
                     <div>
                         <div class="text-muted small">Pages</div>
-                        <div class="fw-semibold">Manage</div>
+                        <div class="h4 mb-0">@Model.Pages</div>
                     </div>
                 </div>
             </div>
@@ -22,10 +25,10 @@
         <a href="/admin/posts" class="card text-decoration-none shadow-sm h-100">
             <div class="card-body">
                 <div class="d-flex align-items-center">
-                    <i class="bi bi-newspaper fs-3 text-success me-3"></i>
+                    <i class="bi bi-newspaper fs-2 text-success me-3"></i>
                     <div>
-                        <div class="text-muted small">Posts</div>
-                        <div class="fw-semibold">Manage</div>
+                        <div class="text-muted small">Posts (Published)</div>
+                        <div class="h4 mb-0">@Model.Posts <small class="text-muted">(@Model.PublishedPosts)</small></div>
                     </div>
                 </div>
             </div>
@@ -35,26 +38,132 @@
         <a href="/admin/users" class="card text-decoration-none shadow-sm h-100">
             <div class="card-body">
                 <div class="d-flex align-items-center">
-                    <i class="bi bi-people fs-3 text-warning me-3"></i>
+                    <i class="bi bi-people fs-2 text-warning me-3"></i>
                     <div>
                         <div class="text-muted small">Users</div>
-                        <div class="fw-semibold">Manage</div>
+                        <div class="h4 mb-0">@Model.Users</div>
                     </div>
                 </div>
             </div>
         </a>
     </div>
     <div class="col-md-6 col-xl-3">
-        <a href="/admin/modules" class="card text-decoration-none shadow-sm h-100">
+        <a href="/admin/media" class="card text-decoration-none shadow-sm h-100">
             <div class="card-body">
                 <div class="d-flex align-items-center">
-                    <i class="bi bi-puzzle fs-3 text-info me-3"></i>
+                    <i class="bi bi-images fs-2 text-info me-3"></i>
                     <div>
-                        <div class="text-muted small">Modules</div>
-                        <div class="fw-semibold">Manage</div>
+                        <div class="text-muted small">Media files</div>
+                        <div class="h4 mb-0">@Model.MediaFiles</div>
                     </div>
                 </div>
             </div>
         </a>
+    </div>
+    <div class="col-md-6 col-xl-3">
+        <a href="/admin/categories" class="card text-decoration-none shadow-sm h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <i class="bi bi-folder fs-2 text-secondary me-3"></i>
+                    <div>
+                        <div class="text-muted small">Categories</div>
+                        <div class="h4 mb-0">@Model.Categories</div>
+                    </div>
+                </div>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-6 col-xl-3">
+        <a href="/admin/roles" class="card text-decoration-none shadow-sm h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <i class="bi bi-shield-lock fs-2 text-danger me-3"></i>
+                    <div>
+                        <div class="text-muted small">Roles</div>
+                        <div class="h4 mb-0">@Model.Roles</div>
+                    </div>
+                </div>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-6 col-xl-3">
+        <a href="/admin/broadcast/history" class="card text-decoration-none shadow-sm h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <i class="bi bi-envelope-paper fs-2 text-warning me-3"></i>
+                    <div>
+                        <div class="text-muted small">Pending messages</div>
+                        <div class="h4 mb-0">@Model.PendingMessages</div>
+                    </div>
+                </div>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-6 col-xl-3">
+        <a href="/admin/broadcast/history" class="card text-decoration-none shadow-sm h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <i class="bi bi-x-octagon fs-2 text-danger me-3"></i>
+                    <div>
+                        <div class="text-muted small">Failed messages</div>
+                        <div class="h4 mb-0">@Model.FailedMessages</div>
+                    </div>
+                </div>
+            </div>
+        </a>
+    </div>
+</div>
+
+@* ── Recent activity + system info ─────────────────────────── *@
+<div class="row g-3">
+    <div class="col-lg-8">
+        <div class="card shadow-sm h-100">
+            <div class="card-header fw-semibold d-flex justify-content-between align-items-center">
+                <span>Recent activity</span>
+                <a href="/admin/audit-log" class="small text-decoration-none">View all →</a>
+            </div>
+            <div class="card-body p-0">
+                <table class="table table-sm mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>When</th>
+                            <th>Action</th>
+                            <th>Entity</th>
+                            <th>User</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (Model.RecentActivity.Count == 0)
+                        {
+                            <tr><td colspan="4" class="text-center text-muted py-3">No activity yet.</td></tr>
+                        }
+                        @foreach (var l in Model.RecentActivity)
+                        {
+                            <tr>
+                                <td><small>@FcmsTime.Format(l.CreatedAt)</small></td>
+                                <td><code class="small">@l.Action</code></td>
+                                <td><small>@l.EntityType</small></td>
+                                <td><small>@(string.IsNullOrEmpty(l.UserName) ? "(system)" : l.UserName)</small></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-4">
+        <div class="card shadow-sm h-100">
+            <div class="card-header fw-semibold">System</div>
+            <div class="card-body">
+                <dl class="mb-0 small">
+                    <dt>Version</dt>
+                    <dd class="text-muted">@(Model.AppVersion ?? "—")</dd>
+                    <dt>Runtime</dt>
+                    <dd class="text-muted">@Model.Runtime</dd>
+                    <dt>OS</dt>
+                    <dd class="text-muted">@Model.Os</dd>
+                </dl>
+            </div>
+        </div>
     </div>
 </div>

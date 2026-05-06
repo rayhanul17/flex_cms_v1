@@ -14,6 +14,10 @@ using FlexCms.Framework.Messaging;
 using FlexCms.Framework.Messaging.Gateways;
 using FlexCms.Framework.Messaging.Services;
 using FlexCms.Framework.Middleware;
+using FlexCms.Framework.Notifications;
+using FlexCms.Framework.Rendering;
+using FlexCms.Framework.Security;
+using FlexCms.Framework.Widgets;
 using FlexCms.Framework.Modules;
 using FlexCms.Framework.Services;
 using FlexCms.Framework.Setup;
@@ -113,6 +117,12 @@ public static class FcmsServiceExtensions
         services.AddHostedService<MessageProcessorService>();
 
         services.AddScoped<IBroadcastService, BroadcastService>();
+
+        // ── Phase 9: Notifications + widgets + honeypot + view rendering ─────
+        services.AddScoped<IFcmsNotificationService, FcmsNotificationService>();
+        services.AddScoped<IFcmsWidgetManager, FcmsWidgetManager>();
+        services.AddSingleton<IFcmsHoneypotService, FcmsHoneypotService>();
+        services.AddScoped<IFcmsViewRenderService, FcmsViewRenderService>();
 
         // Permission service (15min IMemoryCache — requires IRepository<> to be registered)
         services.AddMemoryCache();

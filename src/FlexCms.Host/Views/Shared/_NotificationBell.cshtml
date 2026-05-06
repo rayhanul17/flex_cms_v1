@@ -1,0 +1,110 @@
+@*
+    Bell icon for the admin top bar. Polls /admin/notifications/recent every 60s
+    for the unread count + dropdown content. The dropdown is rendered client-side
+    from the JSON payload so a slow network never blocks the topbar render.
+*@
+
+<div class="dropdown" id="fcmsBell">
+    <button class="btn btn-sm btn-outline-secondary position-relative" type="button"
+            data-bs-toggle="dropdown" aria-expanded="false" id="fcmsBellBtn">
+        <i class="bi bi-bell"></i>
+        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger d-none"
+              id="fcmsBellBadge" style="font-size:.6rem">0</span>
+    </button>
+    <ul class="dropdown-menu dropdown-menu-end p-0" style="min-width:340px;max-width:380px;max-height:480px;overflow-y:auto">
+        <li class="d-flex justify-content-between align-items-center px-3 py-2 border-bottom">
+            <strong class="small">Notifications</strong>
+            <button type="button" class="btn btn-link btn-sm text-decoration-none" id="fcmsBellMarkAll">
+                Mark all read
+            </button>
+        </li>
+        <li id="fcmsBellList" class="list-unstyled m-0">
+            <div class="px-3 py-3 text-center text-muted small">Loading…</div>
+        </li>
+    </ul>
+</div>
+
+<script>
+(() => {
+    const POLL_MS = 60_000;
+    const badge   = document.getElementById('fcmsBellBadge');
+    const list    = document.getElementById('fcmsBellList');
+    const markAll = document.getElementById('fcmsBellMarkAll');
+
+    function csrf() {
+        // Pull the CSRF token from the meta tag the layout always emits.
+        return document.querySelector('meta[name="csrf-token"]')?.content || '';
+    }
+
+    function levelClass(l) {
+        return ({ info: 'text-info', success: 'text-success', warning: 'text-warning', danger: 'text-danger' }[l]) || 'text-muted';
+    }
+
+    function escapeHtml(s) {
+        return (s ?? '').toString().replace(/[&<>"']/g, c =>
+            ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+    }
+
+    function renderItem(n) {
+        const cls = levelClass(n.level);
+        const url = n.url ? `href="${escapeHtml(n.url)}"` : 'href="#"';
+        return `
+        <a ${url} class="d-flex gap-2 px-3 py-2 border-bottom text-decoration-none text-body fcms-bell-item ${n.isRead ? 'bg-white' : 'bg-light'}"
+           data-id="${n.id}">
+            <i class="${escapeHtml(n.icon)} ${cls} mt-1"></i>
+            <div class="flex-grow-1">
+                <div class="d-flex justify-content-between">
+                    <strong class="small">${escapeHtml(n.title)}</strong>
+                    <small class="text-muted ms-2">${escapeHtml(n.createdAt)}</small>
+                </div>
+                ${n.body ? `<div class="small text-muted">${escapeHtml(n.body)}</div>` : ''}
+            </div>
+        </a>`;
+    }
+
+    async function refresh() {
+        try {
+            const res = await fetch('/admin/notifications/recent', { headers: { 'X-Requested-With': 'fetch' }});
+            if (!res.ok) return;
+            const json = await res.json();
+            if (!json.isSuccess) return;
+
+            if (json.unread > 0) {
+                badge.textContent = json.unread > 99 ? '99+' : json.unread;
+                badge.classList.remove('d-none');
+            } else {
+                badge.classList.add('d-none');
+            }
+
+            list.innerHTML = json.items.length === 0
+                ? '<div class="px-3 py-3 text-center text-muted small">No notifications.</div>'
+                : json.items.map(renderItem).join('');
+        } catch { /* network blip — try next poll */ }
+    }
+
+    list.addEventListener('click', async (e) => {
+        const a = e.target.closest('.fcms-bell-item');
+        if (!a) return;
+        const id = a.dataset.id;
+        if (!id) return;
+        try {
+            await fetch(`/admin/notifications/mark-read/${id}`, {
+                method: 'POST', headers: { 'X-FlexCms-Csrf': csrf() }
+            });
+        } catch {}
+        // Don't preventDefault — let the browser navigate to the URL if any.
+    });
+
+    markAll?.addEventListener('click', async () => {
+        try {
+            await fetch('/admin/notifications/mark-all-read', {
+                method: 'POST', headers: { 'X-FlexCms-Csrf': csrf() }
+            });
+        } catch {}
+        refresh();
+    });
+
+    refresh();
+    setInterval(refresh, POLL_MS);
+})();
+</script>

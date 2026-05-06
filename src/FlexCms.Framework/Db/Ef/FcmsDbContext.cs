@@ -5,6 +5,8 @@ using FlexCms.Framework.Db;
 using FlexCms.Framework.Helpers;
 using FlexCms.Framework.Messaging;
 using FlexCms.Framework.Modules;
+using FlexCms.Framework.Notifications;
+using FlexCms.Framework.Widgets;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
@@ -64,6 +66,10 @@ public class FcmsDbContext : IdentityDbContext<FcmsUser, FcmsRole, Guid>
 
     // Phase 8 — restart-safe message queue
     public DbSet<FcmsPendingMessage> PendingMessages => Set<FcmsPendingMessage>();
+
+    // Phase 9 — notifications + widgets
+    public DbSet<FcmsNotification> Notifications => Set<FcmsNotification>();
+    public DbSet<FcmsWidgetPlacement> WidgetPlacements => Set<FcmsWidgetPlacement>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -229,6 +235,16 @@ public class FcmsDbContext : IdentityDbContext<FcmsUser, FcmsRole, Guid>
 
         modelBuilder.Entity<FcmsPendingMessage>()
             .HasIndex(m => m.BroadcastId);
+
+        // ── Notifications + widgets (Phase 9) ─────────────────────────────────
+
+        // Bell-icon "unread for me" query → composite index.
+        modelBuilder.Entity<FcmsNotification>()
+            .HasIndex(n => new { n.UserId, n.IsRead, n.CreatedAt });
+
+        // Zone render lookup hit on every page → covering index.
+        modelBuilder.Entity<FcmsWidgetPlacement>()
+            .HasIndex(p => new { p.Zone, p.Enabled, p.SortOrder });
 
         // Audit log entities are append-only — strip the inherited lifecycle
         // columns and skip the soft-delete query filter (no Status column means

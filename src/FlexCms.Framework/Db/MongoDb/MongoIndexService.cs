@@ -3,6 +3,8 @@ using FlexCms.Framework.Cms;
 using FlexCms.Framework.Helpers;
 using FlexCms.Framework.Messaging;
 using FlexCms.Framework.Modules;
+using FlexCms.Framework.Notifications;
+using FlexCms.Framework.Widgets;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using MongoDB.Driver;
@@ -145,6 +147,21 @@ public class MongoIndexService : IHostedService
         await IndexAsync<FcmsPendingMessage>(
             Builders<FcmsPendingMessage>.IndexKeys.Ascending(m => m.BroadcastId),
             "ix_pending_messages_broadcast_id", ct);
+
+        // ── Notifications + widgets (Phase 9) ─────────────────────────────────
+        await IndexAsync<FcmsNotification>(
+            Builders<FcmsNotification>.IndexKeys
+                .Ascending(n => n.UserId)
+                .Ascending(n => n.IsRead)
+                .Descending(n => n.CreatedAt),
+            "ix_notifications_user_unread_created", ct);
+
+        await IndexAsync<FcmsWidgetPlacement>(
+            Builders<FcmsWidgetPlacement>.IndexKeys
+                .Ascending(p => p.Zone)
+                .Ascending(p => p.Enabled)
+                .Ascending(p => p.SortOrder),
+            "ix_widget_placements_zone_enabled_sort", ct);
 
         // ── Modules ───────────────────────────────────────────────────────────
 

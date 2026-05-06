@@ -8,6 +8,13 @@ public class SiteSettings
     public string BaseUrl { get; set; } = "";
     public string DefaultLanguage { get; set; } = "en";
     public string TimeZone { get; set; } = "Asia/Dhaka";
+
+    /// <summary>
+    /// .NET <see cref="DateTime.ToString(string)"/> format string used everywhere
+    /// dates are displayed in the admin UI. Default: <c>yyyy-MM-dd HH:mm</c>.
+    /// Examples: <c>dd MMM yyyy hh:mm tt</c>, <c>yyyy/MM/dd HH:mm:ss</c>.
+    /// </summary>
+    public string DateTimeFormat { get; set; } = "yyyy-MM-dd HH:mm";
     public string? MetaDescription { get; set; }
     public string? GoogleAnalyticsId { get; set; }
 

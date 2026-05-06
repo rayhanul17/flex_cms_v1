@@ -183,7 +183,14 @@ public class ModulesController : BaseAdminController
         if (!_env.IsDevelopment()) return NotFound();
         if (!ModelState.IsValid) return View("Scaffold", model);
 
-        var modulesRoot = Path.Combine(_env.ContentRootPath, "..", "modules");
+        // Walk up from ContentRootPath until we find both the templates and modules dirs.
+        // Handles both src/FlexCms.Host (project) and bin/Debug/net10.0 (running output) layouts.
+        var solutionRoot = FindSolutionRoot(_env.ContentRootPath);
+        if (solutionRoot is null)
+            return FcmsFail("Could not locate the solution root (looked for a 'templates' sibling).");
+
+        var modulesRoot = Path.Combine(solutionRoot, "modules");
+        Directory.CreateDirectory(modulesRoot);
         var dest = Path.Combine(modulesRoot, model.ModuleId);
 
         if (Directory.Exists(dest))
@@ -192,15 +199,28 @@ public class ModulesController : BaseAdminController
             return View("Scaffold", model);
         }
 
-        // Find template source relative to solution root
-        var templateSrc = Path.Combine(_env.ContentRootPath, "..", "templates",
-            "flexcms-module", "content", "FlexCms.Module.Name");
-
+        var templateSrc = Path.Combine(solutionRoot, "templates", "flexcms-module", "content", "FlexCms.Module.Name");
         if (!Directory.Exists(templateSrc))
-            return FcmsFail("Template source not found. Run from the repository root.");
+            return FcmsFail($"Template source not found at: {templateSrc}");
 
         CopyAndReplace(templateSrc, dest, model.ModuleId, model.TablePrefix);
         return FcmsOk($"Module '{model.ModuleId}' scaffolded to modules/{model.ModuleId}/. Open the project, implement your module, build, and restart.");
+    }
+
+    /// <summary>
+    /// Walk up from <paramref name="start"/> looking for a directory that contains
+    /// a <c>templates</c> subfolder — that's the FlexCMS solution root.
+    /// </summary>
+    private static string? FindSolutionRoot(string start)
+    {
+        var dir = new DirectoryInfo(start);
+        while (dir is not null)
+        {
+            if (Directory.Exists(Path.Combine(dir.FullName, "templates", "flexcms-module")))
+                return dir.FullName;
+            dir = dir.Parent;
+        }
+        return null;
     }
 
     private static void CopyAndReplace(string src, string dest, string moduleId, string tablePrefix)

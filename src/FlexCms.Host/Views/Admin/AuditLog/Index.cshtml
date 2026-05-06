@@ -1,174 +1,85 @@
-@model IReadOnlyList<FlexCms.Framework.Cms.FcmsLog>
 @{
     ViewData["Title"] = "Audit Log";
-    var archive = (IReadOnlyList<FlexCms.Framework.Cms.FcmsLogArchive>)ViewBag.Archive;
 }
 
-<form id="csrf" style="display:none">@Html.AntiForgeryToken()</form>
-
 <div class="d-flex justify-content-between align-items-center mb-3">
-    <h4 class="mb-0">Audit Log</h4>
-    <a asp-controller="Settings" asp-action="Index" class="btn btn-sm btn-outline-secondary">
-        <i class="bi bi-gear"></i> Settings
-    </a>
+    <div>
+        <h4 class="mb-0">Audit Log</h4>
+        <small class="text-muted">Background service auto-archives logs older than 24h every hour. Use "Force Archive Now" to run on demand.</small>
+    </div>
+    <div class="d-flex gap-2">
+        <button type="button" class="btn btn-outline-warning btn-sm"
+                fcms-authorize="@FcmsPermissions.AuditManage"
+                data-fcms-action="custom"
+                data-url="/admin/audit-log/force-archive"
+                data-confirm-title="Archive now?"
+                data-confirm-message="Move logs older than 24 hours to archive table?"
+                data-confirm-label="Archive"
+                data-confirm-variant="warning">
+            <i class="bi bi-archive"></i> Force Archive Now
+        </button>
+        <button type="button" class="btn btn-outline-danger btn-sm"
+                fcms-authorize="@FcmsPermissions.AuditManage"
+                data-fcms-action="custom"
+                data-url="/admin/audit-log/clear-archive"
+                data-confirm-title="Clear archive?"
+                data-confirm-message="Permanently delete <b>ALL</b> archived logs? This cannot be undone."
+                data-confirm-label="Clear All"
+                data-confirm-variant="danger">
+            <i class="bi bi-trash"></i> Clear Archive
+        </button>
+    </div>
 </div>
 
 <ul class="nav nav-tabs mb-3" id="auditTab" role="tablist">
     <li class="nav-item" role="presentation">
-        <button class="nav-link active" id="recent-tab" data-bs-toggle="tab" data-bs-target="#recentPane"
-                type="button" role="tab">
-            Recent Logs <span class="badge bg-secondary">@Model.Count</span>
-        </button>
+        <button class="nav-link active" id="recent-tab" data-bs-toggle="tab" data-bs-target="#recentPane" type="button" role="tab">Recent Logs</button>
     </li>
     <li class="nav-item" role="presentation">
-        <button class="nav-link" id="archive-tab" data-bs-toggle="tab" data-bs-target="#archivePane"
-                type="button" role="tab">
-            Archive <span class="badge bg-secondary">@archive.Count</span>
-        </button>
+        <button class="nav-link" id="archive-tab" data-bs-toggle="tab" data-bs-target="#archivePane" type="button" role="tab">Archive</button>
     </li>
 </ul>
 
 <div class="tab-content" id="auditTabContent">
-
-    @* ── Recent Logs tab ─────────────────────────────────────────────────── *@
     <div class="tab-pane fade show active" id="recentPane" role="tabpanel">
-        <div class="d-flex justify-content-end mb-2">
-            <form method="post" action="@Url.Action("Archive")" id="archiveForm">
-                @Html.AntiForgeryToken()
-                <button type="submit" class="btn btn-outline-warning btn-sm"
-                        onclick="return confirm('Move logs older than 24 hours to archive?');">
-                    <i class="bi bi-archive"></i> Move to Archive
-                </button>
-            </form>
-        </div>
-        @if (!Model.Any())
-        {
-            <p class="text-muted text-center py-4">No recent logs.</p>
-        }
-        else
-        {
-            <div class="table-responsive">
-                <table class="table table-sm table-hover table-bordered align-middle small">
-                    <thead class="table-light">
-                        <tr>
-                            <th>Timestamp</th>
-                            <th>User</th>
-                            <th>IP</th>
-                            <th>Action</th>
-                            <th>Entity Type</th>
-                            <th>Entity ID</th>
-                            <th>Module</th>
-                            <th>Severity</th>
-                            <th>New Value</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var log in Model)
-                        {
-                            <tr>
-                                <td class="text-nowrap">@log.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")</td>
-                                <td>@log.UserName</td>
-                                <td>@log.UserIp</td>
-                                <td>@log.Action</td>
-                                <td>@log.EntityType</td>
-                                <td class="font-monospace">@log.EntityId</td>
-                                <td>@log.Module</td>
-                                <td>
-                                    @{
-                                        var badgeClass = log.Severity switch
-                                        {
-                                            FlexCms.Framework.Cms.FcmsLogSeverity.Warning => "bg-warning text-dark",
-                                            FlexCms.Framework.Cms.FcmsLogSeverity.Error => "bg-danger",
-                                            _ => "bg-info text-dark"
-                                        };
-                                    }
-                                    <span class="badge @badgeClass">@log.Severity</span>
-                                </td>
-                                <td>
-                                    @if (log.Value is not null)
-                                    {
-                                        var truncated = log.Value.Length > 80
-                                            ? log.Value[..80] + "…"
-                                            : log.Value;
-                                        <span title="@log.Value" style="cursor:help;">@truncated</span>
-                                    }
-                                </td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <fcms-data-table
+                    id="auditLogRecentTbl"
+                    url="/admin/audit-log/datatable-recent"
+                    base-url="/admin/audit-log">
+                    <fcms-data-column field="CreatedAt"  header="Timestamp"   type="date" sortable="true" default-sort="desc" />
+                    <fcms-data-column field="UserName"   header="User"        sortable="true" />
+                    <fcms-data-column field="UserIp"     header="IP" />
+                    <fcms-data-column field="Action"     header="Action"      sortable="true" />
+                    <fcms-data-column field="EntityType" header="Entity Type" sortable="true" />
+                    <fcms-data-column field="EntityId"   header="Entity ID"   type="code" />
+                    <fcms-data-column field="Module"     header="Module"      sortable="true" />
+                    <fcms-data-column field="Severity"   header="Severity"    sortable="true" />
+                    <fcms-data-column field="Value"      header="Value" />
+                </fcms-data-table>
             </div>
-        }
+        </div>
     </div>
 
-    @* ── Archive tab ──────────────────────────────────────────────────────── *@
     <div class="tab-pane fade" id="archivePane" role="tabpanel">
-        <div class="d-flex justify-content-end mb-2">
-            <form method="post" action="@Url.Action("ClearArchive")" id="clearArchiveForm">
-                @Html.AntiForgeryToken()
-                <button type="submit" class="btn btn-outline-danger btn-sm"
-                        onclick="return confirm('Permanently delete ALL archived logs? This cannot be undone.');">
-                    <i class="bi bi-trash"></i> Clear Archive
-                </button>
-            </form>
-        </div>
-        @if (!archive.Any())
-        {
-            <p class="text-muted text-center py-4">No archived logs.</p>
-        }
-        else
-        {
-            <div class="table-responsive">
-                <table class="table table-sm table-hover table-bordered align-middle small">
-                    <thead class="table-light">
-                        <tr>
-                            <th>Timestamp</th>
-                            <th>User</th>
-                            <th>IP</th>
-                            <th>Action</th>
-                            <th>Entity Type</th>
-                            <th>Entity ID</th>
-                            <th>Module</th>
-                            <th>Severity</th>
-                            <th>New Value</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var log in archive)
-                        {
-                            <tr>
-                                <td class="text-nowrap">@log.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")</td>
-                                <td>@log.UserName</td>
-                                <td>@log.UserIp</td>
-                                <td>@log.Action</td>
-                                <td>@log.EntityType</td>
-                                <td class="font-monospace">@log.EntityId</td>
-                                <td>@log.Module</td>
-                                <td>
-                                    @{
-                                        var archiveBadgeClass = log.Severity switch
-                                        {
-                                            FlexCms.Framework.Cms.FcmsLogSeverity.Warning => "bg-warning text-dark",
-                                            FlexCms.Framework.Cms.FcmsLogSeverity.Error => "bg-danger",
-                                            _ => "bg-info text-dark"
-                                        };
-                                    }
-                                    <span class="badge @archiveBadgeClass">@log.Severity</span>
-                                </td>
-                                <td>
-                                    @if (log.Value is not null)
-                                    {
-                                        var truncated = log.Value.Length > 80
-                                            ? log.Value[..80] + "…"
-                                            : log.Value;
-                                        <span title="@log.Value" style="cursor:help;">@truncated</span>
-                                    }
-                                </td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <fcms-data-table
+                    id="auditLogArchiveTbl"
+                    url="/admin/audit-log/datatable-archive"
+                    base-url="/admin/audit-log">
+                    <fcms-data-column field="CreatedAt"  header="Timestamp"   type="date" sortable="true" default-sort="desc" />
+                    <fcms-data-column field="UserName"   header="User"        sortable="true" />
+                    <fcms-data-column field="UserIp"     header="IP" />
+                    <fcms-data-column field="Action"     header="Action"      sortable="true" />
+                    <fcms-data-column field="EntityType" header="Entity Type" sortable="true" />
+                    <fcms-data-column field="EntityId"   header="Entity ID"   type="code" />
+                    <fcms-data-column field="Module"     header="Module"      sortable="true" />
+                    <fcms-data-column field="Severity"   header="Severity"    sortable="true" />
+                    <fcms-data-column field="Value"      header="Value" />
+                </fcms-data-table>
             </div>
-        }
+        </div>
     </div>
 </div>

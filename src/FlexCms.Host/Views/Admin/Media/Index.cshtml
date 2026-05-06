@@ -180,7 +180,7 @@
             try {
                 const r = await fetch('@Url.Action("Upload")', {
                     method: 'POST',
-                    headers: { 'RequestVerificationToken': csrf() },
+                    headers: { 'X-FlexCms-Csrf': csrf() },
                     body: fd
                 });
                 const json = await r.json();
@@ -213,7 +213,7 @@
 
             const r = await fetch('@Url.Action("CreateFolder")', {
                 method: 'POST',
-                headers: { 'RequestVerificationToken': csrf() },
+                headers: { 'X-FlexCms-Csrf': csrf() },
                 body: fd
             });
             const json = await r.json();
@@ -229,7 +229,7 @@
             const fd = new FormData();
             await fetch(`/admin/media/folder/${id}/delete`, {
                 method: 'POST',
-                headers: { 'RequestVerificationToken': csrf() },
+                headers: { 'X-FlexCms-Csrf': csrf() },
                 body: fd
             });
             location.reload();
@@ -241,7 +241,7 @@
             const fd = new FormData();
             await fetch(`/admin/media/${id}/delete`, {
                 method: 'POST',
-                headers: { 'RequestVerificationToken': csrf() },
+                headers: { 'X-FlexCms-Csrf': csrf() },
                 body: fd
             });
             location.reload();
@@ -268,7 +268,7 @@
                 if (targetFolderId) fd.append('targetFolderId', targetFolderId);
                 await fetch(`/admin/media/${draggedMediaId}/move`, {
                     method: 'POST',
-                    headers: { 'RequestVerificationToken': csrf() },
+                    headers: { 'X-FlexCms-Csrf': csrf() },
                     body: fd
                 });
                 location.reload();

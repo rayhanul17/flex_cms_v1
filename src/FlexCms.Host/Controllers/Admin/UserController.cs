@@ -162,7 +162,7 @@ public class UserController : BaseAdminController
             user.Status = FlexCms.Framework.Db.EntityStatus.InActive;
             await _userManager.SetLockoutEndDateAsync(user, DateTimeOffset.UtcNow.AddYears(100));
             await _userManager.UpdateAsync(user);
-            await OpLog.LogAsync("users.deactivate", "FcmsUser", user.Id.ToString());
+            await OpLog.LogAsync("users.deactivate", "FcmsUser", user.Id.ToString(), value: user);
             return FcmsOk("User deactivated.", new { newStatus = "InActive" });
         }
         else
@@ -170,7 +170,7 @@ public class UserController : BaseAdminController
             user.Status = FlexCms.Framework.Db.EntityStatus.Active;
             await _userManager.SetLockoutEndDateAsync(user, null);
             await _userManager.UpdateAsync(user);
-            await OpLog.LogAsync("users.activate", "FcmsUser", user.Id.ToString());
+            await OpLog.LogAsync("users.activate", "FcmsUser", user.Id.ToString(), value: user);
             return FcmsOk("User activated.", new { newStatus = "Active" });
         }
     }

@@ -19,4 +19,18 @@ public sealed class FcmsClock : IFcmsClock
     public DateOnly Today => DateOnly.FromDateTime(LocalNow);
 
     public TimeOnly TimeOfDay => TimeOnly.FromDateTime(LocalNow);
+
+    public TimeZoneInfo TimeZone => _timeZone;
+
+    public DateTime ToLocal(DateTime utc)
+    {
+        // Treat unspecified Kind as UTC (our convention — entities store UTC).
+        var asUtc = utc.Kind switch
+        {
+            DateTimeKind.Utc => utc,
+            DateTimeKind.Local => utc.ToUniversalTime(),
+            _ => DateTime.SpecifyKind(utc, DateTimeKind.Utc)
+        };
+        return TimeZoneInfo.ConvertTimeFromUtc(asUtc, _timeZone);
+    }
 }

@@ -139,11 +139,13 @@ public class AuthController : Controller
         return RedirectToAction("Index", "Home");
     }
 
-    [HttpGet]
+    [HttpGet("auth/change-password")]
+    [HttpGet("Auth/ChangePassword")]
     [Authorize]
     public IActionResult ChangePassword() => View();
 
-    [HttpPost]
+    [HttpPost("auth/change-password")]
+    [HttpPost("Auth/ChangePassword")]
     [ValidateAntiForgeryToken]
     [Authorize]
     public async Task<IActionResult> ChangePassword(ChangePasswordViewModel model)

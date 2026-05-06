@@ -76,7 +76,7 @@ public class RoleController : BaseAdminController
         var role = new FcmsRole
         {
             Name = model.Name,
-            LoginRedirectUrl = model.LoginRedirectUrl.Trim(),
+            LoginRedirectUrl = NormalizeRedirect(model.LoginRedirectUrl),
             Priority = model.Priority
         };
 
@@ -135,7 +135,7 @@ public class RoleController : BaseAdminController
             role.Name = model.Name;
         }
 
-        role.LoginRedirectUrl = model.LoginRedirectUrl.Trim();
+        role.LoginRedirectUrl = NormalizeRedirect(model.LoginRedirectUrl);
         role.Priority = model.Priority;
 
         var result = await _roleManager.UpdateAsync(role);
@@ -211,4 +211,11 @@ public class RoleController : BaseAdminController
         ShowSuccess($"Role '{role.Name}' deleted.");
         return FcmsOk("Role deleted.");
     }
+
+    /// <summary>
+    /// Empty/whitespace login-redirect URL defaults to "/" so admins aren't
+    /// forced to type a slash for every new role.
+    /// </summary>
+    private static string NormalizeRedirect(string? url)
+        => string.IsNullOrWhiteSpace(url) ? "/" : url.Trim();
 }

@@ -57,7 +57,11 @@ if (!SetupHelper.IsSetupComplete(appDataPath))
 // DB config comes from setup.json (written by setup wizard).
 // appsettings.json values are used as fallback for non-DB options (IP filter, etc.)
 // and for developer overrides during local development.
-builder.Services.AddControllersWithViews()
+builder.Services.AddControllersWithViews(mvc =>
+    {
+        // Custom binder for jQuery DataTables 2.x bracket-notation form data
+        mvc.ModelBinderProviders.Insert(0, new FlexCms.Framework.Models.DataTablesRequestModelBinderProvider());
+    })
     .AddRazorOptions(o =>
     {
         // Admin controllers live under Controllers/Admin/ but Razor only looks

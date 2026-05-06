@@ -1,7 +1,8 @@
+using System.Linq.Expressions;
 using FlexCms.Framework.Auth;
 using FlexCms.Framework.Cms;
-using FlexCms.Framework.Db;
-using FlexCms.Framework.Services;
+using FlexCms.Framework.Db.Ef;
+using FlexCms.Framework.Models;
 using Microsoft.AspNetCore.Mvc;
 
 namespace FlexCms.Host.Controllers.Admin;
@@ -10,33 +11,103 @@ namespace FlexCms.Host.Controllers.Admin;
 public class AuditLogController : BaseAdminController
 {
     private readonly IFcmsLogService _auditLog;
-    private readonly IFcmsUnitOfWork _uow;
+    private readonly FcmsDbContext _db;
 
-    public AuditLogController(IFcmsLogService auditLog, IFcmsUnitOfWork uow)
+    public AuditLogController(IFcmsLogService auditLog, FcmsDbContext db)
     {
         _auditLog = auditLog;
-        _uow = uow;
+        _db = db;
     }
 
     [HttpGet("")]
     [FcmsAuthorize(FcmsPermissions.AuditView)]
-    public async Task<IActionResult> Index(CancellationToken ct)
+    public IActionResult Index() => View();
+
+    // ── Recent logs DataTable ────────────────────────────────────────────────
+
+    [HttpPost("datatable-recent")]
+    [ValidateAntiForgeryToken]
+    [FcmsAuthorize(FcmsPermissions.AuditView)]
+    public Task<IActionResult> DataTableRecent(DataTablesRequest req, CancellationToken ct)
     {
-        var recent = await _auditLog.GetRecentAsync(200, ct);
-        var archive = await _auditLog.GetArchiveAsync(200, ct);
-        ViewBag.Archive = archive;
-        return View(recent);
+        var orderColumns = new Expression<Func<FcmsLog, object>>[]
+        {
+            l => l.CreatedAt,
+            l => l.UserName,
+            l => l.Action,
+            l => l.EntityType,
+            l => l.Module,
+            l => l.Severity
+        };
+        return DataTableResult(
+            _db.Logs,
+            req,
+            select: l => new
+            {
+                l.Id,
+                CreatedAt = l.CreatedAt,
+                l.UserName,
+                l.UserIp,
+                l.Action,
+                l.EntityType,
+                l.EntityId,
+                l.Module,
+                Severity = l.Severity.ToString(),
+                l.Value
+            },
+            orderColumns: orderColumns,
+            globalSearch: q => l => l.Action.Contains(q) || l.EntityType.Contains(q)
+                                  || l.UserName.Contains(q) || l.EntityId.Contains(q),
+            ct: ct);
     }
 
-    [HttpPost("archive")]
+    // ── Archive DataTable ────────────────────────────────────────────────────
+
+    [HttpPost("datatable-archive")]
+    [ValidateAntiForgeryToken]
+    [FcmsAuthorize(FcmsPermissions.AuditView)]
+    public Task<IActionResult> DataTableArchive(DataTablesRequest req, CancellationToken ct)
+    {
+        var orderColumns = new Expression<Func<FcmsLogArchive, object>>[]
+        {
+            l => l.CreatedAt,
+            l => l.UserName,
+            l => l.Action,
+            l => l.EntityType,
+            l => l.Module,
+            l => l.Severity
+        };
+        return DataTableResult(
+            _db.LogArchives,
+            req,
+            select: l => new
+            {
+                l.Id,
+                CreatedAt = l.CreatedAt,
+                l.UserName,
+                l.UserIp,
+                l.Action,
+                l.EntityType,
+                l.EntityId,
+                l.Module,
+                Severity = l.Severity.ToString(),
+                l.Value
+            },
+            orderColumns: orderColumns,
+            globalSearch: q => l => l.Action.Contains(q) || l.EntityType.Contains(q)
+                                  || l.UserName.Contains(q) || l.EntityId.Contains(q),
+            ct: ct);
+    }
+
+    // ── Force-archive (manual override; LogArchiveService runs hourly anyway) ─
+
+    [HttpPost("force-archive")]
     [ValidateAntiForgeryToken]
     [FcmsAuthorize(FcmsPermissions.AuditManage)]
-    public async Task<IActionResult> Archive(CancellationToken ct)
+    public async Task<IActionResult> ForceArchive(CancellationToken ct)
     {
         await _auditLog.ArchiveOlderThanAsync(TimeSpan.FromHours(24), ct);
-        await _uow.SaveChangesAsync(ct);
-        ShowSuccess("Logs older than 24 hours have been moved to archive.");
-        return RedirectToAction(nameof(Index));
+        return FcmsOk("Logs older than 24 hours moved to archive.");
     }
 
     [HttpPost("clear-archive")]
@@ -45,8 +116,6 @@ public class AuditLogController : BaseAdminController
     public async Task<IActionResult> ClearArchive(CancellationToken ct)
     {
         await _auditLog.ClearArchiveAsync(ct);
-        await _uow.SaveChangesAsync(ct);
-        ShowSuccess("Archive cleared.");
-        return RedirectToAction(nameof(Index));
+        return FcmsOk("Archive cleared.");
     }
 }

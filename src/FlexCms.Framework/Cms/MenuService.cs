@@ -45,16 +45,37 @@ public class MenuService : IMenuService
         var user = _httpContextAccessor.HttpContext?.User;
         if (user is null) return [];
 
-        var filtered = new List<FcmsMenuItem>();
+        // Pass 1 — permission filter on every item (own permission only)
+        var permitted = new List<FcmsMenuItem>();
         foreach (var item in allItems)
         {
             if (item.RequiredPermission is null ||
                 await _permService.HasPermissionAsync(user, item.RequiredPermission, ct))
             {
-                filtered.Add(item);
+                permitted.Add(item);
             }
         }
-        return filtered;
+
+        // Pass 2 — drop parent items whose entire child set was filtered out.
+        // A parent is identified by ParentId == null AND someone in the original
+        // set claims it as a parent. If the user can't see ANY child, the parent
+        // collapses too (better UX than empty expandable groups).
+        var permittedIds = permitted.Select(p => p.Id).ToHashSet();
+        var orphanedParentIds = permitted
+            .Where(p => p.ParentId is null)
+            .Where(p =>
+            {
+                // Did this parent have children in the source? (look in unfiltered set)
+                var hadChildren = allItems.Any(c => c.ParentId == p.Id);
+                if (!hadChildren) return false;
+                // After filter, are any of those children still visible?
+                var anyVisible = permitted.Any(c => c.ParentId == p.Id);
+                return !anyVisible;
+            })
+            .Select(p => p.Id)
+            .ToHashSet();
+
+        return permitted.Where(p => !orphanedParentIds.Contains(p.Id)).ToList();
     }
 
     public async Task SeedAsync(string moduleId, List<FcmsMenuItemDef> items, CancellationToken ct = default)

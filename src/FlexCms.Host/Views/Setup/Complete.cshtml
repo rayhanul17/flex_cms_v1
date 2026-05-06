@@ -95,7 +95,7 @@ else
             const csrfToken = document.querySelector('#csrf input[name=__RequestVerificationToken]').value;
             fetch('/Setup/Restart', {
                 method: 'POST',
-                headers: { 'RequestVerificationToken': csrfToken }
+                headers: { 'X-FlexCms-Csrf': csrfToken }
             }).catch(() => {});
 
             // Countdown + redirect

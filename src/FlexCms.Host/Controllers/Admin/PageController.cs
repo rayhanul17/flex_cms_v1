@@ -32,7 +32,7 @@ public class PageController : BaseAdminController
 
     [HttpPost("datatable")]
     [ValidateAntiForgeryToken]
-    public Task<IActionResult> DataTable([FromForm] DataTablesRequest req, CancellationToken ct)
+    public Task<IActionResult> DataTable(DataTablesRequest req, CancellationToken ct)
     {
         var orderColumns = new Expression<Func<FcmsPage, object>>[]
         {

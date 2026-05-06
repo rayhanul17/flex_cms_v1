@@ -17,9 +17,7 @@ public class ForcePasswordChangeMiddleware
         if (userManager is not null && context.User.Identity?.IsAuthenticated == true)
         {
             var user = await userManager.GetUserAsync(context.User);
-            if (user?.ForcePasswordChange == true &&
-                !context.Request.Path.StartsWithSegments("/auth/change-password") &&
-                !context.Request.Path.StartsWithSegments("/auth/logout"))
+            if (user?.ForcePasswordChange == true && !IsAllowedPath(context.Request.Path))
             {
                 context.Response.Redirect("/auth/change-password");
                 return;
@@ -28,4 +26,16 @@ public class ForcePasswordChangeMiddleware
 
         await _next(context);
     }
+
+    /// <summary>
+    /// Paths a force-password-change user can still reach without being looped back.
+    /// Includes /Home/Error so the StatusCodePagesWithReExecute target doesn't
+    /// trigger an infinite redirect when something 404s during this state.
+    /// </summary>
+    private static bool IsAllowedPath(PathString path)
+        => path.StartsWithSegments("/auth/change-password")
+        || path.StartsWithSegments("/Auth/ChangePassword")
+        || path.StartsWithSegments("/auth/logout")
+        || path.StartsWithSegments("/Auth/Logout")
+        || path.StartsWithSegments("/Home/Error");
 }

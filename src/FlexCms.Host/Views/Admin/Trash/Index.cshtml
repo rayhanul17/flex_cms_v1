@@ -84,7 +84,7 @@ else
 
     async function post(url) {
         const body = new URLSearchParams({ __RequestVerificationToken: token });
-        const r = await fetch(url, { method: 'POST', headers: { 'RequestVerificationToken': token }, body });
+        const r = await fetch(url, { method: 'POST', headers: { 'X-FlexCms-Csrf': token }, body });
         return r.json();
     }
 

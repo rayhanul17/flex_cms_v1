@@ -1,47 +1,124 @@
+@model FlexCms.Host.Models.Admin.SettingsViewModel
 @{
-    ViewData["Title"] = "CMS Settings";
-    var auditEnabled = (bool)ViewBag.AuditEnabled;
+    ViewData["Title"] = "Settings";
 }
 
-<form id="csrf" style="display:none">@Html.AntiForgeryToken()</form>
-
-<div class="d-flex justify-content-between align-items-center mb-4">
+<div class="d-flex justify-content-between align-items-center mb-3">
     <h4 class="mb-0">CMS Settings</h4>
 </div>
 
-@* ── Audit Logging ─────────────────────────────────────────────────────────── *@
-<div class="card shadow-sm mb-3">
-    <div class="card-header fw-semibold">Audit Logging</div>
-    <div class="card-body">
-        <div class="d-flex align-items-center justify-content-between">
-            <div>
-                <div class="fw-semibold">Enable audit logging</div>
-                <div class="text-muted small">Record every create / update / delete action to the audit log table.</div>
-            </div>
-            <div class="form-check form-switch mb-0">
-                <input class="form-check-input" type="checkbox" role="switch"
-                       id="auditToggle" @(auditEnabled ? "checked" : "") />
+<form method="post" asp-action="Index">
+    @Html.AntiForgeryToken()
+    <div asp-validation-summary="ModelOnly" class="alert alert-danger" style="display:@(ViewData.ModelState.IsValid ? "none" : "block")"></div>
+
+    @* ── Site identity ─────────────────────────────────────────────────── *@
+    <div class="card shadow-sm mb-3">
+        <div class="card-header fw-semibold">Site Identity</div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label asp-for="SiteName" class="form-label"></label>
+                    <input asp-for="SiteName" class="form-control" />
+                    <span asp-validation-for="SiteName" class="text-danger small"></span>
+                </div>
+                <div class="col-md-6">
+                    <label asp-for="SiteTagline" class="form-label"></label>
+                    <input asp-for="SiteTagline" class="form-control" placeholder="Optional" />
+                </div>
+                <div class="col-md-6">
+                    <label asp-for="SiteBaseUrl" class="form-label"></label>
+                    <input asp-for="SiteBaseUrl" class="form-control" placeholder="https://example.com" />
+                </div>
+                <div class="col-md-6">
+                    <label asp-for="DefaultLanguage" class="form-label"></label>
+                    <select asp-for="DefaultLanguage" class="form-select">
+                        <option value="en">English</option>
+                        <option value="bn">Bangla</option>
+                    </select>
+                </div>
             </div>
         </div>
     </div>
-</div>
 
-@* Future settings sections go here *@
+    @* ── Locale & Display ──────────────────────────────────────────────── *@
+    <div class="card shadow-sm mb-3">
+        <div class="card-header fw-semibold">Locale & Display</div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label asp-for="TimeZoneId" class="form-label"></label>
+                    <select asp-for="TimeZoneId" class="form-select">
+                        @foreach (var tz in Model.AvailableTimeZones)
+                        {
+                            <option value="@tz.Id">@tz.DisplayName</option>
+                        }
+                    </select>
+                    <small class="text-muted">All UTC timestamps are converted to this zone for display via <code>FcmsTime.Format()</code>.</small>
+                </div>
+                <div class="col-md-6">
+                    <label asp-for="DateTimeFormat" class="form-label"></label>
+                    <input asp-for="DateTimeFormat" class="form-control font-monospace" id="dtFmt"
+                           placeholder="yyyy-MM-dd HH:mm" />
+                    <small class="text-muted">
+                        Examples: <code>yyyy-MM-dd HH:mm</code>, <code>dd MMM yyyy hh:mm tt</code>, <code>yyyy/MM/dd HH:mm:ss</code>.
+                        Current preview: <span id="dtPreview" class="badge text-bg-info">@Model.SampleFormatted</span>
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @* ── Content & Audit ───────────────────────────────────────────────── *@
+    <div class="card shadow-sm mb-3">
+        <div class="card-header fw-semibold">Content & Audit</div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label asp-for="TrashRetentionDays" class="form-label"></label>
+                    <input asp-for="TrashRetentionDays" type="number" min="1" max="365" class="form-control" />
+                    <small class="text-muted">Trashed items are auto-purged after this many days.</small>
+                </div>
+                <div class="col-md-8 d-flex align-items-end">
+                    <div class="form-check form-switch mb-2">
+                        <input asp-for="AuditEnabled" class="form-check-input" role="switch" />
+                        <label asp-for="AuditEnabled" class="form-check-label"></label>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg"></i> Save Settings</button>
+        <a asp-action="Index" class="btn btn-outline-secondary">Reset</a>
+    </div>
+</form>
 
 @section Scripts {
 <script>
-    const csrf = () => document.querySelector('#csrf input[name=__RequestVerificationToken]').value;
-
-    document.getElementById('auditToggle').addEventListener('change', async function () {
-        const r = await fetch('@Url.Action("ToggleAudit")', {
-            method: 'POST',
-            headers: { 'RequestVerificationToken': csrf() }
-        });
-        const json = await r.json();
-        if (!json.isSuccess) {
-            this.checked = !this.checked;
-            alert('Failed to toggle audit logging.');
+    // Live preview of the date-format input — pure JS approximation; server is canonical
+    const tokens = {
+        'yyyy': d => d.getFullYear(),
+        'MMM':  d => d.toLocaleString('en', { month: 'short' }),
+        'MM':   d => String(d.getMonth() + 1).padStart(2, '0'),
+        'dd':   d => String(d.getDate()).padStart(2, '0'),
+        'HH':   d => String(d.getHours()).padStart(2, '0'),
+        'hh':   d => String(((d.getHours() + 11) % 12) + 1).padStart(2, '0'),
+        'mm':   d => String(d.getMinutes()).padStart(2, '0'),
+        'ss':   d => String(d.getSeconds()).padStart(2, '0'),
+        'tt':   d => d.getHours() < 12 ? 'AM' : 'PM',
+    };
+    function preview(fmt) {
+        const d = new Date();
+        // Order matters: longer tokens first so 'yyyy' isn't eaten by 'yy'
+        let out = fmt;
+        for (const k of Object.keys(tokens).sort((a, b) => b.length - a.length)) {
+            out = out.replaceAll(k, tokens[k](d));
         }
+        return out;
+    }
+    document.getElementById('dtFmt').addEventListener('input', function () {
+        document.getElementById('dtPreview').textContent = preview(this.value || 'yyyy-MM-dd HH:mm');
     });
 </script>
 }

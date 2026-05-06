@@ -1,13 +1,19 @@
+using FlexCms.Framework.Api;
 using FlexCms.Framework.Auth;
 using FlexCms.Framework.Auth.History;
 using FlexCms.Framework.Chat;
 using FlexCms.Framework.Cms;
+using FlexCms.Framework.Cms.Comments;
+using FlexCms.Framework.Cms.CustomFields;
+using FlexCms.Framework.Cms.Revisions;
 using FlexCms.Framework.Exports;
 using FlexCms.Framework.Helpers;
 using FlexCms.Framework.Messaging;
 using FlexCms.Framework.Modules;
+using FlexCms.Framework.Newsletters;
 using FlexCms.Framework.Notifications;
 using FlexCms.Framework.Sessions;
+using FlexCms.Framework.Webhooks;
 using FlexCms.Framework.Widgets;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -211,6 +217,50 @@ public class MongoIndexService : IHostedService
         await IndexAsync<FcmsLoginHistory>(
             Builders<FcmsLoginHistory>.IndexKeys.Ascending(h => h.AttemptedUserName),
             "ix_login_history_attempted_user", ct);
+
+        // ── Engagement / API (Phase 14) ───────────────────────────────────────
+        await UniqueAsync<FcmsApiToken>(
+            Builders<FcmsApiToken>.IndexKeys.Ascending(t => t.Hash),
+            "ux_api_tokens_hash", ct);
+
+        await IndexAsync<FcmsApiToken>(
+            Builders<FcmsApiToken>.IndexKeys.Ascending(t => t.UserId),
+            "ix_api_tokens_user", ct);
+
+        await IndexAsync<FcmsWebhookDelivery>(
+            Builders<FcmsWebhookDelivery>.IndexKeys
+                .Ascending(d => d.DeliveryStatus)
+                .Ascending(d => d.AttemptCount),
+            "ix_webhook_deliveries_status_attempt", ct);
+
+        await IndexAsync<FcmsContentRevision>(
+            Builders<FcmsContentRevision>.IndexKeys
+                .Ascending(r => r.EntityType)
+                .Ascending(r => r.EntityId)
+                .Descending(r => r.Version),
+            "ix_content_revisions_entity_version", ct);
+
+        await IndexAsync<FcmsComment>(
+            Builders<FcmsComment>.IndexKeys
+                .Ascending(c => c.EntityType)
+                .Ascending(c => c.EntityId)
+                .Ascending(c => c.CommentStatus),
+            "ix_comments_entity_status", ct);
+
+        await UniqueAsync<FcmsSubscriber>(
+            Builders<FcmsSubscriber>.IndexKeys.Ascending(s => s.Email),
+            "ux_subscribers_email", ct);
+
+        await UniqueAsync<FcmsSubscriber>(
+            Builders<FcmsSubscriber>.IndexKeys.Ascending(s => s.Token),
+            "ux_subscribers_token", ct);
+
+        await UniqueAsync<FcmsContentMeta>(
+            Builders<FcmsContentMeta>.IndexKeys
+                .Ascending(m => m.EntityType)
+                .Ascending(m => m.EntityId)
+                .Ascending(m => m.Key),
+            "ux_content_meta_entity_key", ct);
 
         // ── Modules ───────────────────────────────────────────────────────────
 

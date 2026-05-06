@@ -90,4 +90,10 @@ public class SiteSettings
 
     // ── Terms ──────────────────────────────────────────────────────────────
     public string CurrentTermsVersion { get; set; } = "2026-01-01";
+
+    // ── CORS (Phase 14) ────────────────────────────────────────────────────
+    public bool CorsEnabled { get; set; }
+
+    /// <summary>Comma-separated allowed origins (e.g. <c>https://app.example.com,https://admin.example.com</c>).</summary>
+    public string CorsAllowedOrigins { get; set; } = "";
 }

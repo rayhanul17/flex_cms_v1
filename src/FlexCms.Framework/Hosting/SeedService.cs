@@ -248,6 +248,10 @@ public class SeedService : IHostedService
         new() { Key = FcmsPermissions.PaymentsManage,    DisplayName = "Payments: Manage",           Group = "Payments" },
         new() { Key = FcmsPermissions.ExportsRequest,    DisplayName = "Exports: Request",           Group = "Exports" },
         new() { Key = FcmsPermissions.ExportsView,       DisplayName = "Exports: View",              Group = "Exports" },
+        new() { Key = FcmsPermissions.ApiTokensManage,   DisplayName = "API tokens: Manage",         Group = "API" },
+        new() { Key = FcmsPermissions.WebhooksManage,    DisplayName = "Webhooks: Manage",           Group = "API" },
+        new() { Key = FcmsPermissions.CommentsModerate,  DisplayName = "Comments: Moderate",         Group = "Engagement" },
+        new() { Key = FcmsPermissions.SubscribersManage, DisplayName = "Subscribers: Manage",        Group = "Engagement" },
     ];
 
     private async Task SeedPermissionsAsync(CancellationToken ct)

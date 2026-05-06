@@ -1,10 +1,18 @@
+using FlexCms.Framework.Api;
 using FlexCms.Framework.Auth;
 using FlexCms.Framework.Auth.Ef;
 using FlexCms.Framework.Auth.History;
+using FlexCms.Framework.Captcha;
+using FlexCms.Framework.Cdn;
 using FlexCms.Framework.Chat;
 using FlexCms.Framework.Cms;
+using FlexCms.Framework.Cms.Comments;
+using FlexCms.Framework.Cms.CustomFields;
+using FlexCms.Framework.Cms.Revisions;
 using FlexCms.Framework.Health;
+using FlexCms.Framework.Newsletters;
 using FlexCms.Framework.Sessions;
+using FlexCms.Framework.Webhooks;
 using FlexCms.Framework.Clock;
 using FlexCms.Framework.Storage;
 using FlexCms.Framework.Auth.MongoDb;
@@ -161,6 +169,25 @@ public static class FcmsServiceExtensions
             sp.GetRequiredService<IFcmsBackgroundQueue>(),
             sp.GetRequiredService<FcmsBackgroundQueueOptions>()));
         services.AddSingleton<IFcmsHealthCheck>(sp => new DiskSpaceHealthCheck(options.AppDataPath));
+
+        // ── Phase 14: API + Integrations + Engagement ────────────────────────
+        services.AddScoped<IApiTokenService, ApiTokenService>();
+        services.AddHttpClient<WebhookDispatcher>();
+        services.AddScoped<IWebhookDispatcher>(sp => sp.GetRequiredService<WebhookDispatcher>());
+        services.AddHttpClient<TurnstileCaptchaProvider>();
+        services.AddScoped<IFcmsCaptchaProvider>(sp => sp.GetRequiredService<TurnstileCaptchaProvider>());
+        services.AddScoped<ICdnUrlService, CdnUrlService>();
+        services.AddSingleton<IAssetVersionService, AssetVersionService>();
+        services.AddScoped<IContentRevisionService, ContentRevisionService>();
+        services.AddScoped<ICommentService, CommentService>();
+        services.AddScoped<ISubscriberService, SubscriberService>();
+        services.AddScoped<ICustomFieldService, CustomFieldService>();
+
+        // Bearer scheme registered alongside the existing cookie scheme so
+        // [Authorize]'d controllers accept BOTH session cookies and API tokens.
+        services.AddAuthentication()
+            .AddScheme<FcmsApiTokenAuthenticationOptions, FcmsApiTokenAuthenticationHandler>(
+                FcmsApiTokenAuthenticationHandler.SchemeName, _ => { });
 
         // ── Phase 11: Themes ─────────────────────────────────────────────────
         var themesRoot = Path.Combine(options.AppDataPath, "..", "themes");

@@ -1,15 +1,21 @@
+using FlexCms.Framework.Api;
 using FlexCms.Framework.Auth;
 using FlexCms.Framework.Auth.History;
 using FlexCms.Framework.Chat;
 using FlexCms.Framework.Cms;
+using FlexCms.Framework.Cms.Comments;
+using FlexCms.Framework.Cms.CustomFields;
+using FlexCms.Framework.Cms.Revisions;
 using FlexCms.Framework.Clock;
 using FlexCms.Framework.Db;
 using FlexCms.Framework.Exports;
 using FlexCms.Framework.Helpers;
 using FlexCms.Framework.Messaging;
 using FlexCms.Framework.Modules;
+using FlexCms.Framework.Newsletters;
 using FlexCms.Framework.Notifications;
 using FlexCms.Framework.Sessions;
+using FlexCms.Framework.Webhooks;
 using FlexCms.Framework.Widgets;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
@@ -85,6 +91,15 @@ public class FcmsDbContext : IdentityDbContext<FcmsUser, FcmsRole, Guid>
     // Phase 13 — auth hardening
     public DbSet<FcmsUserSession> UserSessions => Set<FcmsUserSession>();
     public DbSet<FcmsLoginHistory> LoginHistory => Set<FcmsLoginHistory>();
+
+    // Phase 14 — API tokens / webhooks / engagement
+    public DbSet<FcmsApiToken> ApiTokens => Set<FcmsApiToken>();
+    public DbSet<FcmsWebhookEndpoint> WebhookEndpoints => Set<FcmsWebhookEndpoint>();
+    public DbSet<FcmsWebhookDelivery> WebhookDeliveries => Set<FcmsWebhookDelivery>();
+    public DbSet<FcmsContentRevision> ContentRevisions => Set<FcmsContentRevision>();
+    public DbSet<FcmsComment> Comments => Set<FcmsComment>();
+    public DbSet<FcmsSubscriber> Subscribers => Set<FcmsSubscriber>();
+    public DbSet<FcmsContentMeta> ContentMeta => Set<FcmsContentMeta>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -305,6 +320,32 @@ public class FcmsDbContext : IdentityDbContext<FcmsUser, FcmsRole, Guid>
 
         modelBuilder.Entity<FcmsLoginHistory>()
             .HasIndex(h => h.AttemptedUserName);
+
+        // ── Engagement / API (Phase 14) ───────────────────────────────────────
+
+        modelBuilder.Entity<FcmsApiToken>().HasIndex(t => t.Hash).IsUnique();
+        modelBuilder.Entity<FcmsApiToken>().HasIndex(t => t.UserId);
+
+        modelBuilder.Entity<FcmsWebhookEndpoint>().HasIndex(e => e.IsActive);
+
+        // Failed-but-retriable scan: WHERE delivery_status=Pending AND attempt_count<3
+        modelBuilder.Entity<FcmsWebhookDelivery>()
+            .HasIndex(d => new { d.DeliveryStatus, d.AttemptCount });
+
+        modelBuilder.Entity<FcmsContentRevision>()
+            .HasIndex(r => new { r.EntityType, r.EntityId, r.Version });
+
+        modelBuilder.Entity<FcmsComment>()
+            .HasIndex(c => new { c.EntityType, c.EntityId, c.CommentStatus });
+        modelBuilder.Entity<FcmsComment>().HasIndex(c => c.ParentId);
+
+        modelBuilder.Entity<FcmsSubscriber>().HasIndex(s => s.Email).IsUnique();
+        modelBuilder.Entity<FcmsSubscriber>().HasIndex(s => s.Token).IsUnique();
+        modelBuilder.Entity<FcmsSubscriber>().HasIndex(s => s.SubscriberStatus);
+
+        modelBuilder.Entity<FcmsContentMeta>()
+            .HasIndex(m => new { m.EntityType, m.EntityId, m.Key })
+            .IsUnique();
 
         // Audit log entities are append-only — strip the inherited lifecycle
         // columns and skip the soft-delete query filter (no Status column means

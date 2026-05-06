@@ -15057,7 +15057,11 @@ tests/FlexCms.Tests.Unit/Phase3/FcmsAuthorizeFilterTests.cs # +SuperAdmin upperc
 ---
 
 ### Phase 14 — API + Integrations + Engagement (Issues 73-83)
-> **❌ NOT STARTED**
+> **🔄 PARTIAL** (2026-05-06) — see [phase-14-test-cases.md](phase-14-test-cases.md)
+> ✅ Done: API tokens (Issue 73 — `FcmsApiToken` entity, SHA-256 hashed at rest, `ApiTokenService` with issue/validate/list/revoke + `LastUsedAt` touch + expiry; `FcmsApiTokenAuthenticationHandler` Bearer scheme registered alongside cookie scheme); webhooks (Issue 74 — `FcmsWebhookEndpoint` + `FcmsWebhookDelivery` entities + `WebhookDispatcher` with HMAC-SHA256 signing + 3-attempt retry + `RetryFailedAsync` drain); CORS settings on `SiteSettings` (Issue 75 — settings exist; pipeline wiring is the next pass); captcha provider abstraction + `TurnstileCaptchaProvider` (Issue 76 — interface, hCaptcha/reCAPTCHA follow same shape); CDN URL helper (Issue 77 — `CdnSettings` + `CdnUrlService` resolves through CDN base URL when enabled); asset versioning (Issue 78 — `AssetVersionService` SHA-256 hash + cache-by-LastWriteTime); content revisions (Issue 79 — `FcmsContentRevision` + `ContentRevisionService` auto-version per entity); comments (Issue 80 — `FcmsComment` + `CommentService` with built-in spam scorer: link count + keyword + caps heuristics → score ≥5 = auto-Spam); subscribers (Issue 82 partial — `FcmsSubscriber` + `SubscriberService` with double opt-in flow + token-based unsubscribe); custom fields (Issue 83 — `FcmsContentMeta` + `CustomFieldService` with typed serialize/deserialize for primitives + JSON).
+> ⏸ Deferred: Forms Builder drag-drop UI (Issue 81), newsletter compose UI + queue wiring (Issue 82 remainder), comment-reply-from-email (Issue 80 remainder), DiffPlex revision diff view (Issue 79 remainder), hCaptcha + reCAPTCHA concrete providers, CORS pipeline wiring, adaptive captcha UI auto-show.
+> Tests: 13 unit (Webhook signature symmetry, comment spam scorer, ApiTokenService hash) + 25 integration (ApiToken EF 6 + Subscriber/CustomField EF 11 + Revision/Comment EF 8). Project total 292 unit + 249 integration.
+> Permissions seeded: `api.tokens.manage`, `webhooks.manage`, `comments.moderate`, `subscribers.manage`.
 **কাজ:**
 - `FcmsApiToken` + `FcmsApiTokenAuthenticationHandler` (Bearer scheme) — Profile UI generate/revoke (Issue 73)
 - `FcmsWebhookEndpoint` + `FcmsWebhookDelivery` + `FcmsWebhookDispatcher` — outbound webhooks (Issue 74)

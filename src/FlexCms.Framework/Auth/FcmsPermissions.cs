@@ -69,4 +69,10 @@ public static class FcmsPermissions
     public const string PaymentsManage = "payments.manage";
     public const string ExportsRequest = "exports.request";
     public const string ExportsView = "exports.view";
+
+    // ── Admin: API + Engagement (Phase 14) ───────────────────────────────────
+    public const string ApiTokensManage = "api.tokens.manage";
+    public const string WebhooksManage = "webhooks.manage";
+    public const string CommentsModerate = "comments.moderate";
+    public const string SubscribersManage = "subscribers.manage";
 }

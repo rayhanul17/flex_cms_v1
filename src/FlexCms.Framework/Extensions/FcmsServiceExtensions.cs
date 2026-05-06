@@ -1,5 +1,6 @@
 using FlexCms.Framework.Auth;
 using FlexCms.Framework.Auth.Ef;
+using FlexCms.Framework.Chat;
 using FlexCms.Framework.Cms;
 using FlexCms.Framework.Clock;
 using FlexCms.Framework.Storage;
@@ -123,6 +124,9 @@ public static class FcmsServiceExtensions
         services.AddScoped<IFcmsWidgetManager, FcmsWidgetManager>();
         services.AddSingleton<IFcmsHoneypotService, FcmsHoneypotService>();
         services.AddScoped<IFcmsViewRenderService, FcmsViewRenderService>();
+
+        // ── Phase 10: Chat (SignalR is added at the host level via AddSignalR) ─
+        services.AddScoped<IChatService, ChatService>();
 
         // Permission service (15min IMemoryCache — requires IRepository<> to be registered)
         services.AddMemoryCache();

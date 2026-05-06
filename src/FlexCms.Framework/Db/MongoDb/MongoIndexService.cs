@@ -1,4 +1,5 @@
 using FlexCms.Framework.Auth;
+using FlexCms.Framework.Chat;
 using FlexCms.Framework.Cms;
 using FlexCms.Framework.Helpers;
 using FlexCms.Framework.Messaging;
@@ -162,6 +163,23 @@ public class MongoIndexService : IHostedService
                 .Ascending(p => p.Enabled)
                 .Ascending(p => p.SortOrder),
             "ix_widget_placements_zone_enabled_sort", ct);
+
+        // ── Chat (Phase 10) ───────────────────────────────────────────────────
+        await IndexAsync<FcmsChatThread>(
+            Builders<FcmsChatThread>.IndexKeys
+                .Ascending(t => t.UserId)
+                .Ascending(t => t.ThreadStatus),
+            "ix_chat_threads_user_status", ct);
+
+        await IndexAsync<FcmsChatThread>(
+            Builders<FcmsChatThread>.IndexKeys.Descending(t => t.LastMessageAt),
+            "ix_chat_threads_last_message_at", ct);
+
+        await IndexAsync<FcmsChatMessage>(
+            Builders<FcmsChatMessage>.IndexKeys
+                .Ascending(m => m.ThreadId)
+                .Ascending(m => m.CreatedAt),
+            "ix_chat_messages_thread_created", ct);
 
         // ── Modules ───────────────────────────────────────────────────────────
 

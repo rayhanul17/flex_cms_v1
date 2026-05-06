@@ -1,0 +1,230 @@
+@*
+    Floating chat widget — rendered into "BeforeBodyEnd" zone of the public
+    layout. Hidden when the user isn't signed in. Talks to ChatHub via SignalR
+    with an AJAX fallback through ChatController if the websocket fails.
+
+    Phase 11 (Themes) will replace the inline styles here with a proper SCSS
+    stylesheet — kept inline now so the widget works regardless of which theme
+    the public site is using.
+*@
+@using System.Security.Claims
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
+@{
+    var isAuthed = User?.Identity?.IsAuthenticated == true;
+    if (!isAuthed) { return; }
+    var token = Antiforgery.GetAndStoreTokens(Context).RequestToken;
+}
+
+<div id="fcmsChat" data-csrf="@token">
+    <button type="button" id="fcmsChatFab" aria-label="Open chat">
+        <i class="bi bi-chat-dots"></i>
+        <span id="fcmsChatDot" hidden></span>
+    </button>
+
+    <div id="fcmsChatPanel" hidden>
+        <header>
+            <strong>Chat</strong>
+            <div>
+                <button type="button" id="fcmsChatNew" title="Start new conversation">
+                    <i class="bi bi-arrow-clockwise"></i>
+                </button>
+                <button type="button" id="fcmsChatClose" aria-label="Close">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+            </div>
+        </header>
+        <div id="fcmsChatBanner" hidden></div>
+        <ul id="fcmsChatList"></ul>
+        <form id="fcmsChatForm">
+            <label class="m-0" for="fcmsChatFile" title="Attach file">
+                <i class="bi bi-paperclip"></i>
+                <input type="file" id="fcmsChatFile" hidden />
+            </label>
+            <input type="text" id="fcmsChatInput" placeholder="Type a message…" autocomplete="off" />
+            <button type="submit"><i class="bi bi-send"></i></button>
+        </form>
+    </div>
+</div>
+
+<style>
+    #fcmsChatFab {
+        position: fixed; right: 16px; bottom: 16px; z-index: 1050;
+        width: 56px; height: 56px; border-radius: 50%;
+        background: #0d6efd; color: #fff; border: 0;
+        box-shadow: 0 6px 16px rgba(0,0,0,.2);
+        display: flex; align-items: center; justify-content: center; font-size: 20px;
+    }
+    #fcmsChatDot {
+        position: absolute; top: 6px; right: 6px;
+        width: 12px; height: 12px; border-radius: 50%;
+        background: #dc3545; border: 2px solid #fff;
+    }
+    #fcmsChatPanel {
+        position: fixed; right: 16px; bottom: 84px; z-index: 1050;
+        width: 380px; max-width: calc(100vw - 32px); height: 500px; max-height: calc(100vh - 110px);
+        background: #fff; border-radius: 8px;
+        display: flex; flex-direction: column;
+        box-shadow: 0 10px 30px rgba(0,0,0,.15); overflow: hidden;
+    }
+    #fcmsChatPanel header {
+        display: flex; justify-content: space-between; align-items: center;
+        padding: 8px 12px; background: #0d6efd; color: #fff;
+    }
+    #fcmsChatPanel header button {
+        background: transparent; border: 0; color: #fff; padding: 4px 6px;
+    }
+    #fcmsChatBanner { padding: 6px 12px; background: #d1e7dd; color: #0a3622; font-size: .85rem; }
+    #fcmsChatList { list-style: none; margin: 0; padding: 8px; flex: 1; overflow-y: auto; }
+    #fcmsChatList li {
+        margin-bottom: 6px; padding: 6px 10px; border-radius: 12px;
+        max-width: 80%; word-wrap: break-word; font-size: .9rem;
+    }
+    #fcmsChatList li.user  { background: #0d6efd; color: #fff; margin-left: auto; }
+    #fcmsChatList li.admin { background: #f1f3f5; color: #212529; }
+    #fcmsChatList li.system{ background: #fff3cd; color: #664d03; text-align: center; font-size: .8rem; }
+    #fcmsChatForm { display: flex; gap: 6px; padding: 8px; border-top: 1px solid #dee2e6; align-items: center; }
+    #fcmsChatForm input[type=text] { flex: 1; border: 1px solid #ced4da; border-radius: 6px; padding: 6px 10px; }
+    #fcmsChatForm button { background: #0d6efd; color: #fff; border: 0; border-radius: 6px; padding: 6px 12px; }
+    @@media (max-width: 575.98px) {
+        #fcmsChatPanel { right: 0; bottom: 0; width: 100vw; height: 100vh; max-width: 100vw; max-height: 100vh; border-radius: 0; }
+    }
+</style>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.7/signalr.min.js"></script>
+<script>
+(() => {
+    const root = document.getElementById('fcmsChat');
+    const csrf = root.dataset.csrf;
+    const fab  = document.getElementById('fcmsChatFab');
+    const dot  = document.getElementById('fcmsChatDot');
+    const panel = document.getElementById('fcmsChatPanel');
+    const list  = document.getElementById('fcmsChatList');
+    const form  = document.getElementById('fcmsChatForm');
+    const input = document.getElementById('fcmsChatInput');
+    const fileInput = document.getElementById('fcmsChatFile');
+    const btnNew = document.getElementById('fcmsChatNew');
+    const btnClose = document.getElementById('fcmsChatClose');
+    const banner = document.getElementById('fcmsChatBanner');
+
+    let threadId = null;
+    let connection = null;
+
+    function escapeHtml(s) {
+        return (s ?? '').toString().replace(/[&<>"']/g, c =>
+            ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+    }
+
+    function appendMessage(m) {
+        const li = document.createElement('li');
+        li.className = m.senderRole;
+        if (m.attachmentKind === 'image') {
+            li.innerHTML = `<img src="${escapeHtml(m.attachmentUrl)}" alt="" style="max-width:100%;border-radius:6px" />`;
+        } else if (m.attachmentKind === 'file') {
+            li.innerHTML = `<a href="${escapeHtml(m.attachmentUrl)}" target="_blank">📎 ${escapeHtml(m.attachmentName)}</a>`;
+        } else {
+            li.textContent = m.body;
+        }
+        list.appendChild(li);
+        list.scrollTop = list.scrollHeight;
+    }
+
+    async function loadMessages() {
+        const res = await fetch('/chat/messages', { credentials: 'same-origin' });
+        if (!res.ok) return;
+        const json = await res.json();
+        if (!json.isSuccess) return;
+        threadId = json.thread.id;
+        list.innerHTML = '';
+        json.messages.forEach(appendMessage);
+
+        if (json.thread.status === 'resolved' || json.thread.status === 'closed') {
+            banner.hidden = false;
+            banner.textContent = 'This conversation is closed. Click ↻ to start a new one.';
+            input.disabled = true;
+        } else {
+            banner.hidden = true;
+            input.disabled = false;
+        }
+    }
+
+    async function startSignalR() {
+        connection = new signalR.HubConnectionBuilder().withUrl('/hubs/chat').withAutomaticReconnect().build();
+        connection.on('NewMessage', (tid, m) => {
+            if (tid !== threadId) return;
+            appendMessage(m);
+            if (panel.hidden) dot.hidden = false;
+        });
+        connection.on('ThreadResolved', () => loadMessages());
+        try {
+            await connection.start();
+            if (threadId) await connection.invoke('JoinThread', threadId);
+        } catch { /* fall through to AJAX-only mode */ }
+    }
+
+    async function sendText(body) {
+        if (connection?.state === 'Connected') {
+            try {
+                const m = await connection.invoke('SendMessage', body);
+                appendMessage(m);
+                return;
+            } catch { /* fall back to AJAX */ }
+        }
+        const fd = new FormData();
+        fd.append('body', body);
+        if (threadId) fd.append('threadId', threadId);
+        const res = await fetch('/chat/send', { method: 'POST', headers: { 'X-FlexCms-Csrf': csrf }, body: fd, credentials: 'same-origin' });
+        if (res.ok) {
+            const j = await res.json();
+            if (j.isSuccess) appendMessage(j.message);
+        }
+    }
+
+    async function uploadFile(file) {
+        const fd = new FormData();
+        fd.append('file', file);
+        if (threadId) fd.append('threadId', threadId);
+        const res = await fetch('/chat/upload', { method: 'POST', headers: { 'X-FlexCms-Csrf': csrf }, body: fd, credentials: 'same-origin' });
+        const j = await res.json();
+        if (j.isSuccess) appendMessage(j.message);
+        else alert(j.message || 'Upload failed.');
+    }
+
+    fab.addEventListener('click', async () => {
+        panel.hidden = !panel.hidden;
+        dot.hidden = true;
+        if (!panel.hidden && list.children.length === 0) {
+            await loadMessages();
+            await startSignalR();
+        }
+    });
+    btnClose.addEventListener('click', () => { panel.hidden = true; });
+
+    btnNew.addEventListener('click', async () => {
+        const res = await fetch('/chat/new-thread', { method: 'POST', headers: { 'X-FlexCms-Csrf': csrf }, credentials: 'same-origin' });
+        if (res.ok) {
+            const j = await res.json();
+            if (j.isSuccess) {
+                if (connection && threadId) try { await connection.invoke('LeaveThread', threadId); } catch {}
+                threadId = j.threadId;
+                if (connection) try { await connection.invoke('JoinThread', threadId); } catch {}
+                list.innerHTML = '';
+                banner.hidden = true;
+                input.disabled = false;
+            }
+        }
+    });
+
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const text = input.value.trim();
+        if (!text) return;
+        input.value = '';
+        await sendText(text);
+    });
+    fileInput.addEventListener('change', async () => {
+        if (!fileInput.files?.[0]) return;
+        await uploadFile(fileInput.files[0]);
+        fileInput.value = '';
+    });
+})();
+</script>

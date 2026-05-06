@@ -242,6 +242,8 @@ public class SeedService : IHostedService
         new() { Key = FcmsPermissions.SettingsManage,    DisplayName = "Settings: Manage",           Group = "Admin" },
         new() { Key = FcmsPermissions.MessagingView,     DisplayName = "Messaging: View",            Group = "Messaging" },
         new() { Key = FcmsPermissions.MessagingBroadcast,DisplayName = "Messaging: Broadcast",       Group = "Messaging" },
+        new() { Key = Chat.ChatPermissions.Send,         DisplayName = "Chat: Send (user)",          Group = "Chat" },
+        new() { Key = Chat.ChatPermissions.Reply,        DisplayName = "Chat: Reply (admin)",        Group = "Chat" },
     ];
 
     private async Task SeedPermissionsAsync(CancellationToken ct)
@@ -285,6 +287,9 @@ public class SeedService : IHostedService
         new() { DefaultName = "Messaging",  Icon = "bi bi-envelope",     Url = "#messaging",         Order = 70 },
         new() { DefaultName = "Broadcast",  Icon = "bi bi-megaphone",    Url = "/admin/broadcast",   Order = 71, ParentDefaultName = "Messaging", RequiredPermission = FcmsPermissions.MessagingView },
         new() { DefaultName = "SMTP / SMS", Icon = "bi bi-gear-wide-connected", Url = "/admin/messaging-settings", Order = 72, ParentDefaultName = "Messaging", RequiredPermission = FcmsPermissions.SettingsManage },
+
+        // Chat (Phase 10)
+        new() { DefaultName = "Chat", Icon = "bi bi-chat-dots", Url = "/admin/chat", Order = 75, ParentDefaultName = "Messaging", RequiredPermission = Chat.ChatPermissions.Reply },
     ];
 
     private async Task SeedMenuItemsAsync(CancellationToken ct)

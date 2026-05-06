@@ -70,6 +70,10 @@ builder.Services.AddControllersWithViews(mvc =>
         o.ViewLocationFormats.Add("/Views/Admin/{1}/{0}.cshtml");
     });
 
+// SignalR (Phase 10 — chat). Default in-memory backplane is fine for
+// single-instance deploys; multi-node would swap in Redis backplane here.
+builder.Services.AddSignalR();
+
 var setup = SetupHelper.ReadStatic(appDataPath);
 var cfg = builder.Configuration;
 
@@ -133,6 +137,9 @@ app.UseMiddleware<ForcePasswordChangeMiddleware>();
 app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Home}/{action=Index}/{id?}");
+
+// Phase 10 — chat hub
+app.MapHub<FlexCms.Framework.Chat.ChatHub>("/hubs/chat");
 
 // CMS page slug catch-all — must come after all other conventional routes
 // so attribute-routed controllers (admin, auth, blog) take priority.

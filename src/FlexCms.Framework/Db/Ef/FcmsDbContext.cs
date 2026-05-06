@@ -1,4 +1,5 @@
 using FlexCms.Framework.Auth;
+using FlexCms.Framework.Chat;
 using FlexCms.Framework.Cms;
 using FlexCms.Framework.Clock;
 using FlexCms.Framework.Db;
@@ -70,6 +71,10 @@ public class FcmsDbContext : IdentityDbContext<FcmsUser, FcmsRole, Guid>
     // Phase 9 — notifications + widgets
     public DbSet<FcmsNotification> Notifications => Set<FcmsNotification>();
     public DbSet<FcmsWidgetPlacement> WidgetPlacements => Set<FcmsWidgetPlacement>();
+
+    // Phase 10 — chat
+    public DbSet<FcmsChatThread> ChatThreads => Set<FcmsChatThread>();
+    public DbSet<FcmsChatMessage> ChatMessages => Set<FcmsChatMessage>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -245,6 +250,27 @@ public class FcmsDbContext : IdentityDbContext<FcmsUser, FcmsRole, Guid>
         // Zone render lookup hit on every page → covering index.
         modelBuilder.Entity<FcmsWidgetPlacement>()
             .HasIndex(p => new { p.Zone, p.Enabled, p.SortOrder });
+
+        // ── Chat (Phase 10) ────────────────────────────────────────────────────
+
+        // Thread → messages cascade so resolving / hard-deleting a thread cleans up its messages.
+        modelBuilder.Entity<FcmsChatMessage>()
+            .HasOne(m => m.Thread)
+            .WithMany(t => t.Messages)
+            .HasForeignKey(m => m.ThreadId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        // (UserId, ThreadStatus) — fast lookup of "open thread for user".
+        modelBuilder.Entity<FcmsChatThread>()
+            .HasIndex(t => new { t.UserId, t.ThreadStatus });
+
+        // Admin list ordering query.
+        modelBuilder.Entity<FcmsChatThread>()
+            .HasIndex(t => t.LastMessageAt);
+
+        // (ThreadId, CreatedAt) — message timeline render.
+        modelBuilder.Entity<FcmsChatMessage>()
+            .HasIndex(m => new { m.ThreadId, m.CreatedAt });
 
         // Audit log entities are append-only — strip the inherited lifecycle
         // columns and skip the soft-delete query filter (no Status column means

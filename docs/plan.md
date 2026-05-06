@@ -14903,19 +14903,18 @@ tests/FlexCms.Tests.Unit/Phase3/FcmsAuthorizeFilterTests.cs # +SuperAdmin upperc
 ---
 
 ### Phase 10 — Chat (SignalR)
-> **❌ NOT STARTED**
+> **✅ DONE** (2026-05-06) — see [phase-10-test-cases.md](phase-10-test-cases.md)
 **কাজ:**
-- `FcmsChatThread`, `FcmsChatMessage` entities
-- `ChatService` (GetOrCreateThread, AddMessage, ResolveThread, CreateNewThread)
-- `ChatHub` ([Authorize] SignalR Hub): SendMessage, SendReply, ResolveThread
-- `ChatController`: /chat/messages, /chat/send (AJAX fallback), /chat/new-thread, /chat/upload
-- Chat file upload: magic bytes, size limit (ChatSettings), IFcmsFileStorage
-- User floating widget (FAB 56px, responsive: mobile full-screen / desktop 380×500px)
-- Admin split panel (300px list + flex detail, mobile full-screen with back button)
-- Message bubbles (user right blue, admin left gray + avatar)
-- `ChatFloatingWidget` extends `FcmsWidget` → "BeforeBodyEnd" zone
-- `ChatModule.MapHubs()` → `endpoints.MapHub<ChatHub>("/hubs/chat")`
-- Thread status: Open → Resolved → Closed; "Start new" flow
+- `FcmsChatThread` (UserId, UserDisplayName, ThreadStatus enum {Open|Resolved|Closed}, LastMessageAt, LastMessagePreview, ResolvedAt + ResolvedByUserId) and `FcmsChatMessage` (ThreadId, SenderUserId, SenderRole enum {User|Admin|System}, SenderDisplayName, Body, AttachmentKind enum {None|Image|File} + Url + Name + Size, IsRead) entities — EF + Mongo with composite indexes (UserId, ThreadStatus), LastMessageAt desc, (ThreadId, CreatedAt)
+- `IChatService` + `ChatService`: `GetOrCreateOpenThreadAsync`, `StartNewThreadAsync` (closes current open + creates fresh), `GetRecentThreadsAsync`, `GetMessagesAsync` (oldest first), `AddMessageAsync` (auto-bumps thread `LastMessageAt` + 120-char preview with ellipsis), `MarkReadAsync` (directional — user marks admin's, admin marks user's), `ResolveThreadAsync`
+- `ChatHub` SignalR ([Authorize], permission-checked): `JoinThread` / `LeaveThread` group management, `SendMessage` (user), `SendReply` (admin, throws HubException if missing `chat.reply`), `ResolveThread`. Pushes `NewMessage` to `thread:{id}` + `user:{userId}` groups, `NewThreadActivity` to `chat:admins`, `ThreadResolved` to user. Admin connections auto-join `chat:admins` group on connect
+- `ChatController` (`/chat/messages`, `/chat/send`, `/chat/upload`, `/chat/new-thread`) — AJAX fallback when SignalR is blocked + the binary upload endpoint with magic-byte validation (jpg/png/gif/webp/pdf/zip/docx/xlsx/doc/xls/txt) + size cap from `ChatSettings.MaxUploadSizeMb` (default 5) + extension whitelist from `ChatSettings.AllowedExtensions`. After every write the controller broadcasts the same payload through `IHubContext<ChatHub>` so connected clients still see it in realtime
+- `_ChatWidget.cshtml` floating partial: 56px FAB (bottom-right), 380×500 popup (full-viewport on `<576px`), inline styles + microsoft-signalr CDN script. SignalR-first send with `/chat/send` AJAX fallback; supports text, image (inline `<img>`), and file (download link) bubbles + ↻ "Start new"
+- `/admin/chat` panel: thread list (left) + detail with reply form + Resolve button (right). Lazy reloads thread list on `NewThreadActivity`; opens individual thread on click + joins its hub group
+- Permissions: `chat.send` (end-user), `chat.reply` (admin) seeded by `SeedService`
+- Sidebar menu: Messaging > Chat (gated by `chat.reply`)
+- Wiring: `services.AddSignalR()` in Program.cs; `app.MapHub<ChatHub>("/hubs/chat")`; `ChatService` registered scoped in `FcmsServiceExtensions`; Mongo indexes added
+- Tests: 11 integration (8 EF in-memory: thread state machine + message append/preview + ordering + mark-read directionality; 3 Mongo via Testcontainers: thread + message persist + resolve). Project total 235 unit + 210 integration.
 
 **✅ Confirm করো:**
 - [ ] User types message → Send → bubble appears right-aligned in widget

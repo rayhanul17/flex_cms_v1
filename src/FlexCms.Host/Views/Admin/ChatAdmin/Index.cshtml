@@ -1,0 +1,142 @@
+@using FlexCms.Framework.Chat
+@using FlexCms.Framework.Clock
+@model List<FlexCms.Framework.Chat.FcmsChatThread>
+@{
+    ViewData["Title"] = "Chat";
+}
+
+<h4 class="mb-3">Chat</h4>
+
+<div class="card shadow-sm">
+    <div class="row g-0" style="min-height:60vh">
+        <div class="col-md-4 border-end" style="max-height:75vh;overflow-y:auto">
+            <ul class="list-group list-group-flush" id="adminThreadList">
+                @foreach (var t in Model)
+                {
+                    <li class="list-group-item list-group-item-action thread-item" data-id="@t.Id" style="cursor:pointer">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <strong>@t.UserDisplayName</strong>
+                            <small class="text-muted">@(t.LastMessageAt is null ? "" : FcmsTime.Format(t.LastMessageAt.Value))</small>
+                        </div>
+                        <div class="small text-muted">@t.LastMessagePreview</div>
+                        <span class="badge text-bg-@(t.ThreadStatus == ChatThreadStatus.Open ? "success" : t.ThreadStatus == ChatThreadStatus.Resolved ? "secondary" : "dark")">@t.ThreadStatus</span>
+                    </li>
+                }
+                @if (Model.Count == 0)
+                {
+                    <li class="list-group-item text-center text-muted py-4">No conversations yet.</li>
+                }
+            </ul>
+        </div>
+        <div class="col-md-8 d-flex flex-column" id="adminChatDetail">
+            <div class="p-3 border-bottom" id="adminChatHeader">
+                <em class="text-muted">Select a conversation</em>
+            </div>
+            <div class="p-3 flex-grow-1" id="adminChatMessages" style="overflow-y:auto"></div>
+            <div class="p-3 border-top" id="adminChatFormWrap" hidden>
+                <form id="adminChatForm" class="d-flex gap-2">
+                    <input type="text" class="form-control" id="adminChatInput" placeholder="Type a reply…" />
+                    <button class="btn btn-primary" type="submit"><i class="bi bi-send"></i></button>
+                    <button class="btn btn-outline-success" type="button" id="adminChatResolve">
+                        <i class="bi bi-check-lg"></i> Resolve
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.7/signalr.min.js"></script>
+<script>
+(() => {
+    const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
+    const list  = document.getElementById('adminThreadList');
+    const header = document.getElementById('adminChatHeader');
+    const messages = document.getElementById('adminChatMessages');
+    const formWrap = document.getElementById('adminChatFormWrap');
+    const form = document.getElementById('adminChatForm');
+    const input = document.getElementById('adminChatInput');
+    const resolveBtn = document.getElementById('adminChatResolve');
+
+    let currentThreadId = null;
+    const conn = new signalR.HubConnectionBuilder().withUrl('/hubs/chat').withAutomaticReconnect().build();
+
+    function escapeHtml(s) {
+        return (s ?? '').toString().replace(/[&<>"']/g, c =>
+            ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+    }
+
+    function renderMessage(m) {
+        const cls = m.senderRole === 'admin' ? 'text-end' : '';
+        const bg  = m.senderRole === 'admin' ? 'bg-light' : 'bg-primary text-white';
+        let body;
+        if (m.attachmentKind === 'image') body = `<img src="${escapeHtml(m.attachmentUrl)}" style="max-width:200px;border-radius:6px"/>`;
+        else if (m.attachmentKind === 'file') body = `<a href="${escapeHtml(m.attachmentUrl)}" target="_blank">📎 ${escapeHtml(m.attachmentName)}</a>`;
+        else body = escapeHtml(m.body);
+        return `<div class="${cls} mb-2">
+            <span class="d-inline-block px-3 py-2 rounded ${bg}" style="max-width:80%">${body}</span>
+            <div class="small text-muted">${escapeHtml(m.senderName)}</div>
+        </div>`;
+    }
+
+    async function openThread(id) {
+        currentThreadId = id;
+        if (conn.state === 'Connected') { try { await conn.invoke('JoinThread', id); } catch {} }
+        const res = await fetch(`/chat/messages?threadId=${id}`, { credentials: 'same-origin' });
+        const j = await res.json();
+        if (!j.isSuccess) return;
+        header.innerHTML = `<strong>Thread: ${escapeHtml(id)}</strong>`;
+        messages.innerHTML = j.messages.map(renderMessage).join('');
+        messages.scrollTop = messages.scrollHeight;
+        formWrap.hidden = j.thread.status !== 'open';
+    }
+
+    list.addEventListener('click', (e) => {
+        const li = e.target.closest('.thread-item');
+        if (li) openThread(li.dataset.id);
+    });
+
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        if (!currentThreadId) return;
+        const body = input.value.trim();
+        if (!body) return;
+        input.value = '';
+
+        if (conn.state === 'Connected') {
+            try { const m = await conn.invoke('SendReply', currentThreadId, body); messages.insertAdjacentHTML('beforeend', renderMessage(m)); messages.scrollTop = messages.scrollHeight; return; } catch {}
+        }
+        const fd = new FormData();
+        fd.append('body', body);
+        fd.append('threadId', currentThreadId);
+        const res = await fetch('/chat/send', { method: 'POST', headers: { 'X-FlexCms-Csrf': csrf }, body: fd, credentials: 'same-origin' });
+        const j = await res.json();
+        if (j.isSuccess) { messages.insertAdjacentHTML('beforeend', renderMessage(j.message)); messages.scrollTop = messages.scrollHeight; }
+    });
+
+    resolveBtn.addEventListener('click', async () => {
+        if (!currentThreadId) return;
+        try { await conn.invoke('ResolveThread', currentThreadId); } catch {}
+    });
+
+    conn.on('NewMessage', (tid, m) => {
+        if (tid === currentThreadId) { messages.insertAdjacentHTML('beforeend', renderMessage(m)); messages.scrollTop = messages.scrollHeight; }
+    });
+    conn.on('NewThreadActivity', () => {
+        // Lazy: just reload the list
+        fetch('/admin/chat/threads').then(r => r.json()).then(j => {
+            if (!j.isSuccess) return;
+            list.innerHTML = j.threads.map(t => `
+                <li class="list-group-item list-group-item-action thread-item" data-id="${t.id}" style="cursor:pointer">
+                    <div class="d-flex justify-content-between"><strong>${escapeHtml(t.user)}</strong></div>
+                    <div class="small text-muted">${escapeHtml(t.preview ?? '')}</div>
+                    <span class="badge text-bg-secondary">${escapeHtml(t.status)}</span>
+                </li>`).join('') || '<li class="list-group-item text-center text-muted py-4">No conversations yet.</li>';
+        });
+    });
+    conn.on('ThreadResolved', (tid) => { if (tid === currentThreadId) formWrap.hidden = true; });
+    conn.start().catch(() => {});
+})();
+</script>
+}

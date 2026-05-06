@@ -41,12 +41,12 @@ public class SettingsController : BaseAdminController
         var site = await _settings.GetAsync<SiteSettings>(SiteSettingsKey, ct: ct);
 
         // Apply changes — only the fields the form exposes
-        site.SiteName        = vm.SiteName?.Trim() ?? "";
-        site.Tagline         = vm.SiteTagline?.Trim() ?? "";
-        site.BaseUrl         = vm.SiteBaseUrl?.Trim() ?? "";
+        site.SiteName = vm.SiteName?.Trim() ?? "";
+        site.Tagline = vm.SiteTagline?.Trim() ?? "";
+        site.BaseUrl = vm.SiteBaseUrl?.Trim() ?? "";
         site.DefaultLanguage = vm.DefaultLanguage ?? "en";
-        site.TimeZone        = vm.TimeZoneId ?? site.TimeZone;
-        site.DateTimeFormat  = string.IsNullOrWhiteSpace(vm.DateTimeFormat) ? "yyyy-MM-dd HH:mm" : vm.DateTimeFormat.Trim();
+        site.TimeZone = vm.TimeZoneId ?? site.TimeZone;
+        site.DateTimeFormat = string.IsNullOrWhiteSpace(vm.DateTimeFormat) ? "yyyy-MM-dd HH:mm" : vm.DateTimeFormat.Trim();
         site.TrashRetentionDays = vm.TrashRetentionDays;
 
         await _settings.SaveAsync(SiteSettingsKey, site, ct);
@@ -76,14 +76,14 @@ public class SettingsController : BaseAdminController
     {
         var vm = new SettingsViewModel
         {
-            SiteName           = site.SiteName,
-            SiteTagline        = site.Tagline,
-            SiteBaseUrl        = site.BaseUrl,
-            DefaultLanguage    = site.DefaultLanguage,
-            TimeZoneId         = site.TimeZone,
-            DateTimeFormat     = site.DateTimeFormat,
+            SiteName = site.SiteName,
+            SiteTagline = site.Tagline,
+            SiteBaseUrl = site.BaseUrl,
+            DefaultLanguage = site.DefaultLanguage,
+            TimeZoneId = site.TimeZone,
+            DateTimeFormat = site.DateTimeFormat,
             TrashRetentionDays = site.TrashRetentionDays,
-            AuditEnabled       = auditEnabled
+            AuditEnabled = auditEnabled
         };
         PopulateAvailable(vm);
         try { vm.SampleFormatted = FcmsTime.Format(FcmsTime.Now, vm.DateTimeFormat); }

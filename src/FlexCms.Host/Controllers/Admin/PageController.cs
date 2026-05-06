@@ -58,7 +58,7 @@ public class PageController : BaseAdminController
             globalSearch: q => p => p.Title.Contains(q) || p.Slug.Contains(q),
             permissions: new()
             {
-                ["edit"]   = FcmsPermissions.PagesEdit,
+                ["edit"] = FcmsPermissions.PagesEdit,
                 ["delete"] = FcmsPermissions.PagesDelete
             },
             ct: ct);

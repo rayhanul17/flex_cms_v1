@@ -29,8 +29,8 @@ public sealed class DataTablesRequestModelBinder : IModelBinder
             return null;
         }
 
-        req.Draw   = int.TryParse(Get("draw"),   out var d) ? d : 0;
-        req.Start  = int.TryParse(Get("start"),  out var s) ? s : 0;
+        req.Draw = int.TryParse(Get("draw"), out var d) ? d : 0;
+        req.Start = int.TryParse(Get("start"), out var s) ? s : 0;
         req.Length = int.TryParse(Get("length"), out var l) ? l : 25;
 
         req.Search = new DataTablesSearch
@@ -61,7 +61,7 @@ public sealed class DataTablesRequestModelBinder : IModelBinder
                 Data = data,
                 Name = Get($"columns[{i}][name]") ?? "",
                 Searchable = !bool.TryParse(Get($"columns[{i}][searchable]"), out var cs) || cs,
-                Orderable  = !bool.TryParse(Get($"columns[{i}][orderable]"),  out var co) || co,
+                Orderable = !bool.TryParse(Get($"columns[{i}][orderable]"), out var co) || co,
                 Search = new DataTablesSearch
                 {
                     Value = Get($"columns[{i}][search][value]") ?? "",

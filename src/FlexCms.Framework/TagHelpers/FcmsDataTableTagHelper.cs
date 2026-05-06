@@ -44,9 +44,9 @@ public sealed class FcmsDataTableTagHelper : TagHelper
     [HtmlAttributeName("page-length")] public int PageLength { get; set; } = 25;
 
     // Standard 4 actions — pass permission keys; if any non-null, an Actions column is auto-added
-    [HtmlAttributeName("edit-permission")]    public string? EditPermission { get; set; }
-    [HtmlAttributeName("toggle-permission")]  public string? TogglePermission { get; set; }
-    [HtmlAttributeName("delete-permission")]  public string? DeletePermission { get; set; }
+    [HtmlAttributeName("edit-permission")] public string? EditPermission { get; set; }
+    [HtmlAttributeName("toggle-permission")] public string? TogglePermission { get; set; }
+    [HtmlAttributeName("delete-permission")] public string? DeletePermission { get; set; }
     [HtmlAttributeName("restore-permission")] public string? RestorePermission { get; set; }
 
     // Children collected via context.Items
@@ -95,9 +95,9 @@ public sealed class FcmsDataTableTagHelper : TagHelper
             }).ToArray(),
             actions = hasActionsColumn ? new
             {
-                edit    = new { visible = await Allowed(EditPermission)    && EditPermission    is not null },
-                toggle  = new { visible = await Allowed(TogglePermission)  && TogglePermission  is not null },
-                @delete = new { visible = await Allowed(DeletePermission)  && DeletePermission  is not null },
+                edit = new { visible = await Allowed(EditPermission) && EditPermission is not null },
+                toggle = new { visible = await Allowed(TogglePermission) && TogglePermission is not null },
+                @delete = new { visible = await Allowed(DeletePermission) && DeletePermission is not null },
                 restore = new { visible = await Allowed(RestorePermission ?? DeletePermission) && (RestorePermission ?? DeletePermission) is not null },
                 custom = await ResolveCustomActions(Allowed)
             } : null,
@@ -171,11 +171,11 @@ public sealed class FcmsDataTableTagHelper : TagHelper
 [HtmlTargetElement("fcms-data-column", ParentTag = "fcms-data-table", TagStructure = TagStructure.WithoutEndTag)]
 public sealed class FcmsDataColumnTagHelper : TagHelper
 {
-    [HtmlAttributeName("field")]        public string Field { get; set; } = "";
-    [HtmlAttributeName("header")]       public string? Header { get; set; }
-    [HtmlAttributeName("type")]         public string? Type { get; set; }
-    [HtmlAttributeName("sortable")]     public bool Sortable { get; set; } = true;
-    [HtmlAttributeName("searchable")]   public bool Searchable { get; set; } = true;
+    [HtmlAttributeName("field")] public string Field { get; set; } = "";
+    [HtmlAttributeName("header")] public string? Header { get; set; }
+    [HtmlAttributeName("type")] public string? Type { get; set; }
+    [HtmlAttributeName("sortable")] public bool Sortable { get; set; } = true;
+    [HtmlAttributeName("searchable")] public bool Searchable { get; set; } = true;
     [HtmlAttributeName("default-sort")] public string? DefaultSort { get; set; }
 
     public override void Process(TagHelperContext context, TagHelperOutput output)
@@ -205,15 +205,15 @@ public sealed class FcmsDataActionsTagHelper : TagHelper
 [HtmlTargetElement("fcms-data-action", ParentTag = "fcms-data-actions", TagStructure = TagStructure.WithoutEndTag)]
 public sealed class FcmsDataActionTagHelper : TagHelper
 {
-    [HtmlAttributeName("type")]            public string Type { get; set; } = "custom";
-    [HtmlAttributeName("label")]           public string? Label { get; set; }
-    [HtmlAttributeName("icon")]            public string? Icon { get; set; }
-    [HtmlAttributeName("variant")]         public string? Variant { get; set; }
-    [HtmlAttributeName("permission")]      public string? Permission { get; set; }
-    [HtmlAttributeName("url-template")]    public string? UrlTemplate { get; set; }
-    [HtmlAttributeName("confirm-title")]   public string? ConfirmTitle { get; set; }
+    [HtmlAttributeName("type")] public string Type { get; set; } = "custom";
+    [HtmlAttributeName("label")] public string? Label { get; set; }
+    [HtmlAttributeName("icon")] public string? Icon { get; set; }
+    [HtmlAttributeName("variant")] public string? Variant { get; set; }
+    [HtmlAttributeName("permission")] public string? Permission { get; set; }
+    [HtmlAttributeName("url-template")] public string? UrlTemplate { get; set; }
+    [HtmlAttributeName("confirm-title")] public string? ConfirmTitle { get; set; }
     [HtmlAttributeName("confirm-message")] public string? ConfirmMessage { get; set; }
-    [HtmlAttributeName("confirm-label")]   public string? ConfirmLabel { get; set; }
+    [HtmlAttributeName("confirm-label")] public string? ConfirmLabel { get; set; }
 
     public override void Process(TagHelperContext context, TagHelperOutput output)
     {

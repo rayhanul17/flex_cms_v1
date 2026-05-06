@@ -28,7 +28,7 @@ namespace FlexCms.Framework.Auth;
 public static class FcmsLogContext
 {
     internal const string EntityIdKey = "FcmsLog.EntityId";
-    internal const string ValueKey    = "FcmsLog.Value";
+    internal const string ValueKey = "FcmsLog.Value";
 
     public static void SetEntityId(Microsoft.AspNetCore.Http.HttpContext httpContext, Guid id)
         => httpContext.Items[EntityIdKey] = id.ToString();

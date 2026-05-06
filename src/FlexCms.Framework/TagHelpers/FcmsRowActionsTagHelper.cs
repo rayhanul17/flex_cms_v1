@@ -49,9 +49,9 @@ public sealed class FcmsRowActionsTagHelper : TagHelper
     [HtmlAttributeName("confirm-name")]
     public string? ConfirmName { get; set; }
 
-    [HtmlAttributeName("edit-permission")]    public string? EditPermission { get; set; }
-    [HtmlAttributeName("toggle-permission")]  public string? TogglePermission { get; set; }
-    [HtmlAttributeName("delete-permission")]  public string? DeletePermission { get; set; }
+    [HtmlAttributeName("edit-permission")] public string? EditPermission { get; set; }
+    [HtmlAttributeName("toggle-permission")] public string? TogglePermission { get; set; }
+    [HtmlAttributeName("delete-permission")] public string? DeletePermission { get; set; }
     [HtmlAttributeName("restore-permission")] public string? RestorePermission { get; set; }
 
     /// <summary>Custom action child elements (collected during ProcessAsync).</summary>
@@ -166,8 +166,8 @@ public sealed class FcmsActionTagHelper : TagHelper
     [HtmlAttributeName("type")]
     public string Type { get; set; } = "custom";
 
-    [HtmlAttributeName("label")]   public string? Label { get; set; }
-    [HtmlAttributeName("icon")]    public string? Icon { get; set; }
+    [HtmlAttributeName("label")] public string? Label { get; set; }
+    [HtmlAttributeName("icon")] public string? Icon { get; set; }
 
     /// <summary>success / danger / warning / info / primary / secondary.</summary>
     [HtmlAttributeName("variant")] public string? Variant { get; set; }
@@ -177,9 +177,9 @@ public sealed class FcmsActionTagHelper : TagHelper
     /// <summary>Full URL. If null, defaults to {base-url}/{entity-id}/{type}.</summary>
     [HtmlAttributeName("url")] public string? Url { get; set; }
 
-    [HtmlAttributeName("confirm-title")]   public string? ConfirmTitle { get; set; }
+    [HtmlAttributeName("confirm-title")] public string? ConfirmTitle { get; set; }
     [HtmlAttributeName("confirm-message")] public string? ConfirmMessage { get; set; }
-    [HtmlAttributeName("confirm-label")]   public string? ConfirmLabel { get; set; }
+    [HtmlAttributeName("confirm-label")] public string? ConfirmLabel { get; set; }
 
     public override void Process(TagHelperContext context, TagHelperOutput output)
     {

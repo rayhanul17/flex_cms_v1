@@ -1,6 +1,8 @@
+using System.Security.Claims;
 using FlexCms.Framework.Auth;
 using FlexCms.Framework.Auth.History;
 using FlexCms.Framework.Messaging;
+using FlexCms.Framework.Sessions;
 using FlexCms.Host.Models.Auth;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
@@ -15,19 +17,22 @@ public class AuthController : Controller
     private readonly RoleManager<FcmsRole> _roleManager;
     private readonly IFcmsBackgroundQueue _queue;
     private readonly ILoginHistoryService _history;
+    private readonly ISessionService _sessions;
 
     public AuthController(
         UserManager<FcmsUser> userManager,
         SignInManager<FcmsUser> signInManager,
         RoleManager<FcmsRole> roleManager,
         IFcmsBackgroundQueue queue,
-        ILoginHistoryService history)
+        ILoginHistoryService history,
+        ISessionService sessions)
     {
         _userManager = userManager;
         _signInManager = signInManager;
         _roleManager = roleManager;
         _queue = queue;
         _history = history;
+        _sessions = sessions;
     }
 
     [HttpGet]
@@ -53,6 +58,19 @@ public class AuthController : Controller
         {
             var user = await _userManager.FindByNameAsync(model.UserName);
             await _history.RecordAsync(model.UserName, user?.Id, LoginOutcome.Success, ip, ua);
+
+            if (user is not null)
+            {
+                // Issue a session id and re-sign-in with it as a claim so the
+                // session-validation middleware can revoke this cookie later.
+                var sessionId = Guid.NewGuid().ToString("N");
+                var deviceLabel = ua.Length > 60 ? ua[..60] : ua;
+                await _sessions.RecordLoginAsync(user.Id, sessionId, ip, ua, deviceLabel);
+
+                await _signInManager.SignOutAsync();   // clear the cookie just issued without the claim
+                await _signInManager.SignInWithClaimsAsync(user, model.RememberMe,
+                    [new Claim(FcmsSessionValidationMiddleware.SessionIdClaim, sessionId)]);
+            }
 
             if (!string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl))
                 return Redirect(returnUrl);
@@ -87,6 +105,14 @@ public class AuthController : Controller
     [Authorize]
     public async Task<IActionResult> Logout()
     {
+        // Revoke the session row so the cookie can't be replayed even if it
+        // somehow leaks before the SignOut response reaches the browser.
+        var sessionId = User.FindFirstValue(FcmsSessionValidationMiddleware.SessionIdClaim);
+        if (!string.IsNullOrEmpty(sessionId))
+        {
+            await _sessions.RevokeAsync(sessionId, revokedByUserId: null, reason: "logout");
+        }
+
         await _signInManager.SignOutAsync();
         return RedirectToAction(nameof(Login));
     }

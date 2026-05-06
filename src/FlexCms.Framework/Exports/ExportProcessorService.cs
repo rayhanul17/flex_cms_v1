@@ -11,6 +11,14 @@ public sealed class ExportProcessorOptions
 {
     public TimeSpan PollInterval { get; init; } = TimeSpan.FromSeconds(30);
     public int BatchSize { get; init; } = 5;
+
+    /// <summary>
+    /// A row stuck in <see cref="ExportStatus.Running"/> longer than this is
+    /// presumed orphaned (the worker that picked it up crashed before
+    /// flipping it to Done/Failed). The reaper resets such rows to Pending
+    /// so the next poll re-runs them. Default 1 hour.
+    /// </summary>
+    public TimeSpan StaleRunningThreshold { get; init; } = TimeSpan.FromHours(1);
 }
 
 /// <summary>
@@ -59,6 +67,11 @@ public sealed class ExportProcessorService : BackgroundService
         var storage = sp.GetRequiredService<IFcmsFileStorage>();
         var notifications = sp.GetService<IFcmsNotificationService>();
         var handlers = sp.GetServices<IFcmsExportHandler>().ToDictionary(h => h.HandlerId, StringComparer.OrdinalIgnoreCase);
+
+        // Reset stale-Running rows BEFORE picking up the Pending batch — that
+        // way an orphaned job (worker crashed mid-render) is rescheduled
+        // alongside fresh requests on the next poll.
+        await ReapStaleRunningAsync(repo, uow, ct);
 
         var batch = (await repo.FindAsync(e => e.ExportStatus == ExportStatus.Pending, ct))
             .OrderBy(e => e.CreatedAt)
@@ -130,5 +143,29 @@ public sealed class ExportProcessorService : BackgroundService
         }
 
         await uow.SaveChangesAsync(ct);
+    }
+
+    /// <summary>
+    /// Find rows that have been Running longer than
+    /// <see cref="ExportProcessorOptions.StaleRunningThreshold"/> and flip
+    /// them back to Pending. These are jobs whose worker crashed before
+    /// they could be marked Done/Failed; resetting lets the next poll
+    /// try them again. Public for testability.
+    /// </summary>
+    public async Task<int> ReapStaleRunningAsync(IRepository<FcmsPendingExport> repo, IFcmsUnitOfWork uow, CancellationToken ct)
+    {
+        var threshold = Clock.FcmsTime.Now - _options.StaleRunningThreshold;
+        var stale = await repo.FindAsync(
+            e => e.ExportStatus == ExportStatus.Running && e.StartedAt != null && e.StartedAt < threshold, ct);
+        if (stale.Count == 0) return 0;
+
+        foreach (var job in stale)
+        {
+            job.ExportStatus = ExportStatus.Pending;
+            job.FailureReason = $"Reaped — was Running since {job.StartedAt:O}, exceeded {_options.StaleRunningThreshold} threshold.";
+            await repo.UpdateAsync(job, ct);
+        }
+        await uow.SaveChangesAsync(ct);
+        return stale.Count;
     }
 }

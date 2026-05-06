@@ -68,11 +68,28 @@ builder.Services.AddControllersWithViews(mvc =>
         // at /Views/{Controller}/{Action} by default. Add /Views/Admin/{...}
         // so admin views can be grouped alongside their controllers.
         o.ViewLocationFormats.Add("/Views/Admin/{1}/{0}.cshtml");
-    });
+    })
+    // Themes ship cshtml under /themes/{Id}/Views/ — outside the default
+    // /Views/ tree the Razor SDK precompiles, so the runtime view engine
+    // needs RuntimeCompilation to discover them.
+    .AddRazorRuntimeCompilation();
 
 // SignalR (Phase 10 — chat). Default in-memory backplane is fine for
 // single-instance deploys; multi-node would swap in Redis backplane here.
 builder.Services.AddSignalR();
+
+// Register the themes/ folder as an additional file provider for the Razor
+// runtime view engine — the ThemeViewLocationExpander emits paths like
+// /themes/{Id}/Views/Shared/_PublicLayout.cshtml that resolve against the
+// project content root once registered here.
+var themesPhysical = Path.Combine(builder.Environment.ContentRootPath, "themes");
+if (Directory.Exists(themesPhysical))
+{
+    builder.Services.Configure<Microsoft.AspNetCore.Mvc.Razor.RuntimeCompilation.MvcRazorRuntimeCompilationOptions>(o =>
+    {
+        o.FileProviders.Add(new Microsoft.Extensions.FileProviders.PhysicalFileProvider(builder.Environment.ContentRootPath));
+    });
+}
 
 var setup = SetupHelper.ReadStatic(appDataPath);
 var cfg = builder.Configuration;
@@ -125,12 +142,20 @@ app.UseStatusCodePagesWithReExecute("/Home/Error/{0}");
 
 app.UseHttpsRedirection();
 app.UseStaticFiles();
+// CORS runs before routing + auth so preflight OPTIONS replies fast even
+// when the eventual endpoint requires authentication.
+app.UseMiddleware<FlexCms.Framework.Middleware.CorsFromSettingsMiddleware>();
 app.UseMiddleware<RedirectMiddleware>();   // after static files — no DB hit per asset
 app.UseMiddleware<FlexCms.Framework.I18n.LanguageMiddleware>();   // sets culture + strips /{lang}/ prefix BEFORE routing
 app.UseRouting();
 app.UseSession();
 app.UseRateLimiter();
 app.UseAuthentication();
+// Session-revocation enforcement runs between authentication (so we have a
+// principal) and authorization (so a revoked session is treated as anonymous
+// before [Authorize] checks fire). Bearer-token requests skip naturally —
+// they don't carry the fcms.session_id claim.
+app.UseMiddleware<FlexCms.Framework.Sessions.FcmsSessionValidationMiddleware>();
 app.UseAuthorization();
 app.UseMiddleware<ForcePasswordChangeMiddleware>();
 

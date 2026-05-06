@@ -175,10 +175,16 @@ public static class FcmsServiceExtensions
         services.AddHttpClient<WebhookDispatcher>();
         services.AddScoped<IWebhookDispatcher>(sp => sp.GetRequiredService<WebhookDispatcher>());
         services.AddHttpClient<TurnstileCaptchaProvider>();
+        services.AddHttpClient<HcaptchaProvider>();
+        services.AddHttpClient<RecaptchaProvider>();
         services.AddScoped<IFcmsCaptchaProvider>(sp => sp.GetRequiredService<TurnstileCaptchaProvider>());
+        services.AddScoped<IFcmsCaptchaProvider>(sp => sp.GetRequiredService<HcaptchaProvider>());
+        services.AddScoped<IFcmsCaptchaProvider>(sp => sp.GetRequiredService<RecaptchaProvider>());
+        services.AddScoped<ICaptchaService, DispatchingCaptchaService>();
         services.AddScoped<ICdnUrlService, CdnUrlService>();
         services.AddSingleton<IAssetVersionService, AssetVersionService>();
         services.AddScoped<IContentRevisionService, ContentRevisionService>();
+        services.AddSingleton<IRevisionDiffService, DiffPlexRevisionDiffService>();
         services.AddScoped<ICommentService, CommentService>();
         services.AddScoped<ISubscriberService, SubscriberService>();
         services.AddScoped<ICustomFieldService, CustomFieldService>();

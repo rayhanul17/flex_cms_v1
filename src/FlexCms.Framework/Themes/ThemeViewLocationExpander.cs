@@ -41,10 +41,12 @@ public sealed class ThemeViewLocationExpander : IViewLocationExpander
             return viewLocations;
 
         // Themes are searched first — host defaults are the fallback.
+        // Lowercase "themes" matches the filesystem convention used by
+        // ThemeManager + the modules folder + Linux case-sensitivity rules.
         var prefixed = new[]
         {
-            $"/Themes/{themeId}/Views/{{1}}/{{0}}.cshtml",
-            $"/Themes/{themeId}/Views/Shared/{{0}}.cshtml"
+            $"/themes/{themeId}/Views/{{1}}/{{0}}.cshtml",
+            $"/themes/{themeId}/Views/Shared/{{0}}.cshtml"
         };
         return prefixed.Concat(viewLocations);
     }

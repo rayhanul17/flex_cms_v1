@@ -1,0 +1,59 @@
+@*
+    Bootstrap 5.3 public theme layout. Picked up by ThemeViewLocationExpander
+    when SiteSettings.PublicThemeId = "FlexCms.Theme.Bootstrap". Falls back to
+    host defaults for any partial this layout doesn't override.
+*@
+@using FlexCms.Framework.Themes
+@{
+    var themeMode = ThemeMode.Resolve(Context);
+}
+<!DOCTYPE html>
+<html lang="@(System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName)"
+      data-theme-mode="@themeMode" data-bs-theme="@(themeMode == ThemeMode.Dark ? "dark" : "light")">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"]</title>
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/lib/bootstrap-icons/font/bootstrap-icons.min.css" />
+    <style>
+        body { display: flex; flex-direction: column; min-height: 100vh; }
+        main { flex: 1; }
+        .fcms-theme-tag { font-size: .7rem; opacity: .6; }
+    </style>
+</head>
+<body>
+    <fcms-env-banner />
+
+    <nav class="navbar navbar-expand-md border-bottom bg-body-tertiary">
+        <div class="container">
+            <a class="navbar-brand" href="/">FlexCms <span class="fcms-theme-tag">[Bootstrap]</span></a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#nav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="nav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item"><a class="nav-link" href="/">Home</a></li>
+                    <li class="nav-item"><a class="nav-link" href="/blog">Blog</a></li>
+                </ul>
+                <div class="d-flex align-items-center gap-2">
+                    <partial name="_LangSwitcher" />
+                    <partial name="_ThemeModeToggle" />
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="container py-4">
+        @RenderBody()
+    </main>
+
+    <footer class="border-top py-3 text-center text-muted small">
+        © @DateTime.UtcNow.Year FlexCms — Bootstrap theme
+    </footer>
+
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

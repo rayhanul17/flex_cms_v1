@@ -1,0 +1,11 @@
+{
+  "id": "FlexCms.Theme.AdminLte",
+  "name": "AdminLTE",
+  "description": "AdminLTE 3 + Bootstrap 5.3 — admin sidebar layout. Public fallback uses a Bootstrap-styled layout. Built-in theme; cannot be deleted.",
+  "version": "1.0.0",
+  "author": "FlexCMS Core",
+  "isBuiltIn": true,
+  "supportsPublic": true,
+  "supportsAdmin": true,
+  "supportedModes": ["light", "dark", "auto"]
+}

@@ -1,0 +1,118 @@
+/* Shared styles for the four full-screen error pages (401/403/404/500). */
+
+.fcms-error-page {
+    background: radial-gradient(circle at center, #0f0c29 0%, #302b63 50%, #24243e 100%);
+    color: #fff;
+    height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    overflow: hidden;
+    margin: 0;
+}
+
+.fcms-error-page.fcms-error-401 { background: radial-gradient(circle at center, #1f3a5f 0%, #0d1b2a 100%); }
+.fcms-error-page.fcms-error-403 { background: radial-gradient(circle at center, #5f1f1f 0%, #2a0d0d 100%); }
+.fcms-error-page.fcms-error-500 { background: radial-gradient(circle at center, #5f3f1f 0%, #2a1d0d 100%); }
+
+.fcms-error-page .glass-card {
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(15px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 24px;
+    padding: 3rem;
+    max-width: 600px;
+    width: 90%;
+    text-align: center;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    animation: fcms-error-fade-in 0.6s ease-out;
+}
+
+@keyframes fcms-error-fade-in {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.fcms-error-page h1 {
+    font-weight: 800;
+    font-size: 2.5rem;
+    margin-bottom: 1rem;
+    background: linear-gradient(45deg, #00f2fe, #4facfe);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.fcms-error-page p {
+    color: rgba(255, 255, 255, 0.75);
+    font-size: 1.05rem;
+    line-height: 1.6;
+    margin-bottom: 2rem;
+}
+
+.fcms-error-page .btn-premium {
+    background: linear-gradient(45deg, #00c6ff, #0072ff);
+    border: none;
+    color: white;
+    padding: 0.7rem 1.6rem;
+    border-radius: 12px;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    text-decoration: none;
+    display: inline-block;
+    margin: 0.4rem;
+}
+
+.fcms-error-page .btn-premium:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 20px rgba(0, 198, 255, 0.4);
+    color: #fff;
+}
+
+.fcms-error-page .btn-outline {
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #fff;
+    padding: 0.7rem 1.6rem;
+    border-radius: 12px;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    text-decoration: none;
+    display: inline-block;
+    margin: 0.4rem;
+}
+
+.fcms-error-page .btn-outline:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.4);
+    color: #fff;
+}
+
+.fcms-error-page .error-image-fallback {
+    font-size: 6rem;
+    color: #4facfe;
+    margin-bottom: 1.5rem;
+    filter: drop-shadow(0 0 20px rgba(79, 172, 254, 0.5));
+}
+
+.fcms-error-page .status-code {
+    position: absolute;
+    top: 2rem;
+    right: 2rem;
+    font-weight: 900;
+    font-size: 8rem;
+    color: rgba(255, 255, 255, 0.04);
+    user-select: none;
+    z-index: 0;
+    pointer-events: none;
+}
+
+/* Mobile: stack action buttons full-width with 44px tap targets. */
+@media (max-width: 575.98px) {
+    .fcms-error-page .glass-card { padding: 2rem 1.25rem; border-radius: 16px; }
+    .fcms-error-page h1 { font-size: 1.75rem; }
+    .fcms-error-page p { font-size: 0.95rem; }
+    .fcms-error-page .btn-premium,
+    .fcms-error-page .btn-outline { width: 100%; min-height: 44px; }
+    .fcms-error-page .status-code { font-size: 5rem; top: 1rem; right: 1rem; }
+}

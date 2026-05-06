@@ -1,5 +1,6 @@
 using FlexCms.Framework.Cms;
 using FlexCms.Framework.Clock;
+using FlexCms.Framework.Db;
 using FlexCms.Framework.Db.Ef;
 using Microsoft.EntityFrameworkCore;
 
@@ -33,10 +34,10 @@ public class ScheduledPublishTests : IDisposable
         await using var db = NewScope();
         var now = FcmsTime.Now;
         var pages = await db.Pages
-            .Where(p => !p.IsDeleted && !p.IsPublished && p.PublishedAt != null && p.PublishedAt <= now)
+            .Where(p => p.Status != EntityStatus.Deleted && !p.IsPublished && p.PublishedAt != null && p.PublishedAt <= now)
             .ToListAsync();
         var posts = await db.Posts
-            .Where(p => !p.IsDeleted && !p.IsPublished && p.PublishedAt != null && p.PublishedAt <= now)
+            .Where(p => p.Status != EntityStatus.Deleted && !p.IsPublished && p.PublishedAt != null && p.PublishedAt <= now)
             .ToListAsync();
         foreach (var p in pages) { p.IsPublished = true; p.UpdatedAt = now; }
         foreach (var p in posts) { p.IsPublished = true; p.UpdatedAt = now; }
@@ -147,11 +148,11 @@ public class TrashCleanupTests : IDisposable
         var cutoff = FcmsTime.Now.AddDays(-retentionDays);
 
         var oldPages = await db.Pages.IgnoreQueryFilters()
-            .Where(p => p.IsDeleted && p.DeletedAt != null && p.DeletedAt < cutoff)
+            .Where(p => p.Status == EntityStatus.Deleted && p.DeletedAt != null && p.DeletedAt < cutoff)
             .ToListAsync();
 
         var oldPosts = await db.Posts.IgnoreQueryFilters()
-            .Where(p => p.IsDeleted && p.DeletedAt != null && p.DeletedAt < cutoff)
+            .Where(p => p.Status == EntityStatus.Deleted && p.DeletedAt != null && p.DeletedAt < cutoff)
             .ToListAsync();
 
         if (oldPages.Count > 0) db.Pages.RemoveRange(oldPages);
@@ -175,7 +176,7 @@ public class TrashCleanupTests : IDisposable
             Title = "Old",
             Slug = "old-page",
             Content = "",
-            IsDeleted = true,
+            Status = EntityStatus.Deleted,
             DeletedAt = DateTime.UtcNow.AddDays(-31)
         };
         _db.Pages.Add(old);
@@ -194,7 +195,7 @@ public class TrashCleanupTests : IDisposable
             Title = "Recent",
             Slug = "recent-page",
             Content = "",
-            IsDeleted = true,
+            Status = EntityStatus.Deleted,
             DeletedAt = DateTime.UtcNow.AddDays(-5)
         };
         _db.Pages.Add(recent);
@@ -213,7 +214,7 @@ public class TrashCleanupTests : IDisposable
             Title = "Del Post",
             Slug = "del-post-cleanup",
             Content = "",
-            IsDeleted = true,
+            Status = EntityStatus.Deleted,
             DeletedAt = DateTime.UtcNow.AddDays(-40)
         };
         _db.Posts.Add(post);
@@ -233,7 +234,7 @@ public class TrashCleanupTests : IDisposable
     [Fact]
     public async Task Live_pages_are_not_affected_by_purge()
     {
-        var live = new FcmsPage { Title = "Live", Slug = "live-safe", Content = "", IsDeleted = false };
+        var live = new FcmsPage { Title = "Live", Slug = "live-safe", Content = "", Status = EntityStatus.Active };
         _db.Pages.Add(live);
         await _db.SaveChangesAsync();
 

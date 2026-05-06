@@ -1,3 +1,4 @@
+using FlexCms.Framework.Clock;
 using Microsoft.Extensions.Logging;
 
 namespace FlexCms.Framework.Modules;
@@ -46,7 +47,7 @@ public class ModuleStateService
         }
 
         var marker = Path.Combine(moduleFolder, ModuleManager.DisabledMarker);
-        File.WriteAllText(marker, $"Deactivated at {DateTime.UtcNow:O}\n");
+        File.WriteAllText(marker, $"Deactivated at {FcmsTime.Now:O}\n");
         return true;
     }
 
@@ -64,7 +65,7 @@ public class ModuleStateService
         }
 
         var marker = Path.Combine(moduleFolder, ModuleManager.UninstallMarker);
-        File.WriteAllText(marker, $"Uninstall scheduled at {DateTime.UtcNow:O}\n");
+        File.WriteAllText(marker, $"Uninstall scheduled at {FcmsTime.Now:O}\n");
         return true;
     }
 

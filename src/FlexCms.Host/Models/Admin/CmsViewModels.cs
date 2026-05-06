@@ -60,6 +60,7 @@ public class CategoryListItemViewModel
     public string Slug { get; set; } = "";
     public string? Description { get; set; }
     public int PostCount { get; set; }
+    public FlexCms.Framework.Db.EntityStatus Status { get; set; } = FlexCms.Framework.Db.EntityStatus.Active;
 }
 
 public class CreateEditCategoryViewModel

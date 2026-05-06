@@ -1,13 +1,19 @@
+using System.ComponentModel;
 using System.Reflection;
+using System.Security.Cryptography;
 using System.Text;
+using System.Text.RegularExpressions;
+using Microsoft.AspNetCore.WebUtilities;
 
 namespace FlexCms.Framework.Helpers;
 
 /// <summary>
-/// Convention helpers shared across the framework, core, and modules.
+/// Convention and utility helpers shared across the framework, core, and modules.
 /// </summary>
 public static class FcmsHelper
 {
+    // ── Entity naming ─────────────────────────────────────────────────────────
+
     /// <summary>
     /// Returns the table / collection name for an entity following the project
     /// convention: <c>snake_case</c> + plural, prefixed by the owning module's
@@ -15,26 +21,12 @@ public static class FcmsHelper
     /// module). The prefix is only prepended when it is not already part of
     /// the snake-cased name.
     /// </summary>
-    /// <param name="modulePrefix">
-    /// The owning module's table prefix (without trailing underscore).
-    /// Pass an empty string to skip prefixing entirely.
-    /// </param>
-    /// <example>
-    /// <code>
-    /// FcmsHelper.GetEntityName&lt;FcmsUser&gt;("fcms")        // → "fcms_users"
-    /// FcmsHelper.GetEntityName&lt;FcmsPermission&gt;("fcms")  // → "fcms_permissions" (already prefixed)
-    /// FcmsHelper.GetEntityName&lt;BlogPost&gt;("blog")        // → "blog_posts" (already prefixed)
-    /// FcmsHelper.GetEntityName&lt;Comment&gt;("blog")         // → "blog_comments" (prefix prepended)
-    /// FcmsHelper.GetEntityName&lt;StudentRecord&gt;("school") // → "school_student_records"
-    /// </code>
-    /// </example>
-    public static string GetEntityName<T>(string modulePrefix = "")
-        => GetEntityName(typeof(T), modulePrefix);
+    public static string GetTableName<T>(string modulePrefix = "")
+        => GetTableName(typeof(T), modulePrefix);
 
-    /// <inheritdoc cref="GetEntityName{T}(string)" />
-    public static string GetEntityName(Type type, string modulePrefix = "")
+    /// <inheritdoc cref="GetTableName{T}(string)" />
+    public static string GetTableName(Type type, string modulePrefix = "")
     {
-        // Allow an explicit override via [FcmsTable("custom_name")] later if needed.
         var attr = type.GetCustomAttribute<FcmsTableAttribute>();
         if (attr is not null) return attr.Name;
 
@@ -54,10 +46,8 @@ public static class FcmsHelper
     }
 
     /// <summary>
-    /// Convert PascalCase / camelCase to snake_case (lowercase, underscore-separated).
-    /// "FcmsUser" → "fcms_user", "BlogPost" → "blog_post", "AbcDef" → "abc_def".
-    /// Consecutive uppercase letters are treated as one segment to preserve
-    /// readability of acronyms — "HTTPRequest" → "http_request" (not "h_t_t_p_request").
+    /// Convert PascalCase / camelCase to snake_case.
+    /// "FcmsUser" → "fcms_user", "BlogPost" → "blog_post".
     /// </summary>
     public static string ToSnakeCase(string name)
     {
@@ -84,9 +74,8 @@ public static class FcmsHelper
     }
 
     /// <summary>
-    /// Naive English pluralizer suitable for table names.
-    /// "user" → "users", "category" → "categories", "address" → "addresses",
-    /// "post" → "posts". Words already ending in "s" are left unchanged.
+    /// Naive English pluralizer for table names.
+    /// "user" → "users", "category" → "categories", "address" → "addresses".
     /// </summary>
     public static string Pluralize(string word)
     {
@@ -99,10 +88,121 @@ public static class FcmsHelper
             return word[..^1] + "ies";
         return word + "s";
     }
+
+    // ── Enum helpers ──────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Converts an enum to <c>Dictionary&lt;int, string&gt;</c> using
+    /// <see cref="DescriptionAttribute"/> when present, falling back to the member name.
+    /// Useful for building dropdown lists in Razor views.
+    /// </summary>
+    public static Dictionary<int, string> LoadEnumToDictionary<T>(
+        List<int>? excludeList = null,
+        bool includeAll = false)
+        where T : struct, Enum
+    {
+        var result = new Dictionary<int, string>();
+        if (includeAll) result[0] = "All";
+
+        foreach (var value in Enum.GetValues<T>())
+        {
+            var key = (int)(object)value;
+            if (excludeList is not null && excludeList.Contains(key)) continue;
+
+            var desc = typeof(T).GetField(value.ToString())
+                ?.GetCustomAttribute<DescriptionAttribute>()?.Description;
+            result[key] = desc ?? value.ToString()!;
+        }
+        return result;
+    }
+
+    // ── Display string helpers ─────────────────────────────────────────────
+
+    /// <summary>Returns <paramref name="emptyString"/> when the value is null or whitespace.</summary>
+    public static string GetDisplayString(string? value, string emptyString = "-")
+        => string.IsNullOrWhiteSpace(value) ? emptyString : value.Trim();
+
+    /// <summary>Returns <paramref name="emptyString"/> when the value is null.</summary>
+    public static string GetDisplayString(object? value, string emptyString = "-")
+        => value is null ? emptyString : value.ToString()!;
+
+    /// <summary>Returns "Yes" / "No" or <paramref name="emptyString"/> when null.</summary>
+    public static string GetDisplayString(bool? value, string emptyString = "-")
+        => value is null ? emptyString : (value.Value ? "Yes" : "No");
+
+    /// <summary>Formats a nullable DateTime using <paramref name="format"/>.</summary>
+    public static string GetDisplayString(DateTime? value, string format = "yyyy-MM-dd", string emptyString = "-")
+        => value is null ? emptyString : value.Value.ToString(format);
+
+    // ── String helpers ─────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Inserts a space before each uppercase letter: "BlogPost" → "Blog Post".
+    /// Useful for generating admin UI labels from class/property names.
+    /// </summary>
+    public static string FormatName(string name)
+        => Regex.Replace(name, "([A-Z])", " $1").Trim();
+
+    // ── Base64URL helpers ──────────────────────────────────────────────────
+
+    /// <summary>URL-safe Base64 encode (no padding, URL-safe alphabet).</summary>
+    public static string? Base64UrlEncode(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return null;
+        return WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(value));
+    }
+
+    /// <summary>Decodes a URL-safe Base64 string produced by <see cref="Base64UrlEncode"/>.</summary>
+    public static string? Base64UrlDecode(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return null;
+        try { return Encoding.UTF8.GetString(WebEncoders.Base64UrlDecode(value)); }
+        catch { return null; }
+    }
+
+    // ── Security helpers ───────────────────────────────────────────────────
+
+    // Fixed purpose key — protects against rainbow tables for page passwords.
+    // Changing this invalidates all stored PasswordHash values in FcmsPage.
+    private static readonly byte[] PagePasswordKey =
+        Encoding.UTF8.GetBytes("FlexCms.PagePassword.v1");
+
+    /// <summary>
+    /// Hashes a page protection password with HMACSHA256 using a fixed purpose key.
+    /// The returned hex string is stored in <c>FcmsPage.PasswordHash</c>.
+    /// </summary>
+    public static string HashPagePassword(string password)
+    {
+        using var hmac = new HMACSHA256(PagePasswordKey);
+        var bytes = hmac.ComputeHash(Encoding.UTF8.GetBytes(password));
+        return Convert.ToHexString(bytes).ToLowerInvariant();
+    }
+
+    // ── DateTime helpers ───────────────────────────────────────────────────
+
+    /// <summary>
+    /// Returns midnight (00:00:00) of the given date converted to UTC using
+    /// the caller's UTC offset in minutes. Use for date-range queries against UTC-stored data.
+    /// </summary>
+    public static DateTime StartOfDayUtc(DateTime date, int utcOffsetMinutes = 0)
+    {
+        var local = new DateTime(date.Year, date.Month, date.Day, 0, 0, 0, DateTimeKind.Unspecified);
+        return local.AddMinutes(-utcOffsetMinutes);
+    }
+
+    /// <summary>
+    /// Returns 23:59:59 of the given date converted to UTC using
+    /// the caller's UTC offset in minutes. Use for date-range queries against UTC-stored data.
+    /// </summary>
+    public static DateTime EndOfDayUtc(DateTime date, int utcOffsetMinutes = 0)
+    {
+        var local = new DateTime(date.Year, date.Month, date.Day, 23, 59, 59, DateTimeKind.Unspecified);
+        return local.AddMinutes(-utcOffsetMinutes);
+    }
 }
 
 /// <summary>
-/// Override the auto-generated entity name produced by <see cref="FcmsHelper.GetEntityName{T}(string)"/>.
+/// Override the auto-generated entity name produced by <see cref="FcmsHelper.GetTableName{T}(string)"/>.
 /// Use sparingly — the default convention should cover almost everything.
 /// </summary>
 [AttributeUsage(AttributeTargets.Class, Inherited = false)]

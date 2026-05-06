@@ -25,4 +25,19 @@ public static class FcmsTime
     public static DateOnly Today => _clock.Today;
 
     public static TimeOnly TimeOfDay => _clock.TimeOfDay;
+
+    /// <summary>Convert a UTC <see cref="DateTime"/> to the configured site timezone.</summary>
+    public static DateTime ToLocal(DateTime utc) => _clock.ToLocal(utc);
+
+    /// <summary>
+    /// Convert a UTC <see cref="DateTime"/> to the site timezone and format using
+    /// the supplied pattern (defaults to <c>yyyy-MM-dd HH:mm</c>). Use this for
+    /// any UI display of an entity timestamp — never <c>.ToString()</c> directly.
+    /// </summary>
+    public static string Format(DateTime utc, string? pattern = null)
+        => _clock.ToLocal(utc).ToString(pattern ?? "yyyy-MM-dd HH:mm");
+
+    /// <summary>Nullable variant — returns empty string when null.</summary>
+    public static string Format(DateTime? utc, string? pattern = null)
+        => utc.HasValue ? Format(utc.Value, pattern) : "";
 }

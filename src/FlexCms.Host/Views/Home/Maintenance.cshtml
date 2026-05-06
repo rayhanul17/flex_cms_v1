@@ -1,0 +1,156 @@
+@{
+    Layout = null;
+    ViewData["Title"] = "Under Maintenance";
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Under Maintenance — FlexCms</title>
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/lib/bootstrap-icons/font/bootstrap-icons.min.css" />
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #fff;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            margin: 0;
+            padding: 1rem;
+        }
+
+        .glass-card {
+            background: rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            border-radius: 24px;
+            padding: 3rem 2.5rem;
+            max-width: 560px;
+            width: 100%;
+            text-align: center;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.4);
+            animation: fadeIn 0.6s ease-out;
+        }
+
+        @@keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        .gear-icon {
+            font-size: 5rem;
+            color: #ffd166;
+            margin-bottom: 1.5rem;
+            display: inline-block;
+            animation: spin 6s linear infinite;
+            filter: drop-shadow(0 0 25px rgba(255, 209, 102, 0.5));
+        }
+
+        @@keyframes spin {
+            100% { transform: rotate(360deg); }
+        }
+
+        h1 {
+            font-weight: 800;
+            font-size: 2.25rem;
+            margin: 0 0 1rem;
+            background: linear-gradient(45deg, #fff, #ffd166);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        p {
+            color: rgba(255, 255, 255, 0.85);
+            font-size: 1.05rem;
+            line-height: 1.6;
+            margin-bottom: 1.5rem;
+        }
+
+        .info-box {
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: .85rem 1rem;
+            margin: 1rem 0 1.5rem;
+            font-size: .9rem;
+            color: rgba(255, 255, 255, 0.7);
+            display: inline-flex;
+            align-items: center;
+            gap: .5rem;
+        }
+
+        .progress-bar-bg {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 50px;
+            overflow: hidden;
+            height: 6px;
+            margin: 1.5rem 0 .5rem;
+        }
+
+        .progress-bar-fill {
+            background: linear-gradient(90deg, #ffd166, #ff6b6b);
+            height: 100%;
+            width: 60%;
+            border-radius: 50px;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @@keyframes pulse {
+            0%, 100% { opacity: .6; }
+            50%      { opacity: 1; }
+        }
+
+        .footer-note {
+            margin-top: 1.5rem;
+            color: rgba(255, 255, 255, 0.5);
+            font-size: .8rem;
+        }
+
+        .footer-note a {
+            color: rgba(255, 255, 255, 0.8);
+            text-decoration: none;
+        }
+
+        .footer-note a:hover {
+            color: #ffd166;
+        }
+    </style>
+</head>
+<body>
+    <div class="glass-card">
+        <div class="gear-icon"><i class="bi bi-gear-fill"></i></div>
+        <h1>We'll Be Back Soon</h1>
+        <p>
+            Our site is undergoing scheduled maintenance to bring you a better experience.
+            We expect to be back online shortly. Thank you for your patience.
+        </p>
+
+        @if (ViewBag.EstimatedReturn is string eta && !string.IsNullOrWhiteSpace(eta))
+        {
+            <div class="info-box">
+                <i class="bi bi-clock"></i>
+                Estimated return: @eta
+            </div>
+        }
+
+        <div class="progress-bar-bg">
+            <div class="progress-bar-fill"></div>
+        </div>
+
+        <div class="footer-note">
+            Need urgent help? <a href="mailto:support@flexcms.local">Contact support</a>
+        </div>
+    </div>
+
+    <script>
+        // Auto-retry every 30s in case maintenance ends
+        setTimeout(() => location.reload(), 30000);
+    </script>
+</body>
+</html>

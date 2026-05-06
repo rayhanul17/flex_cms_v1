@@ -141,7 +141,7 @@
         try {
             const res = await fetch('/Setup/TestConnection', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': token },
+                headers: { 'Content-Type': 'application/json', 'X-FlexCms-Csrf': token },
                 body: JSON.stringify(getFormPayload())
             });
             const data = await res.json();

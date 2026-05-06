@@ -218,7 +218,7 @@ public class PermissionServiceTests : IDisposable
             new FcmsPermission { Key = "posts.create", Group = "Posts", DisplayName = "Create Posts" }
         ]);
 
-        var all = _db.Permissions.Where(p => !p.IsDeleted).ToList();
+        var all = _db.Permissions.Where(p => p.Status != EntityStatus.Deleted).ToList();
         Assert.Equal(2, all.Count);
         Assert.Single(all, p => p.Key == "posts.view");
         Assert.Single(all, p => p.Key == "posts.create");  // xUnit2031 suppressed: filter is on a pre-materialized list

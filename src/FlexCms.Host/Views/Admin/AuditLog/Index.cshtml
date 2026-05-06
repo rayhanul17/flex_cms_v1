@@ -1,0 +1,85 @@
+@{
+    ViewData["Title"] = "Audit Log";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h4 class="mb-0">Audit Log</h4>
+        <small class="text-muted">Background service auto-archives logs older than 24h every hour. Use "Force Archive Now" to run on demand.</small>
+    </div>
+    <div class="d-flex gap-2">
+        <button type="button" class="btn btn-outline-warning btn-sm"
+                fcms-authorize="@FcmsPermissions.AuditManage"
+                data-fcms-action="custom"
+                data-url="/admin/audit-log/force-archive"
+                data-confirm-title="Archive now?"
+                data-confirm-message="Move logs older than 24 hours to archive table?"
+                data-confirm-label="Archive"
+                data-confirm-variant="warning">
+            <i class="bi bi-archive"></i> Force Archive Now
+        </button>
+        <button type="button" class="btn btn-outline-danger btn-sm"
+                fcms-authorize="@FcmsPermissions.AuditManage"
+                data-fcms-action="custom"
+                data-url="/admin/audit-log/clear-archive"
+                data-confirm-title="Clear archive?"
+                data-confirm-message="Permanently delete <b>ALL</b> archived logs? This cannot be undone."
+                data-confirm-label="Clear All"
+                data-confirm-variant="danger">
+            <i class="bi bi-trash"></i> Clear Archive
+        </button>
+    </div>
+</div>
+
+<ul class="nav nav-tabs mb-3" id="auditTab" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="recent-tab" data-bs-toggle="tab" data-bs-target="#recentPane" type="button" role="tab">Recent Logs</button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="archive-tab" data-bs-toggle="tab" data-bs-target="#archivePane" type="button" role="tab">Archive</button>
+    </li>
+</ul>
+
+<div class="tab-content" id="auditTabContent">
+    <div class="tab-pane fade show active" id="recentPane" role="tabpanel">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <fcms-data-table
+                    id="auditLogRecentTbl"
+                    url="/admin/audit-log/datatable-recent"
+                    base-url="/admin/audit-log">
+                    <fcms-data-column field="CreatedAt"  header="Timestamp"   type="date" sortable="true" default-sort="desc" />
+                    <fcms-data-column field="UserName"   header="User"        sortable="true" />
+                    <fcms-data-column field="UserIp"     header="IP" />
+                    <fcms-data-column field="Action"     header="Action"      sortable="true" />
+                    <fcms-data-column field="EntityType" header="Entity Type" sortable="true" />
+                    <fcms-data-column field="EntityId"   header="Entity ID"   type="code" />
+                    <fcms-data-column field="Module"     header="Module"      sortable="true" />
+                    <fcms-data-column field="Severity"   header="Severity"    sortable="true" />
+                    <fcms-data-column field="Value"      header="Value" />
+                </fcms-data-table>
+            </div>
+        </div>
+    </div>
+
+    <div class="tab-pane fade" id="archivePane" role="tabpanel">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <fcms-data-table
+                    id="auditLogArchiveTbl"
+                    url="/admin/audit-log/datatable-archive"
+                    base-url="/admin/audit-log">
+                    <fcms-data-column field="CreatedAt"  header="Timestamp"   type="date" sortable="true" default-sort="desc" />
+                    <fcms-data-column field="UserName"   header="User"        sortable="true" />
+                    <fcms-data-column field="UserIp"     header="IP" />
+                    <fcms-data-column field="Action"     header="Action"      sortable="true" />
+                    <fcms-data-column field="EntityType" header="Entity Type" sortable="true" />
+                    <fcms-data-column field="EntityId"   header="Entity ID"   type="code" />
+                    <fcms-data-column field="Module"     header="Module"      sortable="true" />
+                    <fcms-data-column field="Severity"   header="Severity"    sortable="true" />
+                    <fcms-data-column field="Value"      header="Value" />
+                </fcms-data-table>
+            </div>
+        </div>
+    </div>
+</div>

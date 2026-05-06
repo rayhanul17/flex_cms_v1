@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using FlexCms.Framework.Db;
 
 namespace FlexCms.Host.Models.Admin;
 
@@ -7,7 +8,8 @@ public class UserListItemViewModel
     public Guid Id { get; set; }
     public string Email { get; set; } = "";
     public string? DisplayName { get; set; }
-    public bool IsActive { get; set; }
+    public EntityStatus Status { get; set; } = EntityStatus.Active;
+    public bool IsActive => Status == EntityStatus.Active;
     public bool ForcePasswordChange { get; set; }
     public DateTime CreatedAt { get; set; }
     public List<string> Roles { get; set; } = [];

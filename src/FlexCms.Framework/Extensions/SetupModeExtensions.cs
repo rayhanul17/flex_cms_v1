@@ -14,6 +14,12 @@ public static class SetupModeExtensions
         services.AddSession(o => o.IdleTimeout = TimeSpan.FromMinutes(30));
         services.AddDistributedMemoryCache();
 
+        // Match the production-mode antiforgery header so setup-wizard JS
+        // (Setup/Index.cshtml, Setup/Complete.cshtml) sends the same
+        // X-FlexCms-Csrf header it would in production. Without this, the
+        // wizard's [Test Connection] / [Save] AJAX calls fail with 400.
+        services.AddAntiforgery(o => o.HeaderName = "X-FlexCms-Csrf");
+
         services.AddDataProtection()
             .PersistKeysToFileSystem(new DirectoryInfo(Path.Combine(appDataPath, "keys")))
             .SetApplicationName("FlexCms");

@@ -1,26 +1,27 @@
 using System.Text.Json;
 using FlexCms.Framework.Db;
-using FlexCms.Framework.Db.Ef;
-using Microsoft.EntityFrameworkCore;
 
 namespace FlexCms.Framework.Services;
 
 public class SettingsService : ISettingsService
 {
-    private readonly FcmsDbContext _db;
+    private readonly IRepository<FcmsSettings> _repo;
+    private readonly IFcmsUnitOfWork _uow;
 
     private static readonly JsonSerializerOptions JsonOpts = new()
     {
         PropertyNameCaseInsensitive = true
     };
 
-    public SettingsService(FcmsDbContext db) => _db = db;
+    public SettingsService(IRepository<FcmsSettings> repo, IFcmsUnitOfWork uow)
+    {
+        _repo = repo;
+        _uow = uow;
+    }
 
     public async Task<T> GetAsync<T>(string key, CancellationToken ct = default) where T : class, new()
     {
-        var row = await _db.Set<FcmsSettings>()
-            .AsNoTracking()
-            .FirstOrDefaultAsync(s => s.Key == key, ct);
+        var row = await _repo.FirstOrDefaultAsync(s => s.Key == key, ct);
 
         if (row is null || string.IsNullOrEmpty(row.Value))
             return new T();
@@ -32,19 +33,16 @@ public class SettingsService : ISettingsService
     {
         var json = JsonSerializer.Serialize(value, JsonOpts);
 
-        var row = await _db.Set<FcmsSettings>()
-            .FirstOrDefaultAsync(s => s.Key == key, ct);
+        var row = await _repo.FirstOrDefaultAsync(s => s.Key == key, ct);
 
         if (row is null)
-        {
-            _db.Set<FcmsSettings>().Add(new FcmsSettings { Key = key, Value = json });
-        }
+            await _repo.AddAsync(new FcmsSettings { Key = key, Value = json }, ct);
         else
         {
             row.Value = json;
-            _db.Set<FcmsSettings>().Update(row);
+            await _repo.UpdateAsync(row, ct);
         }
 
-        await _db.SaveChangesAsync(ct);
+        await _uow.SaveChangesAsync(ct);
     }
 }

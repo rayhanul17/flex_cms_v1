@@ -8,7 +8,7 @@
     <h4 class="mb-0">Add Role</h4>
 </div>
 
-<div class="card shadow-sm" style="max-width:480px">
+<div class="card shadow-sm" style="max-width:520px">
     <div class="card-body">
         <form asp-action="Create" method="post">
             @Html.AntiForgeryToken()
@@ -16,6 +16,18 @@
                 <label asp-for="Name" class="form-label fw-semibold">Role Name <span class="text-danger">*</span></label>
                 <input asp-for="Name" class="form-control" placeholder="e.g. Editor" autofocus />
                 <span asp-validation-for="Name" class="text-danger small"></span>
+            </div>
+            <div class="mb-3">
+                <label asp-for="LoginRedirectUrl" class="form-label fw-semibold">Login Redirect URL</label>
+                <input asp-for="LoginRedirectUrl" class="form-control" placeholder="/admin/posts" />
+                <div class="form-text">Where users with this role go after login. Blank defaults to <code>/</code>.</div>
+                <span asp-validation-for="LoginRedirectUrl" class="text-danger small"></span>
+            </div>
+            <div class="mb-3">
+                <label asp-for="Priority" class="form-label fw-semibold">Priority</label>
+                <input asp-for="Priority" type="number" class="form-control" style="max-width:120px" min="0" max="9999" />
+                <div class="form-text">Higher value wins when a user has multiple roles (0 = lowest).</div>
+                <span asp-validation-for="Priority" class="text-danger small"></span>
             </div>
             <div asp-validation-summary="ModelOnly" class="text-danger small mb-2"></div>
             <button type="submit" class="btn btn-primary">Create Role</button>

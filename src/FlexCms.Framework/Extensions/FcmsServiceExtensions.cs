@@ -2,6 +2,7 @@ using FlexCms.Framework.Auth;
 using FlexCms.Framework.Auth.Ef;
 using FlexCms.Framework.Cms;
 using FlexCms.Framework.Clock;
+using FlexCms.Framework.Storage;
 using FlexCms.Framework.Auth.MongoDb;
 using FlexCms.Framework.Db;
 using FlexCms.Framework.Db.Ef;
@@ -56,17 +57,27 @@ public static class FcmsServiceExtensions
         // Settings service (DB-backed; only useful when a DB provider is configured)
         services.AddScoped<ISettingsService, SettingsService>();
 
-        // CMS services
+        // File storage — local by default; swap for cloud implementation without changing services
+        services.AddScoped<IFcmsFileStorage, LocalFileStorage>();
+
+        // CMS services — IFcmsUnitOfWork is injected by DI (registered below per provider)
         services.AddScoped<IPageService, PageService>();
         services.AddScoped<ICategoryService, CategoryService>();
         services.AddScoped<IPostService, PostService>();
+        services.AddScoped<IMediaService, MediaService>();
+        services.AddScoped<IMediaFolderService, MediaFolderService>();
         services.AddHostedService<ScheduledPublishService>();
         services.AddSingleton(new TrashCleanupOptions { RetentionDays = options.TrashRetentionDays });
         services.AddHostedService<TrashCleanupService>();
+        services.AddScoped<IFcmsLogService, FcmsLogService>();
+        services.AddHostedService<LogArchiveService>();
 
         // Permission service (15min IMemoryCache — requires IRepository<> to be registered)
         services.AddMemoryCache();
         services.AddScoped<IPermissionService, PermissionService>();
+
+        // Menu service — loads items from DB, filters by permission, caches 15 min
+        services.AddScoped<IMenuService, MenuService>();
 
         // Context service — current user + IP + browser/OS via UAParser
         services.AddScoped<IFcmsContextService, FcmsContextService>();
@@ -90,23 +101,27 @@ public static class FcmsServiceExtensions
         services.AddHostedService<ModuleActivationService>();
 
         // ── Module discovery + wiring ────────────────────────────────────────
-        // The registry is built once at startup; each loaded module gets:
+        // Scan the modules/ directory (sibling of App_Data). Each discovered module gets:
         //   1. RegisterServices(services) called
         //   2. AttributeScanner runs over its assembly for [FcmsScoped]/etc
         //   3. Its assembly added as an MVC ApplicationPart so its controllers
         //      and Razor views become routable
+        // ModuleLoader/Manager/StateService are available for admin UI queries.
         services.AddSingleton<ModuleLoader>();
         services.AddSingleton<ModuleManager>();
         services.AddSingleton<ModuleStateService>();
 
         var modulesRoot = Path.Combine(options.AppDataPath, "..", "modules");
-        var loadedModules = BuildModuleRegistry(services, modulesRoot);
-        services.AddSingleton(loadedModules);
+        var registry = BuildModuleRegistry(services, modulesRoot);
+        services.AddSingleton(registry);
 
         // Cookie authentication (8h sliding window).
         // Scheme name MUST be IdentityConstants.ApplicationScheme so that
         // SignInManager.PasswordSignInAsync (which targets that scheme) works
         // with AddIdentityCore (which does NOT auto-register Identity cookies).
+        services.Configure<SecurityStampValidatorOptions>(o =>
+            o.ValidationInterval = TimeSpan.FromMinutes(30));
+
         services.AddAuthentication(IdentityConstants.ApplicationScheme)
             .AddCookie(IdentityConstants.ApplicationScheme, opts =>
             {
@@ -123,7 +138,6 @@ public static class FcmsServiceExtensions
         services.AddHttpContextAccessor();
         services.AddAntiforgery(o => o.HeaderName = "X-FlexCms-Csrf");
         services.AddSession(o => { o.Cookie.HttpOnly = true; o.Cookie.IsEssential = true; o.IdleTimeout = TimeSpan.FromMinutes(30); });
-        services.AddSignalR();
 
         // Rate limiting — partitioned by IP (M19: prevents one IP from blocking others)
         services.AddRateLimiter(limiter =>
@@ -183,11 +197,10 @@ public static class FcmsServiceExtensions
                     opts.User.RequireUniqueEmail = true;
                 })
                 .AddRoles<FcmsRole>()
+                .AddClaimsPrincipalFactory<UserClaimsPrincipalFactory<FcmsUser, FcmsRole>>()
                 .AddSignInManager<SignInManager<FcmsUser>>()
                 .AddPasswordValidator<FcmsPasswordValidator>()
                 .AddDefaultTokenProviders();
-
-            services.AddHttpContextAccessor();
 
             if (options.UseMySQL)
             {
@@ -238,8 +251,11 @@ public static class FcmsServiceExtensions
                             sp.GetRequiredService<IMongoClient>(),
                             sp.GetRequiredService<IMongoDatabase>()));
 
-                    services.AddScoped<IUserStore<FcmsUser>, MongoUserStore>();
-                    services.AddScoped<IRoleStore<FcmsRole>, MongoRoleStore>();
+                    identityBuilder.AddUserStore<MongoUserStore>();
+                    identityBuilder.AddRoleStore<MongoRoleStore>();
+
+                    // Create indexes mirroring EF unique constraints / FKs
+                    services.AddHostedService<MongoIndexService>();
                 }
             }
         }

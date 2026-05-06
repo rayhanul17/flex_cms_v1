@@ -1,3 +1,5 @@
+using FlexCms.Framework.Cms;
+using FlexCms.Framework.Clock;
 using FlexCms.Framework.Db.Ef;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
@@ -46,7 +48,9 @@ public class ModuleActivationService : IHostedService
         if (activeModules.Count == 0) return;
 
         await using var scope = _scopes.CreateAsyncScope();
-        var db = scope.ServiceProvider.GetRequiredService<FcmsDbContext>();
+        var repo = scope.ServiceProvider.GetService<Db.IRepository<FcmsModuleRecord>>();
+        if (repo is null) return;
+        var uow = scope.ServiceProvider.GetRequiredService<Db.IFcmsUnitOfWork>();
 
         foreach (var loaded in activeModules)
         {
@@ -75,8 +79,7 @@ public class ModuleActivationService : IHostedService
             }
 
             // ── 2. Seed data (first activation only) ─────────────────────────
-            var record = await db.ModuleRecords
-                .FirstOrDefaultAsync(r => r.ModuleId == module.ModuleId, ct);
+            var record = await repo.FirstOrDefaultAsync(r => r.ModuleId == module.ModuleId, ct);
 
             if (record is null)
             {
@@ -84,11 +87,11 @@ public class ModuleActivationService : IHostedService
                 {
                     ModuleId = module.ModuleId,
                     Version = module.Version,
-                    Status = "Active",
-                    ActivatedAt = DateTime.UtcNow
+                    ActivationStatus = "Active",
+                    ActivatedAt = FcmsTime.Now
                 };
-                db.ModuleRecords.Add(record);
-                await db.SaveChangesAsync(ct);
+                await repo.AddAsync(record, ct);
+                await uow.SaveChangesAsync(ct);
             }
 
             if (!record.SeedCompleted)
@@ -98,13 +101,31 @@ public class ModuleActivationService : IHostedService
                     await module.SeedDataAsync(scope.ServiceProvider, ct);
                     record.SeedCompleted = true;
                     record.Version = module.Version;
-                    await db.SaveChangesAsync(ct);
+                    await repo.UpdateAsync(record, ct);
+                    await uow.SaveChangesAsync(ct);
                     _logger.LogInformation("Module {Id}: seed completed.", module.ModuleId);
                 }
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Module {Id}: seed failed.", module.ModuleId);
                 }
+            }
+
+            // Menu items seeded on EVERY activation (idempotent — inserts new,
+            // refreshes existing metadata, restores soft-deleted from deactivation).
+            try
+            {
+                var menuItems = module.GetMenuItems();
+                if (menuItems.Count > 0)
+                {
+                    var menuService = scope.ServiceProvider.GetService<IMenuService>();
+                    if (menuService is not null)
+                        await menuService.SeedAsync(module.ModuleId, menuItems, ct);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Module {Id}: menu seed failed.", module.ModuleId);
             }
 
             // ── 3. OnUpgrade — version changed since last run ─────────────────
@@ -115,7 +136,8 @@ public class ModuleActivationService : IHostedService
                     var fromVersion = record.Version;
                     await module.OnUpgradeAsync(fromVersion, scope.ServiceProvider, ct);
                     record.Version = module.Version;
-                    await db.SaveChangesAsync(ct);
+                    await repo.UpdateAsync(record, ct);
+                    await uow.SaveChangesAsync(ct);
                     _logger.LogInformation("Module {Id}: upgraded {From} → {To}.",
                         module.ModuleId, fromVersion, module.Version);
                 }

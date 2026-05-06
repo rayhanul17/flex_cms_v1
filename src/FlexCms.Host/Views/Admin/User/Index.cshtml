@@ -5,14 +5,14 @@
 
 <div class="d-flex justify-content-between align-items-center mb-3">
     <h4 class="mb-0">Users</h4>
-    <a asp-action="Create" class="btn btn-primary btn-sm" fcms-authorize="users.create">
+    <a asp-action="Create" class="btn btn-primary btn-sm" fcms-authorize="@FcmsPermissions.UsersCreate">
         <i class="bi bi-plus-lg"></i> Add User
     </a>
 </div>
 
 <div class="card shadow-sm">
     <div class="card-body p-0">
-        <table id="userTable" class="table table-hover mb-0">
+        <table id="userTable" class="table table-hover mb-0 align-middle">
             <thead class="table-light">
                 <tr>
                     <th>Email</th>
@@ -25,7 +25,14 @@
             <tbody>
                 @foreach (var u in Model)
                 {
-                    <tr data-id="@u.Id">
+                    var statusClass = u.Status switch
+                    {
+                        EntityStatus.Active   => "text-bg-success",
+                        EntityStatus.InActive => "text-bg-secondary",
+                        EntityStatus.Deleted  => "text-bg-danger",
+                        _ => "text-bg-light"
+                    };
+                    <tr>
                         <td>
                             @u.Email
                             @if (u.ForcePasswordChange)
@@ -39,26 +46,17 @@
                                 <span class="badge text-bg-secondary me-1">@r</span>
                             }
                         </td>
-                        <td>
-                            <div class="form-check form-switch mb-0" fcms-authorize="users.edit">
-                                <input class="form-check-input active-toggle" type="checkbox"
-                                       data-id="@u.Id"
-                                       @(u.IsActive ? "checked" : "")>
-                            </div>
-                            @if (!u.IsActive)
-                            {
-                                <span class="text-danger small">Inactive</span>
-                            }
-                        </td>
+                        <td><span class="badge @statusClass" data-fcms-status>@u.Status</span></td>
                         <td class="text-muted small">@u.CreatedAt.ToString("yyyy-MM-dd")</td>
                         <td class="text-end">
-                            <a asp-action="Edit" asp-route-id="@u.Id"
-                               class="btn btn-sm btn-outline-secondary"
-                               fcms-authorize="users.edit">Edit</a>
-
-                            <button class="btn btn-sm btn-outline-danger delete-btn"
-                                    data-id="@u.Id" data-email="@u.Email"
-                                    fcms-authorize="users.delete">Delete</button>
+                            <fcms-row-actions
+                                entity-id="@u.Id"
+                                base-url="/admin/users"
+                                status="@u.Status"
+                                edit-permission="@FcmsPermissions.UsersEdit"
+                                toggle-permission="@FcmsPermissions.UsersEdit"
+                                delete-permission="@FcmsPermissions.UsersDelete"
+                                confirm-name="@u.Email" />
                         </td>
                     </tr>
                 }
@@ -66,41 +64,3 @@
         </table>
     </div>
 </div>
-
-@section Scripts {
-<script>
-    // Active toggle
-    document.querySelectorAll('.active-toggle').forEach(toggle => {
-        toggle.addEventListener('change', async function () {
-            const id = this.dataset.id;
-            const token = document.querySelector('meta[name="csrf-token"]')?.content ?? '';
-            const res = await fetch(`/admin/users/${id}/toggle-active`, {
-                method: 'POST',
-                headers: { 'X-FlexCms-Csrf': token, 'X-Requested-With': 'XMLHttpRequest' }
-            });
-            const data = await res.json();
-            if (!data.isSuccess) {
-                this.checked = !this.checked;
-                alert(data.message);
-            }
-        });
-    });
-
-    // Delete
-    document.querySelectorAll('.delete-btn').forEach(btn => {
-        btn.addEventListener('click', async function () {
-            const email = this.dataset.email;
-            if (!confirm(`Delete user "${email}"? This cannot be undone.`)) return;
-            const id = this.dataset.id;
-            const token = document.querySelector('meta[name="csrf-token"]')?.content ?? '';
-            const res = await fetch(`/admin/users/${id}/delete`, {
-                method: 'POST',
-                headers: { 'X-FlexCms-Csrf': token, 'X-Requested-With': 'XMLHttpRequest' }
-            });
-            const data = await res.json();
-            if (data.isSuccess) this.closest('tr').remove();
-            else alert(data.message);
-        });
-    });
-</script>
-}

@@ -1,0 +1,122 @@
+@model List<FlexCms.Framework.Cms.FcmsMenuItem>
+@{
+    ViewData["Title"] = "Menu";
+    var byParent = Model.Where(m => m.ParentId is not null).GroupBy(m => m.ParentId!.Value).ToDictionary(g => g.Key, g => g.OrderBy(m => m.Order).ToList());
+    var topLevel = Model.Where(m => m.ParentId is null).OrderBy(m => m.Order).ToList();
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h4 class="mb-0">Admin Sidebar Menu</h4>
+        <small class="text-muted">Drag the ☰ handle to reorder. Click the name to rename.</small>
+    </div>
+    <a asp-action="Create" class="btn btn-primary btn-sm">
+        <i class="bi bi-plus-lg"></i> New Menu Item
+    </a>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-body p-0">
+        <table class="table table-hover mb-0 align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th style="width:40px"></th>
+                    <th>Name</th>
+                    <th>Custom Name</th>
+                    <th>URL</th>
+                    <th>Permission</th>
+                    <th>Module</th>
+                    <th class="text-end">Actions</th>
+                </tr>
+            </thead>
+            <tbody id="menu-list" class="sortable">
+                @{
+                    var rows = new List<(FlexCms.Framework.Cms.FcmsMenuItem item, int depth)>();
+                    foreach (var top in topLevel)
+                    {
+                        rows.Add((top, 0));
+                        if (byParent.TryGetValue(top.Id, out var kids))
+                            foreach (var k in kids) rows.Add((k, 1));
+                    }
+                }
+                @foreach (var (item, depth) in rows)
+                {
+                    var indent = depth * 24 + 12;
+                    <tr data-id="@item.Id">
+                        <td class="text-muted drag-handle" style="cursor:grab">☰</td>
+                        <td style="padding-left:@(indent)px">
+                            <i class="@item.Icon me-1"></i>@item.DefaultName
+                        </td>
+                        <td>
+                            <input type="text" class="form-control form-control-sm rename-input"
+                                   data-id="@item.Id"
+                                   value="@(item.CustomName ?? "")"
+                                   placeholder="@item.DefaultName" />
+                        </td>
+                        <td class="text-muted small"><code>@item.Url</code></td>
+                        <td class="text-muted small">@(item.RequiredPermission ?? "—")</td>
+                        <td class="text-muted small">@item.ModuleId</td>
+                        <td class="text-end text-nowrap">
+                            <a asp-action="Edit" asp-route-id="@item.Id" class="btn btn-sm btn-outline-secondary">Edit</a>
+                            <button class="btn btn-sm btn-outline-danger delete-btn"
+                                    data-id="@item.Id" data-name="@item.DefaultName">Delete</button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@section Scripts {
+<script src="~/lib/sortablejs/Sortable.min.js"></script>
+<script>
+const token = document.querySelector('meta[name="csrf-token"]')?.content ?? '';
+
+// Drag-to-reorder
+const list = document.getElementById('menu-list');
+Sortable.create(list, {
+    handle: '.drag-handle',
+    animation: 150,
+    onEnd: async () => {
+        const rows = [...list.querySelectorAll('tr[data-id]')];
+        const items = rows.map((r, i) => ({ id: r.dataset.id, order: i * 10 }));
+        await fetch('/admin/menu/reorder', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-FlexCms-Csrf': token, 'X-Requested-With': 'XMLHttpRequest' },
+            body: JSON.stringify(items)
+        });
+    }
+});
+
+// Rename on blur
+document.querySelectorAll('.rename-input').forEach(input => {
+    input.addEventListener('blur', async function () {
+        const id = this.dataset.id;
+        const fd = new FormData();
+        fd.append('customName', this.value);
+        await fetch(`/admin/menu/${id}/rename`, {
+            method: 'POST',
+            headers: { 'X-FlexCms-Csrf': token, 'X-Requested-With': 'XMLHttpRequest' },
+            body: fd
+        });
+    });
+});
+
+// Delete
+document.querySelectorAll('.delete-btn').forEach(btn => {
+    btn.addEventListener('click', async function () {
+        const name = this.dataset.name;
+        if (!confirm(`Delete menu item "${name}"?`)) return;
+        const id = this.dataset.id;
+        const res = await fetch(`/admin/menu/${id}/delete`, {
+            method: 'POST',
+            headers: { 'X-FlexCms-Csrf': token, 'X-Requested-With': 'XMLHttpRequest' }
+        });
+        const data = await res.json();
+        if (data.isSuccess) this.closest('tr').remove();
+        else alert(data.message);
+    });
+});
+</script>
+}

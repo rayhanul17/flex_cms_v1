@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Identity;
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization;
 using MongoDB.Bson.Serialization.Conventions;
@@ -22,6 +23,14 @@ public static class MongoDbSerializerSetup
             // DateTime as Unix milliseconds Int64 (NOT BSON Date)
             BsonSerializer.RegisterSerializer(typeof(DateTime), FcmsDateTimeSerializer.Instance);
 
+            // EntityStatus as Int32 (overrides global enum-as-string convention).
+            // Stable across renames + smaller payload + matches int-based queries.
+            BsonSerializer.RegisterSerializer(typeof(EntityStatus), new EnumSerializer<EntityStatus>(BsonType.Int32));
+
+            // DateTimeOffset (used by IdentityUser.LockoutEnd) — store as ISO string
+            BsonSerializer.RegisterSerializer(typeof(DateTimeOffset), new DateTimeOffsetSerializer(BsonType.String));
+            BsonSerializer.RegisterSerializer(typeof(DateTimeOffset?), new NullableSerializer<DateTimeOffset>(new DateTimeOffsetSerializer(BsonType.String)));
+
             // Camel-case element names, ignore extra elements
             var pack = new ConventionPack
             {
@@ -30,6 +39,51 @@ public static class MongoDbSerializerSetup
                 new EnumRepresentationConvention(BsonType.String)
             };
             ConventionRegistry.Register("FcmsConventions", pack, _ => true);
+
+            // Map BaseEfEntity Id to BsonId since it doesn't have the [BsonId] attribute
+            if (!BsonClassMap.IsClassMapRegistered(typeof(Db.Ef.BaseEfEntity)))
+            {
+                BsonClassMap.RegisterClassMap<Db.Ef.BaseEfEntity>(cm =>
+                {
+                    cm.AutoMap();
+                    cm.MapIdMember(c => c.Id);
+                });
+            }
+
+            // Map Identity base classes to ensure Id is handled correctly in inheritance
+            if (!BsonClassMap.IsClassMapRegistered(typeof(IdentityUser<Guid>)))
+            {
+                BsonClassMap.RegisterClassMap<IdentityUser<Guid>>(cm =>
+                {
+                    cm.AutoMap();
+                    cm.MapIdMember(c => c.Id);
+                });
+            }
+
+            if (!BsonClassMap.IsClassMapRegistered(typeof(IdentityRole<Guid>)))
+            {
+                BsonClassMap.RegisterClassMap<IdentityRole<Guid>>(cm =>
+                {
+                    cm.AutoMap();
+                    cm.MapIdMember(c => c.Id);
+                });
+            }
+
+            if (!BsonClassMap.IsClassMapRegistered(typeof(Auth.FcmsUser)))
+            {
+                BsonClassMap.RegisterClassMap<Auth.FcmsUser>(cm =>
+                {
+                    cm.AutoMap();
+                });
+            }
+
+            if (!BsonClassMap.IsClassMapRegistered(typeof(Auth.FcmsRole)))
+            {
+                BsonClassMap.RegisterClassMap<Auth.FcmsRole>(cm =>
+                {
+                    cm.AutoMap();
+                });
+            }
 
             _registered = true;
         }

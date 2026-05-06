@@ -1,6 +1,5 @@
 using FlexCms.Framework.Clock;
-using FlexCms.Framework.Db.Ef;
-using Microsoft.EntityFrameworkCore;
+using FlexCms.Framework.Db;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -35,23 +34,20 @@ public class ScheduledPublishService : BackgroundService
     private async Task PublishDueAsync(CancellationToken ct)
     {
         await using var scope = _scopes.CreateAsyncScope();
-        var db = scope.ServiceProvider.GetRequiredService<FcmsDbContext>();
+        var pageRepo = scope.ServiceProvider.GetRequiredService<Db.IRepository<FcmsPage>>();
+        var postRepo = scope.ServiceProvider.GetRequiredService<Db.IRepository<FcmsPost>>();
+        var uow = scope.ServiceProvider.GetRequiredService<Db.IFcmsUnitOfWork>();
         var now = FcmsTime.Now;
 
-        var pages = await db.Pages
-            .Where(p => !p.IsDeleted && !p.IsPublished && p.PublishedAt != null && p.PublishedAt <= now)
-            .ToListAsync(ct);
-
-        var posts = await db.Posts
-            .Where(p => !p.IsDeleted && !p.IsPublished && p.PublishedAt != null && p.PublishedAt <= now)
-            .ToListAsync(ct);
+        var pages = await pageRepo.FindAsync(p => !p.IsPublished && p.PublishedAt != null && p.PublishedAt <= now, ct);
+        var posts = await postRepo.FindAsync(p => !p.IsPublished && p.PublishedAt != null && p.PublishedAt <= now, ct);
 
         if (pages.Count == 0 && posts.Count == 0) return;
 
-        foreach (var page in pages) { page.IsPublished = true; page.UpdatedAt = now; }
-        foreach (var post in posts) { post.IsPublished = true; post.UpdatedAt = now; }
+        foreach (var page in pages) { page.IsPublished = true; page.UpdatedAt = now; await pageRepo.UpdateAsync(page, ct); }
+        foreach (var post in posts) { post.IsPublished = true; post.UpdatedAt = now; await postRepo.UpdateAsync(post, ct); }
 
-        await db.SaveChangesAsync(ct);
+        await uow.SaveChangesAsync(ct);
         _logger.LogInformation("ScheduledPublish: published {Pages} page(s), {Posts} post(s).", pages.Count, posts.Count);
     }
 }

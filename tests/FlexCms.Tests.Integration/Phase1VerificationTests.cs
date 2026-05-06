@@ -44,7 +44,7 @@ public class EfPhase1Tests : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
-        _mysql = new MySqlBuilder()
+        _mysql = new MySqlBuilder("mysql:8.4")
             .WithDatabase("flexcms_test")
             .WithUsername("root")
             .WithPassword("root")
@@ -129,7 +129,7 @@ public class MongoPhase1Tests : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
-        _mongo = new MongoDbBuilder().Build();
+        _mongo = new MongoDbBuilder("mongo:7").Build();
         await _mongo.StartAsync();
 
         MongoDbSerializerSetup.Register();
@@ -163,7 +163,8 @@ public class MongoPhase1Tests : IAsyncLifetime
         await repo.AddAsync(entity);
 
         // Verify GUID stored as binary UUID subtype 4 (Standard)
-        var collection = _database.GetCollection<BsonDocument>("mongotestentitys");
+        var collName = FlexCms.Framework.Helpers.FcmsHelper.GetTableName<MongoTestEntity>("fcms");
+        var collection = _database.GetCollection<BsonDocument>(collName);
         var doc = await collection.Find(IdFilter(entity.Id)).FirstOrDefaultAsync();
 
         Assert.NotNull(doc);
@@ -179,7 +180,7 @@ public class MongoPhase1Tests : IAsyncLifetime
 
         await repo.AddAsync(entity);
 
-        var collection = _database.GetCollection<BsonDocument>("mongotestentitys");
+        var collection = _database.GetCollection<BsonDocument>(FlexCms.Framework.Helpers.FcmsHelper.GetTableName<MongoTestEntity>("fcms"));
         var doc = await collection.Find(IdFilter(entity.Id)).FirstOrDefaultAsync();
 
         Assert.NotNull(doc);
@@ -198,7 +199,7 @@ public class MongoPhase1Tests : IAsyncLifetime
         var afterUtc = DateTime.UtcNow;
 
         // 1. Raw BSON: Int64 Unix ms (UTC-epoch based)
-        var collection = _database.GetCollection<BsonDocument>("mongotestentitys");
+        var collection = _database.GetCollection<BsonDocument>(FlexCms.Framework.Helpers.FcmsHelper.GetTableName<MongoTestEntity>("fcms"));
         var doc = await collection.Find(IdFilter(entity.Id)).FirstOrDefaultAsync();
         Assert.NotNull(doc);
         Assert.Equal(BsonType.Int64, doc["createdAt"].BsonType);
@@ -225,11 +226,12 @@ public class MongoPhase1Tests : IAsyncLifetime
         var all = await repo.GetAllAsync();
         Assert.DoesNotContain(all, e => e.Id == entity.Id);
 
-        // But document still physically exists in collection
-        var collection = _database.GetCollection<BsonDocument>("mongotestentitys");
+        // But document still physically exists in collection (soft-delete only flips status)
+        var collection = _database.GetCollection<BsonDocument>(FlexCms.Framework.Helpers.FcmsHelper.GetTableName<MongoTestEntity>("fcms"));
         var doc = await collection.Find(IdFilter(entity.Id)).FirstOrDefaultAsync();
         Assert.NotNull(doc);
-        Assert.True(doc["isDeleted"].AsBoolean);
+        // EntityStatus.Deleted = 404, registered as Int32 in MongoDbSerializerSetup
+        Assert.Equal(404, doc["status"].AsInt32);
     }
 }
 

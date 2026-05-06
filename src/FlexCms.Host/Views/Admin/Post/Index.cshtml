@@ -5,7 +5,7 @@
 
 <div class="d-flex justify-content-between align-items-center mb-3">
     <h4 class="mb-0">Posts</h4>
-    <a asp-action="Create" class="btn btn-primary btn-sm" fcms-authorize="posts.create">
+    <a asp-action="Create" class="btn btn-primary btn-sm" fcms-authorize="@FcmsPermissions.PostsCreate">
         <i class="bi bi-plus-lg"></i> New Post
     </a>
 </div>
@@ -44,8 +44,8 @@
                         <td>@p.ViewCount</td>
                         <td>@p.CreatedAt.ToString("yyyy-MM-dd")</td>
                         <td class="text-end">
-                            <a asp-action="Edit" asp-route-id="@p.Id" class="btn btn-sm btn-outline-secondary" fcms-authorize="posts.edit">Edit</a>
-                            <button class="btn btn-sm btn-outline-danger btn-delete" data-id="@p.Id" fcms-authorize="posts.delete">Delete</button>
+                            <a asp-action="Edit" asp-route-id="@p.Id" class="btn btn-sm btn-outline-secondary" fcms-authorize="@FcmsPermissions.PostsEdit">Edit</a>
+                            <button class="btn btn-sm btn-outline-danger btn-delete" data-id="@p.Id" fcms-authorize="@FcmsPermissions.PostsDelete">Delete</button>
                         </td>
                     </tr>
                 }
@@ -66,7 +66,7 @@ document.querySelectorAll('.btn-delete').forEach(btn => {
         const id = btn.dataset.id;
         const res = await fetch(`/admin/posts/${id}/delete`, {
             method: 'POST',
-            headers: { 'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value ?? '' }
+            headers: { 'X-FlexCms-Csrf': document.querySelector('input[name="__RequestVerificationToken"]')?.value ?? '' }
         });
         if ((await res.json()).isSuccess) location.reload();
     });

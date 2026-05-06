@@ -10,11 +10,16 @@ public class AuthController : Controller
 {
     private readonly UserManager<FcmsUser> _userManager;
     private readonly SignInManager<FcmsUser> _signInManager;
+    private readonly RoleManager<FcmsRole> _roleManager;
 
-    public AuthController(UserManager<FcmsUser> userManager, SignInManager<FcmsUser> signInManager)
+    public AuthController(
+        UserManager<FcmsUser> userManager,
+        SignInManager<FcmsUser> signInManager,
+        RoleManager<FcmsRole> roleManager)
     {
         _userManager = userManager;
         _signInManager = signInManager;
+        _roleManager = roleManager;
     }
 
     [HttpGet]
@@ -26,7 +31,6 @@ public class AuthController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-
     public async Task<IActionResult> Login(LoginViewModel model, string? returnUrl = null)
     {
         if (!ModelState.IsValid) return View(model);
@@ -35,7 +39,17 @@ public class AuthController : Controller
             model.UserName, model.Password, model.RememberMe, lockoutOnFailure: true);
 
         if (result.Succeeded)
-            return LocalRedirect(returnUrl ?? "/");
+        {
+            if (!string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl))
+                return Redirect(returnUrl);
+
+            var user = await _userManager.FindByNameAsync(model.UserName);
+            var redirectUrl = user is not null
+                ? await ResolveLoginRedirectAsync(user)
+                : "/";
+
+            return LocalRedirect(redirectUrl);
+        }
 
         if (result.IsLockedOut)
             return View("Lockout");
@@ -58,7 +72,6 @@ public class AuthController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-
     public async Task<IActionResult> ForgotPassword(ForgotPasswordViewModel model)
     {
         if (!ModelState.IsValid) return View(model);
@@ -103,7 +116,6 @@ public class AuthController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-
     public async Task<IActionResult> VerifyOtp(VerifyOtpViewModel model)
     {
         if (!ModelState.IsValid) return View(model);
@@ -127,11 +139,13 @@ public class AuthController : Controller
         return RedirectToAction("Index", "Home");
     }
 
-    [HttpGet]
+    [HttpGet("auth/change-password")]
+    [HttpGet("Auth/ChangePassword")]
     [Authorize]
     public IActionResult ChangePassword() => View();
 
-    [HttpPost]
+    [HttpPost("auth/change-password")]
+    [HttpPost("Auth/ChangePassword")]
     [ValidateAntiForgeryToken]
     [Authorize]
     public async Task<IActionResult> ChangePassword(ChangePasswordViewModel model)
@@ -154,5 +168,38 @@ public class AuthController : Controller
             ModelState.AddModelError(string.Empty, error.Description);
 
         return View(model);
+    }
+
+    [HttpGet]
+    public IActionResult AccessDenied() => View();
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// SuperAdmin → /admin always.
+    /// Other roles: pick highest-Priority role's LoginRedirectUrl (fallback "/").
+    /// returnUrl takes precedence over role redirect (checked before this is called).
+    /// </summary>
+    private async Task<string> ResolveLoginRedirectAsync(FcmsUser user)
+    {
+        var roleNames = await _userManager.GetRolesAsync(user);
+
+        if (roleNames.Contains(FcmsRoles.SuperAdmin))
+            return "/admin";
+
+        if (roleNames.Count == 0)
+            return "/";
+
+        FcmsRole? bestRole = null;
+        foreach (var name in roleNames)
+        {
+            var role = await _roleManager.FindByNameAsync(name);
+            if (role is null) continue;
+            if (bestRole is null || role.Priority > bestRole.Priority)
+                bestRole = role;
+        }
+
+        var url = bestRole?.LoginRedirectUrl;
+        return string.IsNullOrWhiteSpace(url) ? "/" : url;
     }
 }

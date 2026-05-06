@@ -22,7 +22,7 @@ public class NameDbContext : DbContext
         base.OnModelCreating(modelBuilder);
 
         // Auto-name tables using FlexCms convention: {prefix}_{entity_snake_plural}
-        // Example: FcmsHelper.GetEntityName<NamePost>(Prefix) → "mod_prefix_name_posts"
+        // Example: FcmsHelper.GetTableName<NamePost>(Prefix) → "mod_prefix_name_posts"
         foreach (var entityType in modelBuilder.Model.GetEntityTypes())
         {
             if (!typeof(BaseEfEntity).IsAssignableFrom(entityType.ClrType)) continue;
@@ -35,5 +35,5 @@ public class NameDbContext : DbContext
     }
 
     private static void ApplyNaming<T>(ModelBuilder builder) where T : BaseEfEntity
-        => builder.Entity<T>().ToTable(FcmsHelper.GetEntityName<T>(Prefix));
+        => builder.Entity<T>().ToTable(FcmsHelper.GetTableName<T>(Prefix));
 }

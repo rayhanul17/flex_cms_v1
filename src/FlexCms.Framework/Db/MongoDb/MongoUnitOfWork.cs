@@ -1,18 +1,26 @@
+using Microsoft.AspNetCore.Http;
 using MongoDB.Driver;
 
 namespace FlexCms.Framework.Db.MongoDb;
+
+internal interface IMongoSessionAware
+{
+    void SetSession(IClientSessionHandle? session);
+}
 
 public class MongoUnitOfWork : IFcmsUnitOfWork
 {
     private readonly IMongoDatabase _database;
     private readonly IMongoClient _client;
+    private readonly IHttpContextAccessor? _httpContextAccessor;
     private IClientSessionHandle? _session;
     private readonly Dictionary<Type, object> _repositories = new();
 
-    public MongoUnitOfWork(IMongoClient client, IMongoDatabase database)
+    public MongoUnitOfWork(IMongoClient client, IMongoDatabase database, IHttpContextAccessor? httpContextAccessor = null)
     {
         _client = client;
         _database = database;
+        _httpContextAccessor = httpContextAccessor;
     }
 
     public IRepository<T> Repository<T>() where T : class, IBaseEntity
@@ -20,10 +28,13 @@ public class MongoUnitOfWork : IFcmsUnitOfWork
         var type = typeof(T);
         if (!_repositories.TryGetValue(type, out var repo))
         {
-            // Use Activator to bypass compile-time BaseMongoEntity constraint
             var repoType = typeof(MongoRepository<>).MakeGenericType(type);
-            repo = Activator.CreateInstance(repoType, _database)!;
+            repo = Activator.CreateInstance(repoType, _database, _httpContextAccessor)!;
             _repositories[type] = repo;
+
+            // If a transaction is already active, wire the session into the new repo
+            if (_session is not null && repo is IMongoSessionAware aware)
+                aware.SetSession(_session);
         }
         return (IRepository<T>)repo;
     }
@@ -32,6 +43,7 @@ public class MongoUnitOfWork : IFcmsUnitOfWork
     {
         _session = await _client.StartSessionAsync(cancellationToken: ct);
         _session.StartTransaction();
+        PropagateSession(_session);
     }
 
     public async Task CommitAsync(CancellationToken ct = default)
@@ -54,5 +66,12 @@ public class MongoUnitOfWork : IFcmsUnitOfWork
         _session?.Dispose();
         GC.SuppressFinalize(this);
         return ValueTask.CompletedTask;
+    }
+
+    private void PropagateSession(IClientSessionHandle? session)
+    {
+        foreach (var repo in _repositories.Values)
+            if (repo is IMongoSessionAware aware)
+                aware.SetSession(session);
     }
 }

@@ -1,5 +1,5 @@
-using FlexCms.Framework.Cms;
 using FlexCms.Framework.Auth;
+using FlexCms.Framework.Cms;
 using FlexCms.Framework.Clock;
 using FlexCms.Framework.Db;
 using FlexCms.Framework.Helpers;
@@ -43,6 +43,7 @@ public class FcmsDbContext : IdentityDbContext<FcmsUser, FcmsRole, Guid>
     public DbSet<FcmsPermission> Permissions => Set<FcmsPermission>();
     public DbSet<FcmsRolePermission> RolePermissions => Set<FcmsRolePermission>();
     public DbSet<FcmsModuleRecord> ModuleRecords => Set<FcmsModuleRecord>();
+    public DbSet<FcmsMenuItem> MenuItems => Set<FcmsMenuItem>();
 
     // CMS
     public DbSet<FcmsPage> Pages => Set<FcmsPage>();
@@ -51,6 +52,12 @@ public class FcmsDbContext : IdentityDbContext<FcmsUser, FcmsRole, Guid>
     public DbSet<FcmsTag> Tags => Set<FcmsTag>();
     public DbSet<FcmsPostTag> PostTags => Set<FcmsPostTag>();
     public DbSet<FcmsRedirect> Redirects => Set<FcmsRedirect>();
+    public DbSet<FcmsMediaFolder> MediaFolders => Set<FcmsMediaFolder>();
+    public DbSet<FcmsMedia> Media => Set<FcmsMedia>();
+
+    // Audit logs
+    public DbSet<FcmsLog> Logs => Set<FcmsLog>();
+    public DbSet<FcmsLogArchive> LogArchives => Set<FcmsLogArchive>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -66,8 +73,13 @@ public class FcmsDbContext : IdentityDbContext<FcmsUser, FcmsRole, Guid>
         modelBuilder.Entity<IdentityRoleClaim<Guid>>().ToTable("fcms_role_claims");
         modelBuilder.Entity<IdentityUserToken<Guid>>().ToTable("fcms_user_tokens");
 
-        // Roles list is embedded in Mongo only; ignore in EF
+        // Embedded collections used in Mongo only; ignore in EF
         modelBuilder.Entity<FcmsUser>().Ignore(u => u.Roles);
+        modelBuilder.Entity<FcmsUser>().Ignore(u => u.Claims);
+        modelBuilder.Entity<FcmsUser>().Ignore(u => u.Logins);
+        modelBuilder.Entity<FcmsUser>().Ignore(u => u.Tokens);
+
+        modelBuilder.Entity<FcmsRole>().Ignore(r => r.Claims);
 
         // Unique index: one permission key per role
         modelBuilder.Entity<FcmsRolePermission>()
@@ -75,7 +87,7 @@ public class FcmsDbContext : IdentityDbContext<FcmsUser, FcmsRole, Guid>
             .IsUnique();
 
         // FK: deleting a role hard-removes its permission rows. Soft-delete
-        // (IsDeleted=true) is a column update and does NOT trigger this cascade.
+        // (Status=Deleted) is a column update and does NOT trigger this cascade.
         modelBuilder.Entity<FcmsRolePermission>()
             .HasOne<FcmsRole>()
             .WithMany()
@@ -132,9 +144,10 @@ public class FcmsDbContext : IdentityDbContext<FcmsUser, FcmsRole, Guid>
             .HasIndex(t => t.Slug)
             .IsUnique();
 
-        // PostTags: explicit junction table — no soft-delete, composite PK
+        // PostTags: junction table with unique index
         modelBuilder.Entity<FcmsPostTag>()
-            .HasKey(pt => new { pt.PostId, pt.TagId });
+            .HasIndex(pt => new { pt.PostId, pt.TagId })
+            .IsUnique();
 
         modelBuilder.Entity<FcmsPostTag>()
             .ToTable("fcms_post_tags");
@@ -156,17 +169,37 @@ public class FcmsDbContext : IdentityDbContext<FcmsUser, FcmsRole, Guid>
             .HasIndex(r => r.FromPath)
             .IsUnique();
 
+        // MediaFolders: self-referential hierarchy
+        modelBuilder.Entity<FcmsMediaFolder>()
+            .HasOne(f => f.Parent)
+            .WithMany(f => f.Children)
+            .HasForeignKey(f => f.ParentId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // Media: FK to folder (nullable — root-level media has no folder)
+        modelBuilder.Entity<FcmsMedia>()
+            .HasOne(m => m.Folder)
+            .WithMany(f => f.Media)
+            .HasForeignKey(m => m.FolderId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        // Audit log entities are append-only — strip the inherited lifecycle
+        // columns and skip the soft-delete query filter (no Status column means
+        // the filter expression would target a missing column).
+        ConfigureLogEntity<FcmsLog>(modelBuilder);
+        ConfigureLogEntity<FcmsLogArchive>(modelBuilder);
+
         // Module builders — each registered IFcmsModelBuilder configures its
         // own entities (tables, indexes, FKs) into this shared DbContext.
         foreach (var builder in _moduleBuilders)
             builder.Build(modelBuilder);
 
-        // Apply soft-delete filter + auto-name table for every BaseEfEntity.
-        // Module entities will follow the same convention with their own prefix
-        // once the module loader (Phase 4 sub-PR 2) is in place.
+        // Apply soft-delete filter + auto-name table for every BaseEfEntity
+        // EXCEPT the log entities (already configured above).
         foreach (var entityType in modelBuilder.Model.GetEntityTypes())
         {
             if (!typeof(BaseEfEntity).IsAssignableFrom(entityType.ClrType)) continue;
+            if (entityType.ClrType == typeof(FcmsLog) || entityType.ClrType == typeof(FcmsLogArchive)) continue;
 
             var method = typeof(FcmsDbContext)
                 .GetMethod(nameof(ApplySoftDeleteFilter),
@@ -179,8 +212,21 @@ public class FcmsDbContext : IdentityDbContext<FcmsUser, FcmsRole, Guid>
 
     private static void ApplySoftDeleteFilter<T>(ModelBuilder builder) where T : BaseEfEntity
     {
-        builder.Entity<T>().HasQueryFilter(e => !e.IsDeleted);
-        builder.Entity<T>().ToTable(FcmsHelper.GetEntityName<T>(FrameworkPrefix));
+        builder.Entity<T>().HasQueryFilter(e => e.Status != EntityStatus.Deleted);
+        builder.Entity<T>().ToTable(FcmsHelper.GetTableName<T>(FrameworkPrefix));
+    }
+
+    private static void ConfigureLogEntity<T>(ModelBuilder builder) where T : BaseEfEntity
+    {
+        var entity = builder.Entity<T>();
+        // Strip inherited lifecycle columns — logs are write-once
+        entity.Ignore(e => e.Status);
+        entity.Ignore(e => e.DeletedAt);
+        entity.Ignore(e => e.UpdatedAt);
+        entity.Ignore(e => e.UpdatedBy);
+        entity.Ignore(e => e.CreatedBy);  // UserId field carries the actor
+        entity.ToTable(FcmsHelper.GetTableName<T>(FrameworkPrefix));
+        // No HasQueryFilter — logs are visible regardless of any "deleted" semantics
     }
 
     public override async Task<int> SaveChangesAsync(CancellationToken ct = default)

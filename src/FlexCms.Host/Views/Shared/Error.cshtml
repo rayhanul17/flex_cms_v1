@@ -1,25 +1,183 @@
-﻿@model ErrorViewModel
+@model FlexCms.Host.Models.ErrorViewModel
 @{
-    ViewData["Title"] = "Error";
+    Layout = null;
+    ViewData["Title"] = "System Error";
 }
 
-<h1 class="text-danger">Error.</h1>
-<h2 class="text-danger">An error occurred while processing your request.</h2>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>@ViewData["Title"] - FlexCms</title>
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/lib/bootstrap-icons/font/bootstrap-icons.min.css">
+    <style>
+        body {
+            background: #0a0a0a;
+            color: #fff;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Inter', system-ui, sans-serif;
+            margin: 0;
+            overflow: hidden;
+        }
 
-@if (Model.ShowRequestId)
-{
-    <p>
-        <strong>Request ID:</strong> <code>@Model.RequestId</code>
-    </p>
-}
+        .error-container {
+            text-align: center;
+            padding: 2rem;
+            max-width: 600px;
+            z-index: 1;
+        }
 
-<h3>Development Mode</h3>
-<p>
-    Swapping to <strong>Development</strong> environment will display more detailed information about the error that occurred.
-</p>
-<p>
-    <strong>The Development environment shouldn't be enabled for deployed applications.</strong>
-    It can result in displaying sensitive information from exceptions to end users.
-    For local debugging, enable the <strong>Development</strong> environment by setting the <strong>ASPNETCORE_ENVIRONMENT</strong> environment variable to <strong>Development</strong>
-    and restarting the app.
-</p>
+        .warning-icon {
+            font-size: 8rem;
+            color: #ff4d4d;
+            filter: drop-shadow(0 0 20px rgba(255, 77, 77, 0.5));
+            animation: pulse 2s infinite;
+            margin-bottom: 1rem;
+        }
+
+        @@keyframes pulse {
+            0% { transform: scale(1); opacity: 0.8; }
+            50% { transform: scale(1.05); opacity: 1; filter: drop-shadow(0 0 30px rgba(255, 77, 77, 0.8)); }
+            100% { transform: scale(1); opacity: 0.8; }
+        }
+
+        h1 {
+            font-weight: 900;
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            text-transform: uppercase;
+            letter-spacing: -1px;
+            background: linear-gradient(to right, #ff4d4d, #f093fb);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        p {
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 1.25rem;
+            line-height: 1.6;
+            margin-bottom: 2.5rem;
+        }
+
+        .error-details {
+            background: rgba(255, 77, 77, 0.1);
+            border: 1px solid rgba(255, 77, 77, 0.2);
+            padding: 1rem;
+            border-radius: 12px;
+            font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+            font-size: 0.9rem;
+            color: #ff4d4d;
+            margin-bottom: 2.5rem;
+            display: inline-block;
+        }
+
+        .btn-premium {
+            background: #ff4d4d;
+            color: #fff;
+            padding: 1rem 2.5rem;
+            border-radius: 50px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            box-shadow: 0 10px 30px rgba(255, 77, 77, 0.3);
+        }
+
+        .btn-premium:hover {
+            background: #ff3333;
+            transform: translateY(-3px);
+            box-shadow: 0 15px 40px rgba(255, 77, 77, 0.5);
+            color: #fff;
+        }
+
+        .btn-ghost {
+            background: transparent;
+            color: rgba(255, 255, 255, 0.7);
+            padding: 1rem 2rem;
+            border-radius: 50px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            text-decoration: none;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            margin-left: .5rem;
+            transition: all 0.3s ease;
+        }
+
+        .btn-ghost:hover {
+            color: #fff;
+            border-color: rgba(255, 255, 255, 0.5);
+        }
+
+        .copy-id {
+            cursor: pointer;
+            background: none;
+            border: none;
+            color: #ff4d4d;
+            font-size: 0.8rem;
+            margin-left: .5rem;
+            text-decoration: underline;
+        }
+
+        .timestamp {
+            color: rgba(255, 255, 255, 0.4);
+            font-size: 0.8rem;
+            margin-top: 1rem;
+        }
+
+        /* Background Glitch Effect */
+        .glitch-bg {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: repeating-linear-gradient(0deg, rgba(255,255,255,0.03) 0px, rgba(255,255,255,0.03) 1px, transparent 1px, transparent 2px);
+            pointer-events: none;
+            z-index: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="glitch-bg"></div>
+    
+    <div class="error-container">
+        <div class="warning-icon">
+            <i class="bi bi-exclamation-triangle-fill"></i>
+        </div>
+        <h1>System Failure</h1>
+        <p>
+            We've encountered a critical exception that we couldn't handle. 
+            Our engineers have been alerted.
+        </p>
+
+        @if (Model.ShowRequestId)
+        {
+            <div class="error-details">
+                <span id="errId">CRITICAL_ERROR_ID: @Model.RequestId</span>
+                <button type="button" class="copy-id" onclick="copyId()">Copy</button>
+            </div>
+        }
+
+        <div>
+            <a href="/" class="btn-premium">Return Home</a>
+            <a href="javascript:history.back()" class="btn-ghost">Go Back</a>
+        </div>
+
+        <div class="timestamp">@DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss") UTC</div>
+    </div>
+
+    <script>
+        function copyId() {
+            const txt = document.getElementById('errId')?.innerText ?? '';
+            navigator.clipboard?.writeText(txt);
+            event.target.innerText = 'Copied!';
+            setTimeout(() => event.target.innerText = 'Copy', 1500);
+        }
+    </script>
+</body>
+</html>

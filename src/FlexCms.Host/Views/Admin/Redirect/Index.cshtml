@@ -62,7 +62,7 @@ else
         if (!confirm('Delete this redirect?')) return;
         const r = await fetch(`/admin/redirects/${btn.dataset.id}/delete`, {
             method: 'POST',
-            headers: { 'RequestVerificationToken': token },
+            headers: { 'X-FlexCms-Csrf': token },
             body: new URLSearchParams({ __RequestVerificationToken: token })
         });
         const j = await r.json();

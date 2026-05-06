@@ -1,11 +1,13 @@
+using System.Linq.Expressions;
 using FlexCms.Framework.Auth;
 using FlexCms.Framework.Clock;
 using FlexCms.Framework.Cms;
+using FlexCms.Framework.Db;
+using FlexCms.Framework.Helpers;
+using FlexCms.Framework.Models;
 using FlexCms.Host.Models.Admin;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
-using System.Security.Cryptography;
-using System.Text;
 
 namespace FlexCms.Host.Controllers.Admin;
 
@@ -13,41 +15,65 @@ namespace FlexCms.Host.Controllers.Admin;
 public class PageController : BaseAdminController
 {
     private readonly IPageService _pages;
+    private readonly IRepository<FcmsPage> _pageRepo;
 
-    public PageController(IPageService pages) => _pages = pages;
+    public PageController(IPageService pages, IRepository<FcmsPage> pageRepo)
+    {
+        _pages = pages;
+        _pageRepo = pageRepo;
+    }
 
     // ── List ──────────────────────────────────────────────────────────────────
 
     [HttpGet("")]
-    public async Task<IActionResult> Index(CancellationToken ct)
+    public IActionResult Index() => View();
+
+    // ── DataTable AJAX endpoint (server-side processing) ─────────────────────
+
+    [HttpPost("datatable")]
+    [ValidateAntiForgeryToken]
+    public Task<IActionResult> DataTable(DataTablesRequest req, CancellationToken ct)
     {
-        var all = await _pages.GetAllAsync(ct);
-        var dict = all.ToDictionary(p => p.Id, p => p.Title);
-
-        var vm = all.Select(p => new PageListItemViewModel
+        var orderColumns = new Expression<Func<FcmsPage, object>>[]
         {
-            Id = p.Id,
-            Title = p.Title,
-            Slug = p.Slug,
-            IsPublished = p.IsPublished,
-            ParentId = p.ParentId,
-            ParentTitle = p.ParentId.HasValue && dict.TryGetValue(p.ParentId.Value, out var t) ? t : null,
-            CreatedAt = p.CreatedAt
-        }).ToList();
-
-        return View(vm);
+            p => p.Title,
+            p => p.Slug,
+            p => p.IsPublished,
+            p => p.Status,
+            p => p.UpdatedAt
+        };
+        return DataTableResult(
+            _pageRepo.Query(),
+            req,
+            select: p => new
+            {
+                Id = p.Id,
+                Title = p.Title,
+                Slug = p.Slug,
+                IsPublished = p.IsPublished,
+                Status = (int)p.Status,
+                UpdatedAt = p.UpdatedAt
+            },
+            orderColumns: orderColumns,
+            globalSearch: q => p => p.Title.Contains(q) || p.Slug.Contains(q),
+            permissions: new()
+            {
+                ["edit"] = FcmsPermissions.PagesEdit,
+                ["delete"] = FcmsPermissions.PagesDelete
+            },
+            ct: ct);
     }
 
     // ── Create ────────────────────────────────────────────────────────────────
 
     [HttpGet("create")]
-    [FcmsAuthorize("pages.create")]
+    [FcmsAuthorize(FcmsPermissions.PagesCreate)]
     public async Task<IActionResult> Create(CancellationToken ct)
         => View(new CreateEditPageViewModel { AvailableParents = await GetParentSelectListAsync(ct) });
 
     [HttpPost("create")]
     [ValidateAntiForgeryToken]
-    [FcmsAuthorize("pages.create")]
+    [FcmsAuthorize(FcmsPermissions.PagesCreate)]
     public async Task<IActionResult> Create(CreateEditPageViewModel model, CancellationToken ct)
     {
         if (await _pages.SlugExistsAsync(model.Slug, ct: ct))
@@ -79,7 +105,7 @@ public class PageController : BaseAdminController
     // ── Edit ──────────────────────────────────────────────────────────────────
 
     [HttpGet("{id:guid}/edit")]
-    [FcmsAuthorize("pages.edit")]
+    [FcmsAuthorize(FcmsPermissions.PagesEdit)]
     public async Task<IActionResult> Edit(Guid id, CancellationToken ct)
     {
         var page = await _pages.GetByIdAsync(id, ct);
@@ -104,7 +130,7 @@ public class PageController : BaseAdminController
 
     [HttpPost("{id:guid}/edit")]
     [ValidateAntiForgeryToken]
-    [FcmsAuthorize("pages.edit")]
+    [FcmsAuthorize(FcmsPermissions.PagesEdit)]
     public async Task<IActionResult> Edit(Guid id, CreateEditPageViewModel model, CancellationToken ct)
     {
         if (await _pages.SlugExistsAsync(model.Slug, excludeId: id, ct: ct))
@@ -143,7 +169,7 @@ public class PageController : BaseAdminController
 
     [HttpPost("{id:guid}/delete")]
     [ValidateAntiForgeryToken]
-    [FcmsAuthorize("pages.delete")]
+    [FcmsAuthorize(FcmsPermissions.PagesDelete)]
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
     {
         await _pages.DeleteAsync(id, ct);
@@ -153,11 +179,7 @@ public class PageController : BaseAdminController
 
     // ── Helper ────────────────────────────────────────────────────────────────
 
-    private static string HashPassword(string password)
-    {
-        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(password));
-        return Convert.ToHexString(bytes).ToLowerInvariant();
-    }
+    private static string HashPassword(string password) => FcmsHelper.HashPagePassword(password);
 
     private async Task<List<SelectListItem>> GetParentSelectListAsync(CancellationToken ct, Guid? excludeId = null)
     {

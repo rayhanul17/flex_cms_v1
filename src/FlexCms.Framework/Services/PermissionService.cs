@@ -59,9 +59,8 @@ public class PermissionService : IPermissionService
         if (_cache.TryGetValue(CacheKey(roleId), out HashSet<string>? cached) && cached is not null)
             return cached;
 
-        var all = await _rolePerms.GetAllAsync(ct);
-        var keys = all
-            .Where(rp => rp.RoleId == roleId && !rp.IsDeleted)
+        var rows = await _rolePerms.FindAsync(rp => rp.RoleId == roleId, ct);
+        var keys = rows
             .Select(rp => rp.PermissionKey)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
@@ -71,10 +70,9 @@ public class PermissionService : IPermissionService
 
     public async Task AssignAsync(Guid roleId, string permissionKey, CancellationToken ct = default)
     {
-        var all = await _rolePerms.GetAllAsync(ct);
-        var exists = all.Any(rp => rp.RoleId == roleId
-            && string.Equals(rp.PermissionKey, permissionKey, StringComparison.OrdinalIgnoreCase)
-            && !rp.IsDeleted);
+        var exists = await _rolePerms.ExistsAsync(
+            rp => rp.RoleId == roleId &&
+                  rp.PermissionKey == permissionKey, ct);
 
         if (exists) return;
 
@@ -90,15 +88,12 @@ public class PermissionService : IPermissionService
 
     public async Task RevokeAsync(Guid roleId, string permissionKey, CancellationToken ct = default)
     {
-        var all = await _rolePerms.GetAllAsync(ct);
-        var rp = all.FirstOrDefault(r => r.RoleId == roleId
-            && string.Equals(r.PermissionKey, permissionKey, StringComparison.OrdinalIgnoreCase)
-            && !r.IsDeleted);
+        var rp = await _rolePerms.FirstOrDefaultAsync(
+            r => r.RoleId == roleId && r.PermissionKey == permissionKey, ct);
 
         if (rp is null) return;
 
-        rp.IsDeleted = true;
-        await _rolePerms.UpdateAsync(rp, ct);
+        await _rolePerms.SoftDeleteAsync(rp, ct);
         await _uow.SaveChangesAsync(ct);
         InvalidateRoleCache(roleId);
     }

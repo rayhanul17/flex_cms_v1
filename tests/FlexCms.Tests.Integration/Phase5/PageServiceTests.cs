@@ -1,6 +1,8 @@
 using FlexCms.Framework.Cms;
+using FlexCms.Framework.Db;
 using FlexCms.Framework.Db.Ef;
 using Microsoft.EntityFrameworkCore;
+using NSubstitute;
 
 namespace FlexCms.Tests.Integration.Phase5;
 
@@ -15,7 +17,9 @@ public class PageServiceTests : IDisposable
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
             .Options;
         _db = new FcmsDbContext(opts);
-        _svc = new PageService(_db);
+#pragma warning disable CA2000
+        _svc = new PageService(new EfRepository<FcmsPage>(_db), new EfUnitOfWork(_db), Substitute.For<IFcmsLogService>());
+#pragma warning restore CA2000
     }
 
     public void Dispose() => _db.Dispose();
@@ -91,6 +95,6 @@ public class PageServiceTests : IDisposable
 
         Assert.Null(await _svc.GetByIdAsync(page.Id));
         // Row still exists physically
-        Assert.Equal(1, await _db.Pages.IgnoreQueryFilters().CountAsync(p => p.IsDeleted));
+        Assert.Equal(1, await _db.Pages.IgnoreQueryFilters().CountAsync(p => p.Status == EntityStatus.Deleted));
     }
 }

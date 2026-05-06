@@ -3,14 +3,16 @@ using MongoDB.Driver;
 
 namespace FlexCms.Framework.Auth.MongoDb;
 
-public class MongoRoleStore : IRoleStore<FcmsRole>
+public class MongoRoleStore : IRoleStore<FcmsRole>, IQueryableRoleStore<FcmsRole>, IRoleClaimStore<FcmsRole>
 {
     private readonly IMongoCollection<FcmsRole> _roles;
 
     public MongoRoleStore(IMongoDatabase database)
     {
-        _roles = database.GetCollection<FcmsRole>("fcmsroles");
+        _roles = database.GetCollection<FcmsRole>(Helpers.FcmsHelper.GetTableName<FcmsRole>("fcms"));
     }
+
+    public IQueryable<FcmsRole> Roles => _roles.AsQueryable();
 
     private FilterDefinition<FcmsRole> ById(string roleId) =>
         Builders<FcmsRole>.Filter.Eq(r => r.Id, Guid.Parse(roleId));
@@ -60,6 +62,23 @@ public class MongoRoleStore : IRoleStore<FcmsRole>
     public async Task<FcmsRole?> FindByNameAsync(string normalizedRoleName, CancellationToken ct)
         => await _roles.Find(Builders<FcmsRole>.Filter.Eq(r => r.NormalizedName, normalizedRoleName))
                        .FirstOrDefaultAsync(ct);
+
+    // IRoleClaimStore
+    public Task<IList<System.Security.Claims.Claim>> GetClaimsAsync(FcmsRole role, CancellationToken ct)
+        => Task.FromResult<IList<System.Security.Claims.Claim>>(role.Claims.Select(c => c.ToClaim()).ToList());
+
+    public Task AddClaimAsync(FcmsRole role, System.Security.Claims.Claim claim, CancellationToken ct)
+    {
+        role.Claims.Add(new IdentityRoleClaim<Guid> { RoleId = role.Id, ClaimType = claim.Type, ClaimValue = claim.Value });
+        return Task.CompletedTask;
+    }
+
+    public Task RemoveClaimAsync(FcmsRole role, System.Security.Claims.Claim claim, CancellationToken ct)
+    {
+        var existing = role.Claims.FirstOrDefault(c => c.ClaimType == claim.Type && c.ClaimValue == claim.Value);
+        if (existing is not null) role.Claims.Remove(existing);
+        return Task.CompletedTask;
+    }
 
     public void Dispose() { }
 }

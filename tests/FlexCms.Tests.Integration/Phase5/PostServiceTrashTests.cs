@@ -1,6 +1,8 @@
+using FlexCms.Framework.Db;
 using FlexCms.Framework.Cms;
 using FlexCms.Framework.Db.Ef;
 using Microsoft.EntityFrameworkCore;
+using NSubstitute;
 
 namespace FlexCms.Tests.Integration.Phase5;
 
@@ -18,7 +20,9 @@ public class PostServiceTrashTests : IDisposable
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
             .Options;
         _db = new FcmsDbContext(opts);
-        _svc = new PostService(_db);
+#pragma warning disable CA2000
+        _svc = new PostService(new EfRepository<FcmsPost>(_db), new EfRepository<FcmsTag>(_db), new EfRepository<FcmsPostTag>(_db), new EfUnitOfWork(_db), Substitute.For<IFcmsLogService>());
+#pragma warning restore CA2000
     }
 
     public void Dispose() => _db.Dispose();
@@ -46,7 +50,7 @@ public class PostServiceTrashTests : IDisposable
 
         var found = await _svc.GetByIdAsync(post.Id);
         Assert.NotNull(found);
-        Assert.False(found.IsDeleted);
+        Assert.NotEqual(EntityStatus.Deleted, found.Status);
         Assert.False(found.IsPublished);
         Assert.Null(found.DeletedAt);
     }

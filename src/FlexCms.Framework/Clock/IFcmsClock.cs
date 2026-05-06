@@ -13,4 +13,10 @@ public interface IFcmsClock
 
     /// <summary>Current time-of-day in the configured site timezone.</summary>
     TimeOnly TimeOfDay { get; }
+
+    /// <summary>Configured site timezone (used for UI conversions).</summary>
+    TimeZoneInfo TimeZone { get; }
+
+    /// <summary>Convert a UTC <see cref="DateTime"/> to the site's local timezone.</summary>
+    DateTime ToLocal(DateTime utc);
 }

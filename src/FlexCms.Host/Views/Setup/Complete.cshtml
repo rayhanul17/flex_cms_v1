@@ -1,8 +1,6 @@
-@inject Microsoft.AspNetCore.Hosting.IWebHostEnvironment Env
 @{
     Layout = "_SetupLayout";
     ViewData["Title"] = "Setup Complete";
-    var isDev = Env.IsDevelopment();
 }
 
 @section Steps {
@@ -12,104 +10,66 @@
     <span class="step active">4. Done</span>
 }
 
-<form id="csrf" style="display:none">@Html.AntiForgeryToken()</form>
-
 <div class="text-center py-3">
     <div class="mb-3">
-        <svg xmlns="http://www.w3.org/2000/svg" width="56" height="56" fill="#198754" viewBox="0 0 16 16">
-            <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/>
-            <path d="M10.97 4.97a.235.235 0 0 0-.02.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.061L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-1.071-1.05z"/>
-        </svg>
+        <i class="bi bi-check-circle-fill text-success" style="font-size: 4rem;"></i>
     </div>
-    <h5 class="fw-bold text-success">Setup complete!</h5>
+    <h5 class="fw-bold text-success mb-3">Setup complete!</h5>
 
-@if (isDev)
-{
-    <p class="text-muted mb-2">Development mode — auto-restart is not available with <code>dotnet watch run</code>.</p>
-    <div class="alert alert-info text-start small mt-3 mb-3">
-        <strong>Manual restart required:</strong>
+    <p class="text-muted small mb-3">
+        The app needs to restart to load production-mode services
+        (database, identity, modules). The wizard polls every 1.5s and
+        will auto-redirect you to login as soon as the app is back up.
+    </p>
+
+    <div class="alert alert-info text-start small mb-3">
+        <strong>Restart the app:</strong>
         <ol class="mb-0 mt-2">
-            <li>Stop the running app: <kbd>Ctrl</kbd> + <kbd>C</kbd> (or stop button in Visual Studio)</li>
-            <li>Start it again: <code>dotnet watch run</code> (or run/debug from Visual Studio)</li>
-            <li>Wait for the indicator below to turn green, then click the button</li>
+            <li>Stop it &mdash; <kbd>Ctrl</kbd>+<kbd>C</kbd> in the terminal, or the Stop button in Visual Studio</li>
+            <li>Start it again &mdash; <code>dotnet run</code>, <code>dotnet watch run</code>, or run/debug from VS</li>
+            <li>The indicator below will turn green when the app is back up</li>
         </ol>
     </div>
 
     <div id="readiness" class="alert alert-warning small mb-3">
-        <span id="readinessIcon">⏳</span>
-        <span id="readinessText">Waiting for app restart… (still in setup mode)</span>
+        <span id="readinessIcon">&#9203;</span>
+        <span id="readinessText">Waiting for restart&hellip; (still in setup mode)</span>
     </div>
 
     <a id="loginLink" href="/auth/login" class="btn btn-success disabled" aria-disabled="true">
-        Go to Login
+        <i class="bi bi-box-arrow-in-right"></i> Go to Login
     </a>
-}
-else
-{
-    <p class="text-muted mb-1">Restarting the application…</p>
-    <p class="text-muted small">Redirecting to login in <strong id="countdown">15</strong> seconds.<br/>
-    If the page doesn't load, wait a moment and
-    <a id="loginLink" href="/auth/login" style="pointer-events:none;opacity:0.4;">click here</a>.</p>
-
-    <div class="progress mt-3" style="height: 6px;">
-        <div id="progressBar" class="progress-bar bg-success" style="width:0%;transition:width 5s linear"></div>
-    </div>
-}
 </div>
 
 @section Scripts {
-    @if (isDev)
-    {
-        <script>
-            // Poll the login endpoint. While the app is in setup mode, /auth/login
-            // is caught by MapFallback and 302-redirects to /Setup. Once production
-            // mode is up, the response is the actual login page (200 + login form).
-            // We follow redirects (default fetch behavior) and check the final URL.
-            const link = document.getElementById('loginLink');
-            const icon = document.getElementById('readinessIcon');
-            const text = document.getElementById('readinessText');
-            const banner = document.getElementById('readiness');
+<script>
+    // Poll the login endpoint. While the app is in setup mode, /auth/login is
+    // caught by MapFallback and 302-redirects back to /Setup. Once production
+    // mode is up, the response is the real login page (200 + form, URL stays
+    // at /auth/login). Connection refused (fetch throws) means the app is
+    // shutting down or stopped — keep retrying.
+    const link   = document.getElementById('loginLink');
+    const icon   = document.getElementById('readinessIcon');
+    const text   = document.getElementById('readinessText');
+    const banner = document.getElementById('readiness');
 
-            async function probe() {
-                try {
-                    const r = await fetch('/auth/login', { redirect: 'follow', cache: 'no-store' });
-                    if (r.ok && !r.url.includes('/Setup')) {
-                        banner.classList.remove('alert-warning');
-                        banner.classList.add('alert-success');
-                        icon.textContent = '✅';
-                        text.textContent = 'App restarted — ready to log in.';
-                        link.classList.remove('disabled');
-                        link.removeAttribute('aria-disabled');
-                        return;
-                    }
-                } catch { /* connection refused → app is restarting; keep polling */ }
-                setTimeout(probe, 1500);
-            }
-            probe();
-        </script>
+    function ready() {
+        banner.classList.remove('alert-warning');
+        banner.classList.add('alert-success');
+        icon.textContent = '\u2705';
+        text.textContent = 'App restarted — redirecting to login…';
+        link.classList.remove('disabled');
+        link.removeAttribute('aria-disabled');
+        setTimeout(() => { window.location.href = '/auth/login'; }, 800);
     }
-    else
-    {
-        <script>
-            // Trigger app restart (production only — relies on process manager to bring it back up)
-            const csrfToken = document.querySelector('#csrf input[name=__RequestVerificationToken]').value;
-            fetch('/Setup/Restart', {
-                method: 'POST',
-                headers: { 'RequestVerificationToken': csrfToken }
-            }).catch(() => {});
 
-            // Countdown + redirect
-            let secs = 15;
-            document.getElementById('progressBar').style.width = '100%';
-            const timer = setInterval(() => {
-                secs--;
-                document.getElementById('countdown').textContent = secs;
-                if (secs <= 0) {
-                    clearInterval(timer);
-                    document.getElementById('loginLink').removeAttribute('style');
-                    window.location.href = '/auth/login';
-                }
-            }, 1000);
-        </script>
+    async function probe() {
+        try {
+            const r = await fetch('/auth/login', { redirect: 'follow', cache: 'no-store' });
+            if (r.ok && !r.url.includes('/Setup')) { ready(); return; }
+        } catch { /* connection refused → app is restarting; keep polling */ }
+        setTimeout(probe, 1500);
     }
+    probe();
+</script>
 }

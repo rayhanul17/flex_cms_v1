@@ -12,8 +12,9 @@ public class FcmsModuleRecord : BaseEfEntity
     public string ModuleId { get; set; } = "";
     public string Version { get; set; } = "";
 
-    /// <summary>"Inactive" | "Active" — controlled by the activation flow.</summary>
-    public string Status { get; set; } = "Inactive";
+    /// <summary>"Inactive" | "Active" — controlled by the activation flow.
+    /// Distinct from <see cref="BaseEfEntity.Status"/> (entity lifecycle / soft-delete).</summary>
+    public string ActivationStatus { get; set; } = "Inactive";
 
     /// <summary>True once <c>SeedDataAsync</c> has run successfully.</summary>
     public bool SeedCompleted { get; set; }

@@ -1,4 +1,5 @@
 using FlexCms.Framework.Auth;
+using FlexCms.Framework.Cms;
 using FlexCms.Framework.Db;
 using FlexCms.Framework.Modules;
 using FlexCms.Host.Models.Admin;
@@ -56,7 +57,7 @@ public class ModulesController : BaseAdminController
                     Author = m.Manifest.Author,
                     Description = m.Manifest.Description,
                     TablePrefix = m.Manifest.TablePrefix,
-                    Status = m.IsDeactivated ? "Inactive" : (rec?.Status ?? "Active"),
+                    Status = m.IsDeactivated ? "Inactive" : (rec?.ActivationStatus ?? "Active"),
                     ActivatedAt = rec?.ActivatedAt,
                     DependsOn = m.Manifest.DependsOn
                 };
@@ -83,7 +84,7 @@ public class ModulesController : BaseAdminController
 
     [HttpPost("deactivate/{id}")]
     [ValidateAntiForgeryToken]
-    public IActionResult Deactivate(string id)
+    public async Task<IActionResult> Deactivate(string id, CancellationToken ct)
     {
         var module = _registry.FindById(id);
         if (module is null) return FcmsFail("Module not found.");
@@ -92,6 +93,13 @@ public class ModulesController : BaseAdminController
             return FcmsFail("Could not deactivate module — folder missing.");
 
         _state.DeleteWwwroot(_env.WebRootPath, module.ModuleId);
+
+        // Hide module menu items so they don't 404 on click after restart.
+        // Restored on next activation by MenuService.SeedAsync (Status set back to Active).
+        var menuService = HttpContext.RequestServices.GetService<IMenuService>();
+        if (menuService is not null)
+            await menuService.RemoveModuleItemsAsync(id, ct);
+
         return FcmsOk("Module deactivated. Restart the app to apply.");
     }
 
@@ -127,13 +135,19 @@ public class ModulesController : BaseAdminController
             }
         }
 
+        // Remove module menu items
+        var menuService = HttpContext.RequestServices.GetService<IMenuService>();
+        if (menuService is not null)
+            await menuService.RemoveModuleItemsAsync(id, ct);
+
         // Soft-delete the DB record now (folder will be removed on next startup
         // by ModuleManager.ProcessPendingUninstalls)
         var record = (await _records.GetAllAsync(ct))
             .FirstOrDefault(r => string.Equals(r.ModuleId, id, StringComparison.OrdinalIgnoreCase));
         if (record is not null)
         {
-            record.IsDeleted = true;
+            record.Status = FlexCms.Framework.Db.EntityStatus.Deleted;
+            record.DeletedAt ??= FlexCms.Framework.Clock.FcmsTime.Now;
             await _records.UpdateAsync(record, ct);
             await _uow.SaveChangesAsync(ct);
         }
@@ -169,7 +183,14 @@ public class ModulesController : BaseAdminController
         if (!_env.IsDevelopment()) return NotFound();
         if (!ModelState.IsValid) return View("Scaffold", model);
 
-        var modulesRoot = Path.Combine(_env.ContentRootPath, "..", "modules");
+        // Walk up from ContentRootPath until we find both the templates and modules dirs.
+        // Handles both src/FlexCms.Host (project) and bin/Debug/net10.0 (running output) layouts.
+        var solutionRoot = FindSolutionRoot(_env.ContentRootPath);
+        if (solutionRoot is null)
+            return FcmsFail("Could not locate the solution root (looked for a 'templates' sibling).");
+
+        var modulesRoot = Path.Combine(solutionRoot, "modules");
+        Directory.CreateDirectory(modulesRoot);
         var dest = Path.Combine(modulesRoot, model.ModuleId);
 
         if (Directory.Exists(dest))
@@ -178,15 +199,28 @@ public class ModulesController : BaseAdminController
             return View("Scaffold", model);
         }
 
-        // Find template source relative to solution root
-        var templateSrc = Path.Combine(_env.ContentRootPath, "..", "templates",
-            "flexcms-module", "content", "FlexCms.Module.Name");
-
+        var templateSrc = Path.Combine(solutionRoot, "templates", "flexcms-module", "content", "FlexCms.Module.Name");
         if (!Directory.Exists(templateSrc))
-            return FcmsFail("Template source not found. Run from the repository root.");
+            return FcmsFail($"Template source not found at: {templateSrc}");
 
         CopyAndReplace(templateSrc, dest, model.ModuleId, model.TablePrefix);
         return FcmsOk($"Module '{model.ModuleId}' scaffolded to modules/{model.ModuleId}/. Open the project, implement your module, build, and restart.");
+    }
+
+    /// <summary>
+    /// Walk up from <paramref name="start"/> looking for a directory that contains
+    /// a <c>templates</c> subfolder — that's the FlexCMS solution root.
+    /// </summary>
+    private static string? FindSolutionRoot(string start)
+    {
+        var dir = new DirectoryInfo(start);
+        while (dir is not null)
+        {
+            if (Directory.Exists(Path.Combine(dir.FullName, "templates", "flexcms-module")))
+                return dir.FullName;
+            dir = dir.Parent;
+        }
+        return null;
     }
 
     private static void CopyAndReplace(string src, string dest, string moduleId, string tablePrefix)

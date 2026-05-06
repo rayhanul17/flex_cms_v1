@@ -32,8 +32,7 @@ public class RoleController : BaseAdminController
     [HttpGet("")]
     public async Task<IActionResult> Index(CancellationToken ct)
     {
-        var roles = _roleManager.Roles.OrderBy(r => r.Name).ToList();
-        var allPerms = await _permissions.GetAllAsync(ct);
+        var roles = _roleManager.Roles.OrderByDescending(r => r.Priority).ThenBy(r => r.Name).ToList();
         var list = new List<RoleListItemViewModel>();
 
         foreach (var role in roles)
@@ -45,7 +44,9 @@ public class RoleController : BaseAdminController
                 Id = role.Id,
                 Name = role.Name ?? "",
                 UserCount = users.Count,
-                PermissionCount = assigned.Count
+                PermissionCount = assigned.Count,
+                Priority = role.Priority,
+                LoginRedirectUrl = role.LoginRedirectUrl
             });
         }
 
@@ -55,12 +56,13 @@ public class RoleController : BaseAdminController
     // ── Create ────────────────────────────────────────────────────────────────
 
     [HttpGet("create")]
-    [FcmsAuthorize("roles.create")]
+    [FcmsAuthorize(FcmsPermissions.RolesCreate)]
     public IActionResult Create() => View(new CreateRoleViewModel());
 
     [HttpPost("create")]
     [ValidateAntiForgeryToken]
-    [FcmsAuthorize("roles.create")]
+    [FcmsAuthorize(FcmsPermissions.RolesCreate)]
+    [FcmsLog("roles.create", "FcmsRole")]
     public async Task<IActionResult> Create(CreateRoleViewModel model)
     {
         if (!ModelState.IsValid) return View(model);
@@ -71,7 +73,14 @@ public class RoleController : BaseAdminController
             return View(model);
         }
 
-        var result = await _roleManager.CreateAsync(new FcmsRole { Name = model.Name });
+        var role = new FcmsRole
+        {
+            Name = model.Name,
+            LoginRedirectUrl = NormalizeRedirect(model.LoginRedirectUrl),
+            Priority = model.Priority
+        };
+
+        var result = await _roleManager.CreateAsync(role);
         if (!result.Succeeded)
         {
             foreach (var err in result.Errors)
@@ -79,11 +88,70 @@ public class RoleController : BaseAdminController
             return View(model);
         }
 
+        FcmsLogContext.SetEntityId(HttpContext, role.Id);
+        FcmsLogContext.SetValue(HttpContext, role);
         ShowSuccess($"Role '{model.Name}' created.");
         return RedirectToAction(nameof(Index));
     }
 
-    // ── Detail (Info + Users + Permissions tabs) ──────────────────────────────
+    // ── Edit ──────────────────────────────────────────────────────────────────
+
+    [HttpGet("{id:guid}/edit")]
+    [FcmsAuthorize(FcmsPermissions.RolesEdit)]
+    public async Task<IActionResult> Edit(Guid id)
+    {
+        var role = await _roleManager.FindByIdAsync(id.ToString());
+        if (role is null) return NotFound();
+
+        return View(new EditRoleViewModel
+        {
+            Id = role.Id,
+            Name = role.Name ?? "",
+            LoginRedirectUrl = role.LoginRedirectUrl,
+            Priority = role.Priority
+        });
+    }
+
+    [HttpPost("{id:guid}/edit")]
+    [ValidateAntiForgeryToken]
+    [FcmsAuthorize(FcmsPermissions.RolesEdit)]
+    [FcmsLog("roles.edit", "FcmsRole")]
+    public async Task<IActionResult> Edit(Guid id, EditRoleViewModel model)
+    {
+        if (!ModelState.IsValid) return View(model);
+
+        var role = await _roleManager.FindByIdAsync(id.ToString());
+        if (role is null) return NotFound();
+
+        // SuperAdmin name is immutable
+        if (role.Name != FcmsRoles.SuperAdmin)
+        {
+            var conflict = await _roleManager.FindByNameAsync(model.Name);
+            if (conflict is not null && conflict.Id != id)
+            {
+                ModelState.AddModelError(nameof(model.Name), "A role with this name already exists.");
+                return View(model);
+            }
+            role.Name = model.Name;
+        }
+
+        role.LoginRedirectUrl = NormalizeRedirect(model.LoginRedirectUrl);
+        role.Priority = model.Priority;
+
+        var result = await _roleManager.UpdateAsync(role);
+        if (!result.Succeeded)
+        {
+            foreach (var err in result.Errors)
+                ModelState.AddModelError("", err.Description);
+            return View(model);
+        }
+
+        FcmsLogContext.SetValue(HttpContext, role);
+        ShowSuccess($"Role '{role.Name}' updated.");
+        return RedirectToAction(nameof(Detail), new { id });
+    }
+
+    // ── Detail (Permissions + Users tabs) ─────────────────────────────────────
 
     [HttpGet("{id:guid}")]
     public async Task<IActionResult> Detail(Guid id, CancellationToken ct)
@@ -96,7 +164,6 @@ public class RoleController : BaseAdminController
         var allPerms = await _permissions.GetAllAsync(ct);
 
         var groups = allPerms
-            .Where(p => !p.IsDeleted)
             .GroupBy(p => p.Group)
             .OrderBy(g => g.Key)
             .Select(g => new PermissionGroupViewModel
@@ -114,6 +181,8 @@ public class RoleController : BaseAdminController
         {
             Id = role.Id,
             Name = role.Name ?? "",
+            LoginRedirectUrl = role.LoginRedirectUrl,
+            Priority = role.Priority,
             Users = users.Select(u => new RoleUserItem { Id = u.Id, Email = u.Email ?? "" }).ToList(),
             PermissionGroups = groups,
             AssignedPermissionKeys = [.. assignedKeys]
@@ -124,7 +193,8 @@ public class RoleController : BaseAdminController
 
     [HttpPost("{id:guid}/delete")]
     [ValidateAntiForgeryToken]
-    [FcmsAuthorize("roles.delete")]
+    [FcmsAuthorize(FcmsPermissions.RolesDelete)]
+    [FcmsLog("roles.delete", "FcmsRole")]
     public async Task<IActionResult> Delete(Guid id)
     {
         var role = await _roleManager.FindByIdAsync(id.ToString());
@@ -133,6 +203,7 @@ public class RoleController : BaseAdminController
         if (role.Name == FcmsRoles.SuperAdmin)
             return FcmsFail("The SuperAdmin role cannot be deleted.");
 
+        FcmsLogContext.SetValue(HttpContext, role);
         var result = await _roleManager.DeleteAsync(role);
         if (!result.Succeeded)
             return FcmsFail(string.Join(", ", result.Errors.Select(e => e.Description)));
@@ -140,4 +211,11 @@ public class RoleController : BaseAdminController
         ShowSuccess($"Role '{role.Name}' deleted.");
         return FcmsOk("Role deleted.");
     }
+
+    /// <summary>
+    /// Empty/whitespace login-redirect URL defaults to "/" so admins aren't
+    /// forced to type a slash for every new role.
+    /// </summary>
+    private static string NormalizeRedirect(string? url)
+        => string.IsNullOrWhiteSpace(url) ? "/" : url.Trim();
 }

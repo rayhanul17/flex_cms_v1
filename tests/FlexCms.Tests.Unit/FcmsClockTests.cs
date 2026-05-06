@@ -141,5 +141,7 @@ public class FcmsClockTests
         public DateTime LocalNow => TimeZoneInfo.ConvertTimeFromUtc(_utc, _tz);
         public DateOnly Today => DateOnly.FromDateTime(LocalNow);
         public TimeOnly TimeOfDay => TimeOnly.FromDateTime(LocalNow);
+        public TimeZoneInfo TimeZone => _tz;
+        public DateTime ToLocal(DateTime utc) => TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(utc, DateTimeKind.Utc), _tz);
     }
 }

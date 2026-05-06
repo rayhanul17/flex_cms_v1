@@ -1,0 +1,128 @@
+@using FlexCms.Framework.Cms
+@inject IMenuService MenuService
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
+@{
+    var menuItems = await MenuService.GetMenuAsync("AdminSidebar");
+    var currentPath = Context.Request.Path.Value ?? "";
+
+    bool IsActive(FcmsMenuItem item) =>
+        currentPath.Equals(item.Url, StringComparison.OrdinalIgnoreCase)
+        || (item.Url is not null && item.Url.Length > 1 && !item.Url.StartsWith('#')
+            && item.Url != "/admin"
+            && currentPath.StartsWith(item.Url, StringComparison.OrdinalIgnoreCase));
+
+    var topLevel = menuItems.Where(m => m.ParentId is null).OrderBy(m => m.Order).ToList();
+    var byParent = menuItems
+        .Where(m => m.ParentId is not null)
+        .GroupBy(m => m.ParentId!.Value)
+        .ToDictionary(g => g.Key, g => g.OrderBy(m => m.Order).ToList());
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="csrf-token" content="@Antiforgery.GetAndStoreTokens(Context).RequestToken" />
+    <title>@ViewData["Title"] — FlexCMS Admin</title>
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/lib/bootstrap-icons/font/bootstrap-icons.min.css" />
+    <link rel="stylesheet" href="~/lib/datatables.net-bs5/css/dataTables.bootstrap5.min.css" />
+    <link rel="stylesheet" href="~/css/admin.css" asp-append-version="true" />
+</head>
+<body>
+
+<!-- ── Sidebar ─────────────────────────────────────────────── -->
+<nav id="sidebar">
+    <a class="sidebar-brand" asp-controller="Dashboard" asp-action="Index">
+        <i class="bi bi-grid-3x3-gap me-2"></i>FlexCMS
+    </a>
+    <ul class="nav flex-column py-2">
+        @foreach (var item in topLevel)
+        {
+            var children = byParent.TryGetValue(item.Id, out var c) ? c : null;
+
+            if (children is null)
+            {
+                <li class="nav-item">
+                    <a class="nav-link @(IsActive(item) ? "active" : "")" href="@item.Url">
+                        <i class="@item.Icon"></i>
+                        <span>@item.DisplayName</span>
+                    </a>
+                </li>
+            }
+            else
+            {
+                var groupId = "g_" + item.Id.ToString("N");
+                var anyChildActive = children.Any(IsActive);
+                <li class="nav-item nav-group @(anyChildActive ? "open" : "")">
+                    <a class="nav-link nav-toggle" href="#@groupId" data-bs-toggle="collapse"
+                       role="button" aria-expanded="@(anyChildActive ? "true" : "false")">
+                        <i class="@item.Icon"></i>
+                        <span>@item.DisplayName</span>
+                        <i class="bi bi-chevron-right ms-auto chevron"></i>
+                    </a>
+                    <div id="@groupId" class="collapse @(anyChildActive ? "show" : "")">
+                        <ul class="nav flex-column nav-children">
+                            @foreach (var child in children)
+                            {
+                                <li class="nav-item">
+                                    <a class="nav-link @(IsActive(child) ? "active" : "")" href="@child.Url">
+                                        <i class="@child.Icon"></i>
+                                        <span>@child.DisplayName</span>
+                                    </a>
+                                </li>
+                            }
+                        </ul>
+                    </div>
+                </li>
+            }
+        }
+    </ul>
+</nav>
+
+<!-- ── Main content ───────────────────────────────────────── -->
+<div id="main-content">
+    <!-- Topbar -->
+    <div id="topbar">
+        <span class="text-muted small">@ViewData["Title"]</span>
+        <div class="d-flex align-items-center gap-3">
+            <a href="/" target="_blank" class="text-muted small">
+                <i class="bi bi-box-arrow-up-right"></i> View site
+            </a>
+            <form asp-controller="Auth" asp-action="Logout" method="post" class="d-inline">
+                <button type="submit" class="btn btn-sm btn-outline-secondary">
+                    <i class="bi bi-box-arrow-right"></i> Logout
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Page body -->
+    <div id="page-body">
+        @RenderBody()
+    </div>
+</div>
+
+<!-- Shared confirm modal + toast container — driven by fcms.confirm/alert/dialog/toast JS APIs -->
+<partial name="_FcmsConfirm" />
+
+<script src="~/lib/jquery/dist/jquery.min.js"></script>
+<script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+<script src="~/lib/datatables.net/js/jquery.dataTables.min.js"></script>
+<script src="~/lib/datatables.net-bs5/js/dataTables.bootstrap5.min.js"></script>
+<script src="~/js/site.js" asp-append-version="true"></script>
+<script src="~/js/fcms-confirm.js" asp-append-version="true"></script>
+<script src="~/js/fcms-toast.js" asp-append-version="true"></script>
+<script src="~/js/fcms-actions.js" asp-append-version="true"></script>
+<script src="~/js/fcms-datatable.js" asp-append-version="true"></script>
+<script>
+    // Server-side TempData toast → fcms.toast on next render
+    @if (TempData["Toast.Message"] is string toastMsg)
+    {
+        var toastType = TempData["Toast.Type"]?.ToString() ?? "success";
+        <text>document.addEventListener('DOMContentLoaded', () => fcms.toast.@(toastType)(@Html.Raw(System.Text.Json.JsonSerializer.Serialize(toastMsg))));</text>
+    }
+</script>
+@await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

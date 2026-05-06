@@ -1,3 +1,4 @@
+using FlexCms.Framework.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -24,7 +25,7 @@ public interface IFcmsModule
 
     /// <summary>
     /// Table-name prefix for this module's entities (e.g. "blog" → "blog_posts").
-    /// Combined with <see cref="Helpers.FcmsHelper.GetEntityName{T}(string)"/>.
+    /// Combined with <see cref="Helpers.FcmsHelper.GetTableName{T}(string)"/>.
     /// </summary>
     string TablePrefix { get; }
 
@@ -60,4 +61,11 @@ public interface IFcmsModule
     /// uninstall request includes the "drop tables" option.
     /// </summary>
     Task DropTablesAsync(string connectionString, string provider, CancellationToken ct = default);
+
+    /// <summary>
+    /// Admin sidebar menu items contributed by this module.
+    /// Seeded to <c>fcms_menu_items</c> on first activation; removed on uninstall.
+    /// Return an empty list if the module adds no menu items.
+    /// </summary>
+    List<FcmsMenuItemDef> GetMenuItems();
 }

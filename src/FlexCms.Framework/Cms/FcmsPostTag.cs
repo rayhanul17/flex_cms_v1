@@ -1,6 +1,8 @@
+using FlexCms.Framework.Db.Ef;
+
 namespace FlexCms.Framework.Cms;
 
-public class FcmsPostTag
+public class FcmsPostTag : BaseEfEntity
 {
     public Guid PostId { get; set; }
     public FcmsPost Post { get; set; } = null!;

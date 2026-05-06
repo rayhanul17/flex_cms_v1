@@ -1,6 +1,7 @@
 using FlexCms.Framework.Extensions;
 using FlexCms.Framework.Middleware;
 using FlexCms.Framework.Setup;
+using Microsoft.AspNetCore.HttpOverrides;
 using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -56,7 +57,11 @@ if (!SetupHelper.IsSetupComplete(appDataPath))
 // DB config comes from setup.json (written by setup wizard).
 // appsettings.json values are used as fallback for non-DB options (IP filter, etc.)
 // and for developer overrides during local development.
-builder.Services.AddControllersWithViews()
+builder.Services.AddControllersWithViews(mvc =>
+    {
+        // Custom binder for jQuery DataTables 2.x bracket-notation form data
+        mvc.ModelBinderProviders.Insert(0, new FlexCms.Framework.Models.DataTablesRequestModelBinderProvider());
+    })
     .AddRazorOptions(o =>
     {
         // Admin controllers live under Controllers/Admin/ but Razor only looks
@@ -97,18 +102,28 @@ var app = builder.Build();
 if (app.Environment.IsDevelopment())
     app.UseDeveloperExceptionPage();   // full stack trace in browser
 
+app.UseForwardedHeaders(new ForwardedHeadersOptions
+{
+    ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
+});
+
 app.UseMiddleware<FcmsExceptionMiddleware>();   // logs + generic page in production
 app.UseMiddleware<SecurityHeadersMiddleware>();
-app.UseMiddleware<RedirectMiddleware>();
 app.UseMiddleware<IpFilterMiddleware>();
 
 if (!app.Environment.IsDevelopment())
+{
+    app.UseExceptionHandler("/Home/Error");
     app.UseHsts();
+}
+
+app.UseStatusCodePagesWithReExecute("/Home/Error/{0}");
 
 app.UseHttpsRedirection();
 app.UseStaticFiles();
-app.UseSession();
+app.UseMiddleware<RedirectMiddleware>();   // after static files — no DB hit per asset
 app.UseRouting();
+app.UseSession();
 app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();

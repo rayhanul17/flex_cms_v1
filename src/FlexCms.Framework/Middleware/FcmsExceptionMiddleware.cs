@@ -71,21 +71,46 @@ public class FcmsExceptionMiddleware
             <meta name="viewport" content="width=device-width,initial-scale=1"/>
             <title>Something went wrong</title>
             <style>
-                body{font-family:system-ui,sans-serif;background:#f8f9fa;display:flex;
-                     align-items:center;justify-content:center;height:100vh;margin:0}
-                .box{text-align:center;max-width:480px;padding:2rem}
-                h1{font-size:4rem;color:#dee2e6;margin:0}
-                h2{color:#343a40;margin:.5rem 0}
-                p{color:#6c757d}
-                a{color:#0d6efd;text-decoration:none}
+                body {
+                    background: #1a1a2e;
+                    color: #fff;
+                    font-family: system-ui, -apple-system, sans-serif;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    height: 100vh;
+                    margin: 0;
+                }
+                .box {
+                    text-align: center;
+                    max-width: 480px;
+                    padding: 3rem;
+                    background: rgba(255,255,255,0.05);
+                    border-radius: 24px;
+                    border: 1px solid rgba(255,255,255,0.1);
+                    backdrop-filter: blur(10px);
+                }
+                h1 { font-size: 3rem; margin: 0; color: #ff4d4d; }
+                h2 { color: #fff; margin: 1rem 0; }
+                p { color: rgba(255,255,255,0.7); line-height: 1.6; }
+                a { 
+                    display: inline-block;
+                    margin-top: 1.5rem;
+                    background: #4e54c8;
+                    color: #fff;
+                    text-decoration: none;
+                    padding: 0.8rem 2rem;
+                    border-radius: 12px;
+                    font-weight: 600;
+                }
             </style>
         </head>
         <body>
             <div class="box">
                 <h1>500</h1>
-                <h2>Something went wrong</h2>
-                <p>An unexpected error occurred. The issue has been logged.<br/>
-                   Please try again or <a href="/">return to the homepage</a>.</p>
+                <h2>Unexpected Error</h2>
+                <p>An error occurred while processing your request. Our team has been notified.<br/>
+                   Please try again or <a href="/">Return Home</a>.</p>
             </div>
         </body>
         </html>

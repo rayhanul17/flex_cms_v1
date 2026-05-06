@@ -1,115 +1,123 @@
-using FlexCms.Framework.Clock;
-using FlexCms.Framework.Db.Ef;
-using Microsoft.EntityFrameworkCore;
+using FlexCms.Framework.Db;
 
 namespace FlexCms.Framework.Cms;
 
 public class PostService : IPostService
 {
-    private readonly FcmsDbContext _db;
+    private readonly IRepository<FcmsPost> _postRepo;
+    private readonly IRepository<FcmsTag> _tagRepo;
+    private readonly IRepository<FcmsPostTag> _postTagRepo;
+    private readonly IFcmsUnitOfWork _uow;
+    private readonly IFcmsLogService _audit;
 
-    public PostService(FcmsDbContext db) => _db = db;
+    public PostService(
+        IRepository<FcmsPost> postRepo,
+        IRepository<FcmsTag> tagRepo,
+        IRepository<FcmsPostTag> postTagRepo,
+        IFcmsUnitOfWork uow,
+        IFcmsLogService audit)
+    {
+        _postRepo = postRepo;
+        _tagRepo = tagRepo;
+        _postTagRepo = postTagRepo;
+        _uow = uow;
+        _audit = audit;
+    }
 
     public Task<FcmsPost?> GetByIdAsync(Guid id, CancellationToken ct = default)
-        => _db.Posts
-            .Include(p => p.Category)
-            .Include(p => p.PostTags).ThenInclude(pt => pt.Tag)
-            .FirstOrDefaultAsync(p => p.Id == id && !p.IsDeleted, ct);
+        => _postRepo.GetByIdAsync(id, ct);
 
     public Task<FcmsPost?> GetBySlugAsync(string slug, CancellationToken ct = default)
-        => _db.Posts
-            .Include(p => p.Category)
-            .Include(p => p.PostTags).ThenInclude(pt => pt.Tag)
-            .FirstOrDefaultAsync(p => p.Slug == slug && !p.IsDeleted, ct);
+        => _postRepo.FirstOrDefaultAsync(p => p.Slug == slug, ct);
 
     public Task<List<FcmsPost>> GetAllAsync(CancellationToken ct = default)
-        => _db.Posts
-            .Where(p => !p.IsDeleted)
-            .Include(p => p.Category)
-            .OrderByDescending(p => p.CreatedAt)
-            .ToListAsync(ct);
+        => _postRepo.FindAsync(p => true, ct);
 
     public Task<List<FcmsPost>> GetPublishedAsync(CancellationToken ct = default)
-        => _db.Posts
-            .Where(p => !p.IsDeleted && p.IsPublished)
-            .Include(p => p.Category)
-            .OrderByDescending(p => p.PublishedAt)
-            .ToListAsync(ct);
+        => _postRepo.FindAsync(p => p.IsPublished, ct);
 
     public Task<List<FcmsPost>> GetByCategoryAsync(Guid categoryId, CancellationToken ct = default)
-        => _db.Posts
-            .Where(p => !p.IsDeleted && p.IsPublished && p.CategoryId == categoryId)
-            .OrderByDescending(p => p.PublishedAt)
-            .ToListAsync(ct);
+        => _postRepo.FindAsync(p => p.IsPublished && p.CategoryId == categoryId, ct);
 
     public Task<bool> SlugExistsAsync(string slug, Guid? excludeId = null, CancellationToken ct = default)
-        => _db.Posts.AnyAsync(p => !p.IsDeleted && p.Slug == slug && p.Id != (excludeId ?? Guid.Empty), ct);
+        => _postRepo.ExistsAsync(p => p.Slug == slug && p.Id != (excludeId ?? Guid.Empty), ct);
+
+    public Task<List<FcmsPost>> GetDeletedAsync(CancellationToken ct = default)
+        => _postRepo.FindAsync(p => p.Status == EntityStatus.Deleted, ct, includeDeleted: true);
 
     public async Task<FcmsPost> CreateAsync(FcmsPost post, IEnumerable<string> tagSlugs, CancellationToken ct = default)
     {
         post.Content = HtmlSanitizer.Sanitize(post.Content);
-        post.CreatedAt = FcmsTime.Now;
-        post.UpdatedAt = FcmsTime.Now;
-        _db.Posts.Add(post);
-        await _db.SaveChangesAsync(ct);
+        await _postRepo.AddAsync(post, ct);
+        await _uow.SaveChangesAsync(ct);
         await SyncTagsAsync(post.Id, tagSlugs, ct);
+        await _audit.LogAsync(FcmsAuditActions.PostCreated, nameof(FcmsPost), post.Id.ToString(),
+            value: post, ct: ct);
         return post;
     }
 
     public async Task UpdateAsync(FcmsPost post, IEnumerable<string> tagSlugs, CancellationToken ct = default)
     {
         post.Content = HtmlSanitizer.Sanitize(post.Content);
-        post.UpdatedAt = FcmsTime.Now;
-        _db.Posts.Update(post);
-        await _db.SaveChangesAsync(ct);
+        await _postRepo.UpdateAsync(post, ct);
+        await _uow.SaveChangesAsync(ct);
         await SyncTagsAsync(post.Id, tagSlugs, ct);
+        await _audit.LogAsync(FcmsAuditActions.PostUpdated, nameof(FcmsPost), post.Id.ToString(),
+            value: post, ct: ct);
     }
-
-    public Task<List<FcmsPost>> GetDeletedAsync(CancellationToken ct = default)
-        => _db.Posts.IgnoreQueryFilters()
-            .Where(p => p.IsDeleted)
-            .Include(p => p.Category)
-            .OrderByDescending(p => p.DeletedAt)
-            .ToListAsync(ct);
 
     public async Task RestoreAsync(Guid id, CancellationToken ct = default)
     {
-        var post = await _db.Posts.IgnoreQueryFilters().FirstOrDefaultAsync(p => p.Id == id && p.IsDeleted, ct);
+        var post = await _postRepo.FirstOrDefaultAsync(p => p.Id == id, ct, includeDeleted: true);
         if (post is null) return;
-        post.IsDeleted = false;
+        post.Status = EntityStatus.Active;
         post.DeletedAt = null;
-        post.IsPublished = false;
-        post.UpdatedAt = FcmsTime.Now;
-        await _db.SaveChangesAsync(ct);
+        post.IsPublished = false; // always restore as draft
+        await _postRepo.UpdateAsync(post, ct);
+        await _uow.SaveChangesAsync(ct);
+        await _audit.LogAsync(FcmsAuditActions.PostRestored, nameof(FcmsPost), id.ToString(), ct: ct);
     }
 
     public async Task HardDeleteAsync(Guid id, CancellationToken ct = default)
     {
-        var post = await _db.Posts.IgnoreQueryFilters().FirstOrDefaultAsync(p => p.Id == id, ct);
+        var post = await _postRepo.FirstOrDefaultAsync(p => p.Id == id, ct, includeDeleted: true);
         if (post is null) return;
-        // Remove PostTags first (no cascade from Post → PostTag in our config)
-        var tags = await _db.PostTags.Where(pt => pt.PostId == id).ToListAsync(ct);
-        _db.PostTags.RemoveRange(tags);
-        _db.Posts.Remove(post);
-        await _db.SaveChangesAsync(ct);
+        // Log before delete — entity must still exist in DB when log is written
+        await _audit.LogAsync(FcmsAuditActions.PostHardDeleted, nameof(FcmsPost), id.ToString(),
+            value: post, severity: FcmsLogSeverity.Warning, ct: ct);
+        var tags = await _postTagRepo.FindAsync(pt => pt.PostId == id, ct, includeDeleted: true);
+        foreach (var tag in tags) await _postTagRepo.DeleteAsync(tag, ct);
+        await _postRepo.DeleteAsync(post, ct);
+        await _uow.SaveChangesAsync(ct);
     }
 
     public async Task DeleteAsync(Guid id, CancellationToken ct = default)
     {
-        var post = await _db.Posts.FirstOrDefaultAsync(p => p.Id == id && !p.IsDeleted, ct);
+        var post = await _postRepo.GetByIdAsync(id, ct);
         if (post is null) return;
-        post.IsDeleted = true;
-        post.DeletedAt = FcmsTime.Now;
-        post.UpdatedAt = FcmsTime.Now;
-        await _db.SaveChangesAsync(ct);
+        post.DeletedAt = Clock.FcmsTime.Now;
+        await _postRepo.SoftDeleteAsync(post, ct);
+        await _uow.SaveChangesAsync(ct);
+        await _audit.LogAsync(FcmsAuditActions.PostDeleted, nameof(FcmsPost), id.ToString(),
+            value: post, ct: ct);
+    }
+
+    public async Task<List<string>> GetTagSlugsAsync(Guid postId, CancellationToken ct = default)
+    {
+        var postTags = await _postTagRepo.FindAsync(pt => pt.PostId == postId, ct);
+        if (postTags.Count == 0) return [];
+        var tagIds = postTags.Select(pt => pt.TagId).ToList();
+        var tags = await _tagRepo.GetByIdsAsync(tagIds, ct);
+        return tags.Select(t => t.Slug).ToList();
     }
 
     public async Task IncrementViewCountAsync(Guid id, CancellationToken ct = default)
     {
-        var post = await _db.Posts.FirstOrDefaultAsync(p => p.Id == id, ct);
+        var post = await _postRepo.GetByIdAsync(id, ct);
         if (post is null) return;
         post.ViewCount++;
-        await _db.SaveChangesAsync(ct);
+        await _postRepo.UpdateAsync(post, ct);
+        await _uow.SaveChangesAsync(ct);
     }
 
     // ── Internal ──────────────────────────────────────────────────────────────
@@ -118,41 +126,29 @@ public class PostService : IPostService
     {
         var slugList = tagSlugs.Select(s => s.Trim().ToLowerInvariant()).Where(s => s.Length > 0).Distinct().ToList();
 
-        // Remove existing PostTags
-        var existing = await _db.PostTags.Where(pt => pt.PostId == postId).ToListAsync(ct);
-        _db.PostTags.RemoveRange(existing);
+        var existing = await _postTagRepo.FindAsync(pt => pt.PostId == postId, ct);
+        foreach (var e in existing) await _postTagRepo.DeleteAsync(e, ct);
 
         if (slugList.Count == 0)
         {
-            await _db.SaveChangesAsync(ct);
+            await _uow.SaveChangesAsync(ct);
             return;
         }
 
-        // Resolve or create tags
-        var existingTags = await _db.Tags
-            .Where(t => slugList.Contains(t.Slug) && !t.IsDeleted)
-            .ToListAsync(ct);
+        var existingTags = await _tagRepo.FindAsync(t => slugList.Contains(t.Slug), ct);
 
         var missingSlugs = slugList.Except(existingTags.Select(t => t.Slug)).ToList();
         foreach (var slug in missingSlugs)
         {
-            var tag = new FcmsTag
-            {
-                Slug = slug,
-                Name = ToTitleCase(slug),
-                CreatedAt = FcmsTime.Now,
-                UpdatedAt = FcmsTime.Now
-            };
-            _db.Tags.Add(tag);
+            var tag = new FcmsTag { Slug = slug, Name = ToTitleCase(slug) };
+            await _tagRepo.AddAsync(tag, ct);
             existingTags.Add(tag);
         }
 
-        await _db.SaveChangesAsync(ct);
+        foreach (var tag in existingTags)
+            await _postTagRepo.AddAsync(new FcmsPostTag { PostId = postId, TagId = tag.Id }, ct);
 
-        // Create new PostTags
-        var postTags = existingTags.Select(t => new FcmsPostTag { PostId = postId, TagId = t.Id });
-        _db.PostTags.AddRange(postTags);
-        await _db.SaveChangesAsync(ct);
+        await _uow.SaveChangesAsync(ct);
     }
 
     private static string ToTitleCase(string slug)

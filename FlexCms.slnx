@@ -11,4 +11,7 @@
   <Folder Name="/samples/">
     <Project Path="samples/FlexCms.Sample.Hello/FlexCms.Sample.Hello.csproj" />
   </Folder>
+  <Folder Name="/templates/">
+    <Project Path="templates/flexcms-module/FlexCms.Templates.csproj" />
+  </Folder>
 </Solution>

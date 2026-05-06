@@ -13,6 +13,22 @@
     <ContentTargetFolders>content</ContentTargetFolders>
     <NoDefaultExcludes>true</NoDefaultExcludes>
     <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+
+    <!--
+      The files under content/ are dotnet new TEMPLATE source — they're shipped
+      verbatim to consumers, not compiled here. Without these flags the SDK
+      auto-includes every .cs / .cshtml / .resx in the project tree as a
+      Compile / Content item and tries to build them, which fails because the
+      template references types from the consuming module's project (BaseModule,
+      DbContext, etc.) that aren't on this project's compile classpath.
+    -->
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <EnableDefaultEmbeddedResourceItems>false</EnableDefaultEmbeddedResourceItems>
+    <EnableDefaultNoneItems>false</EnableDefaultNoneItems>
+    <EnableDefaultContentItems>false</EnableDefaultContentItems>
+
+    <!-- Templates don't reference anything at compile time. -->
+    <NoWarn>$(NoWarn);NU5128</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>

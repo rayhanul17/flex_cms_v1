@@ -1,4 +1,5 @@
 using FlexCms.Framework.Auth;
+using FlexCms.Framework.Auth.History;
 using FlexCms.Framework.Chat;
 using FlexCms.Framework.Cms;
 using FlexCms.Framework.Clock;
@@ -8,6 +9,7 @@ using FlexCms.Framework.Helpers;
 using FlexCms.Framework.Messaging;
 using FlexCms.Framework.Modules;
 using FlexCms.Framework.Notifications;
+using FlexCms.Framework.Sessions;
 using FlexCms.Framework.Widgets;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
@@ -79,6 +81,10 @@ public class FcmsDbContext : IdentityDbContext<FcmsUser, FcmsRole, Guid>
 
     // Phase 12 — async exports
     public DbSet<FcmsPendingExport> PendingExports => Set<FcmsPendingExport>();
+
+    // Phase 13 — auth hardening
+    public DbSet<FcmsUserSession> UserSessions => Set<FcmsUserSession>();
+    public DbSet<FcmsLoginHistory> LoginHistory => Set<FcmsLoginHistory>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -280,6 +286,25 @@ public class FcmsDbContext : IdentityDbContext<FcmsUser, FcmsRole, Guid>
         // Processor scan: WHERE export_status = Pending ORDER BY created_at.
         modelBuilder.Entity<FcmsPendingExport>()
             .HasIndex(e => new { e.ExportStatus, e.CreatedAt });
+
+        // ── Auth hardening (Phase 13) ─────────────────────────────────────────
+
+        // (UserId, IsRevoked) — "active sessions for me" admin/profile lookup.
+        modelBuilder.Entity<FcmsUserSession>()
+            .HasIndex(s => new { s.UserId, s.IsRevoked });
+
+        // SessionId — used by the per-request validation middleware.
+        modelBuilder.Entity<FcmsUserSession>()
+            .HasIndex(s => s.SessionId)
+            .IsUnique();
+
+        // Login history is append-only — Index by (Outcome, CreatedAt) for the
+        // failed-attempt reports the security dashboard runs.
+        modelBuilder.Entity<FcmsLoginHistory>()
+            .HasIndex(h => new { h.Outcome, h.CreatedAt });
+
+        modelBuilder.Entity<FcmsLoginHistory>()
+            .HasIndex(h => h.AttemptedUserName);
 
         // Audit log entities are append-only — strip the inherited lifecycle
         // columns and skip the soft-delete query filter (no Status column means

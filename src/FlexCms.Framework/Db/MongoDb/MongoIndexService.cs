@@ -1,4 +1,5 @@
 using FlexCms.Framework.Auth;
+using FlexCms.Framework.Auth.History;
 using FlexCms.Framework.Chat;
 using FlexCms.Framework.Cms;
 using FlexCms.Framework.Exports;
@@ -6,6 +7,7 @@ using FlexCms.Framework.Helpers;
 using FlexCms.Framework.Messaging;
 using FlexCms.Framework.Modules;
 using FlexCms.Framework.Notifications;
+using FlexCms.Framework.Sessions;
 using FlexCms.Framework.Widgets;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -188,6 +190,27 @@ public class MongoIndexService : IHostedService
                 .Ascending(e => e.ExportStatus)
                 .Ascending(e => e.CreatedAt),
             "ix_pending_exports_status_created", ct);
+
+        // ── Auth hardening (Phase 13) ─────────────────────────────────────────
+        await UniqueAsync<FcmsUserSession>(
+            Builders<FcmsUserSession>.IndexKeys.Ascending(s => s.SessionId),
+            "ux_user_sessions_session_id", ct);
+
+        await IndexAsync<FcmsUserSession>(
+            Builders<FcmsUserSession>.IndexKeys
+                .Ascending(s => s.UserId)
+                .Ascending(s => s.IsRevoked),
+            "ix_user_sessions_user_revoked", ct);
+
+        await IndexAsync<FcmsLoginHistory>(
+            Builders<FcmsLoginHistory>.IndexKeys
+                .Ascending(h => h.Outcome)
+                .Descending(h => h.CreatedAt),
+            "ix_login_history_outcome_created", ct);
+
+        await IndexAsync<FcmsLoginHistory>(
+            Builders<FcmsLoginHistory>.IndexKeys.Ascending(h => h.AttemptedUserName),
+            "ix_login_history_attempted_user", ct);
 
         // ── Modules ───────────────────────────────────────────────────────────
 

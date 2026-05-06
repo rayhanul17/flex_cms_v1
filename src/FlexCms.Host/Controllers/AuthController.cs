@@ -1,4 +1,5 @@
 using FlexCms.Framework.Auth;
+using FlexCms.Framework.Auth.History;
 using FlexCms.Framework.Messaging;
 using FlexCms.Host.Models.Auth;
 using Microsoft.AspNetCore.Authorization;
@@ -13,17 +14,20 @@ public class AuthController : Controller
     private readonly SignInManager<FcmsUser> _signInManager;
     private readonly RoleManager<FcmsRole> _roleManager;
     private readonly IFcmsBackgroundQueue _queue;
+    private readonly ILoginHistoryService _history;
 
     public AuthController(
         UserManager<FcmsUser> userManager,
         SignInManager<FcmsUser> signInManager,
         RoleManager<FcmsRole> roleManager,
-        IFcmsBackgroundQueue queue)
+        IFcmsBackgroundQueue queue,
+        ILoginHistoryService history)
     {
         _userManager = userManager;
         _signInManager = signInManager;
         _roleManager = roleManager;
         _queue = queue;
+        _history = history;
     }
 
     [HttpGet]
@@ -42,12 +46,17 @@ public class AuthController : Controller
         var result = await _signInManager.PasswordSignInAsync(
             model.UserName, model.Password, model.RememberMe, lockoutOnFailure: true);
 
+        var ip = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "";
+        var ua = Request.Headers.UserAgent.ToString();
+
         if (result.Succeeded)
         {
+            var user = await _userManager.FindByNameAsync(model.UserName);
+            await _history.RecordAsync(model.UserName, user?.Id, LoginOutcome.Success, ip, ua);
+
             if (!string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl))
                 return Redirect(returnUrl);
 
-            var user = await _userManager.FindByNameAsync(model.UserName);
             var redirectUrl = user is not null
                 ? await ResolveLoginRedirectAsync(user)
                 : "/";
@@ -56,7 +65,18 @@ public class AuthController : Controller
         }
 
         if (result.IsLockedOut)
+        {
+            await _history.RecordAsync(model.UserName, null, LoginOutcome.LockedOut, ip, ua);
             return View("Lockout");
+        }
+        if (result.IsNotAllowed)
+        {
+            await _history.RecordAsync(model.UserName, null, LoginOutcome.NotAllowed, ip, ua, failReason: "Account not allowed (e.g. email unconfirmed).");
+        }
+        else
+        {
+            await _history.RecordAsync(model.UserName, null, LoginOutcome.InvalidCredentials, ip, ua);
+        }
 
         ModelState.AddModelError(string.Empty, "Invalid login attempt.");
         return View(model);

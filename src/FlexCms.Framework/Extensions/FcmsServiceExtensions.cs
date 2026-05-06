@@ -1,7 +1,10 @@
 using FlexCms.Framework.Auth;
 using FlexCms.Framework.Auth.Ef;
+using FlexCms.Framework.Auth.History;
 using FlexCms.Framework.Chat;
 using FlexCms.Framework.Cms;
+using FlexCms.Framework.Health;
+using FlexCms.Framework.Sessions;
 using FlexCms.Framework.Clock;
 using FlexCms.Framework.Storage;
 using FlexCms.Framework.Auth.MongoDb;
@@ -146,6 +149,18 @@ public static class FcmsServiceExtensions
 
         services.AddSingleton(new ExportProcessorOptions());
         services.AddHostedService<ExportProcessorService>();
+
+        // ── Phase 13: Auth hardening ─────────────────────────────────────────
+        services.AddScoped<ISessionService, SessionService>();
+        services.AddScoped<ILoginHistoryService, LoginHistoryService>();
+        services.AddScoped<ILoginRedirectService, LoginRedirectService>();
+
+        // Health checks — built-ins. Modules add more via AddSingleton<IFcmsHealthCheck, ...>().
+        services.AddScoped<IFcmsHealthCheck, EfDatabaseHealthCheck>();
+        services.AddSingleton<IFcmsHealthCheck>(sp => new BackgroundQueueHealthCheck(
+            sp.GetRequiredService<IFcmsBackgroundQueue>(),
+            sp.GetRequiredService<FcmsBackgroundQueueOptions>()));
+        services.AddSingleton<IFcmsHealthCheck>(sp => new DiskSpaceHealthCheck(options.AppDataPath));
 
         // ── Phase 11: Themes ─────────────────────────────────────────────────
         var themesRoot = Path.Combine(options.AppDataPath, "..", "themes");

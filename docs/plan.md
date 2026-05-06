@@ -15004,7 +15004,10 @@ tests/FlexCms.Tests.Unit/Phase3/FcmsAuthorizeFilterTests.cs # +SuperAdmin upperc
 ---
 
 ### Phase 13 — Auth Hardening + Account Lifecycle (Issues 67-72, 91-92, 102-103)
-> **❌ NOT STARTED**
+> **🔄 PARTIAL** (2026-05-06) — see [phase-13-test-cases.md](phase-13-test-cases.md)
+> ✅ Done in this pass: health checks (Issue 67) — `IFcmsHealthCheck` + EF DB / background-queue / disk-space built-ins + `/health` `/health/ready` `/health/live` endpoints; session tracking (Issue 68) — `FcmsUserSession` entity (EF + Mongo, `(UserId, IsRevoked)` + unique `SessionId` indexes) + `ISessionService` (RecordLogin / GetActive / Touch / IsValid / Revoke / RevokeAllForUser); login history (Issue 69) — `FcmsLoginHistory` + `ILoginHistoryService` + `AuthController` wires it on every login attempt (Success + InvalidCredentials + LockedOut + NotAllowed); env banner (Issue 91) — `<fcms-env-banner />` TagHelper rendered in `_AdminLayout` (red Dev / orange Staging / suppressed in Production); login redirect (Issue 102) — `ILoginRedirectService` + `LoginRedirectService` with priority chain returnUrl → user claim → role map (SuperAdmin > Admin > Editor > Author > Subscriber) → fallback; open-redirect blocked at every level. Database resilience (Issue 92) — `EnableRetryOnFailure(3)` already in earlier phase.
+> ⏸ Deferred (need external services / heavy UI design): 2FA TOTP (Issue 71), OAuth providers (Issue 72), full email-verification flow polish (Issue 70), `FcmsSessionValidationMiddleware` (the IsValid API exists; the middleware needs UI for "active sessions" first), custom 401/403/404/500 styled pages with admin overrides (Issue 103). The framework's existing error middleware covers the unstyled defaults.
+> Tests: 15 unit (LoginRedirectService 10 + BuiltInHealthChecks 5) + 8 integration (SessionService 5 + LoginHistoryService 3). Project total 279 unit + 224 integration.
 **কাজ:**
 - `IFcmsHealthCheck` + built-in checks (DB, Audit, Queue, Disk) → `/health`, `/health/ready`, `/health/live` (Issue 67)
 - `FcmsUserSession` entity + `SessionService` + `FcmsSessionValidationMiddleware` — active sessions + force logout (Issue 68)

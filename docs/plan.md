@@ -199,9 +199,9 @@
 > 3. **Phase 14 (API + Engagement)** — opens up headless/mobile use case + comments/forms/newsletter। Production-ready for SaaS.
 > 4. **Phase 15 (SEO + Ops + Compliance)** — backup, maintenance, GDPR। Enterprise-ready.
 > 5. **Phase 16 (Performance + A11y + Editorial)** — Core Web Vitals, multi-author workflow, full-text search। Newsroom-ready.
-> 6. **Phase 17 (Modern UX + AI + Marketplace)** — competitive with WordPress/Strapi. Future-proof।
+> 6. **Phase 17 (Module API Registry)** — finishes the Phase 4 module system by letting modules call typed APIs on each other (not just the framework). Original Phase 17 also bundled Cmd+K / analytics / PWA / WP importer / multi-step forms / AI / Prometheus / marketplace; those were dropped 2026-05-06 as either external-tool territory or optional add-on modules.
 >
-> **Stop point flexibility:** যেকোনো phase শেষে production-deploy possible। Phase 12 = solid CMS. Phase 15 = enterprise. Phase 17 = modern feature parity।
+> **Stop point flexibility:** যেকোনো phase শেষে production-deploy possible। Phase 12 = solid CMS. Phase 15 = enterprise. Phase 17 = framework feature-complete for modular extensibility।
 
 ---
 
@@ -2749,7 +2749,7 @@ mkdir modules
 | **14** | **API + Integrations + Engagement** | **73-83** (API tokens, webhooks, CORS, CAPTCHA, CDN, revisions, comments, forms, newsletter, custom fields) |
 | **15** | **SEO + Performance + Ops + Compliance** | **84-90, 93-101** (SEO, output cache, backup, maintenance, module update, GDPR, feature flags) |
 | **16** | **Perf Critical + A11y + Editorial** | **104-109** (cache stampede, image optimize, full-text search, SignalR admin notify, WCAG 2.1 AA, editorial workflow) |
-| **17** | **Modern UX + AI + Marketplace** | **110-118** (module API registry, Cmd+K search, privacy analytics, PWA, WP importer, multi-step forms, AI provider, Prometheus, marketplace) |
+| **17** | **Module API Registry** | **110** (cross-module typed APIs with version check). Original 111-118 — Cmd+K, analytics, PWA, WP importer, multi-step forms, AI, Prometheus, marketplace — dropped from core scope; better as optional modules or external tooling. |
 
 ### Implementation Order (Step-by-Step)
 ```
@@ -2771,7 +2771,7 @@ Step 14 → API + Integrations: API tokens (Bearer), webhooks, CORS, CAPTCHA, CD
 Step 15 → Ops + SEO + Compliance: Output cache, slow query, backup/restore, maintenance mode, module update flow, SemVer, sandbox manifest, editor conflict, multi-language, admin widgets, GDPR, feature flags
 ─── Phase 16-17 (Final — Issues 104-118) ───
 Step 16 → Performance Critical + Accessibility + Editorial: Cache stampede (SemaphoreSlim per-key), image optimization (WebP+srcset+lazy), full-text search abstraction, real-time SignalR admin notifications (replace 60s poll), WCAG 2.1 AA accessibility, editorial workflow (review/approve + inline annotations + calendar)
-Step 17 → Modern UX + AI + Marketplace: Module API registry (cross-module), Cmd+K universal admin search, privacy-first analytics (cookie-less), PWA + service worker, WordPress migration importer, multi-step forms + conditional fields, IFcmsAiProvider abstraction, Prometheus /metrics, module marketplace skeleton
+Step 17 → Module API Registry only: IFcmsModuleApiRegistry with cross-module typed APIs and [FcmsModuleApi] version check. Original Step 17 also covered Cmd+K, analytics, PWA, WP importer, multi-step forms, AI, Prometheus, marketplace — dropped from core scope (see Phase 17 section for the rationale).
 ```
 
 ### Module Roadmap (Phase 2+)
@@ -2876,16 +2876,16 @@ dotnet add package DiffPlex                                       # Apache 2.0 �
 # dotnet add package Serilog.Sinks.Elasticsearch
 # dotnet add package Serilog.Sinks.ApplicationInsights
 
-# ── Phase 16-17 (Issues 104-118 — Performance + Modern + AI + Marketplace) ──
-dotnet add package prometheus-net.AspNetCore                      # MIT — /metrics endpoint (Issue 117)
-dotnet add package Fastenshtein                                   # MIT — optional fuzzy match for Cmd+K (Issue 111)
+# ── Phase 16 (Issues 104-109 — Performance Critical + A11y + Editorial) ──
 # Test project only:
 # dotnet add package Deque.AxeCore.Selenium                       # Apache 2.0 — WCAG axe-core CI tests (Issue 108)
 # dotnet add package Deque.AxeCore.Playwright                     # Apache 2.0 — alt
-# Phase 2 plugin module NuGets (NOT installed by Framework):
-# - FlexCms.Ai.OpenAi:    OpenAI                                 # MIT
-# - FlexCms.Ai.Anthropic: Anthropic.SDK                          # MIT
-# - FlexCms.Ai.Ollama:    no NuGet — direct HTTP client
+
+# ── Phase 17 (Issue 110 only — Module API Registry) ──
+# No new NuGet packages — uses existing DI + reflection.
+# (Original Phase 17 listed prometheus-net.AspNetCore, Fastenshtein, AI SDKs,
+#  axe-core, etc. for Cmd+K / analytics / PWA / AI / Prometheus / marketplace —
+#  all dropped from core scope 2026-05-06. See Phase 17 section for rationale.)
 # Issues 104, 105, 106, 107, 109, 110, 112, 113, 114, 115, 118 → no extra NuGet (in-house implementation)
 
 # ── v10.1 Re-Audit Production Hardening ──
@@ -9556,14 +9556,14 @@ Admin panel-এ Page/Post content field-এ Toast UI Editor classic build।
 | Accessibility | WCAG 2.1 AA — ARIA, focus, contrast, axe-core CI | Legal compliance EU/US/AU |
 | Editorial workflow | `FcmsContentReview` + `FcmsContentAnnotation` | Submit/Approve/RequestChanges + inline comments + editorial calendar |
 | Module API registry | `IFcmsModuleApiRegistry` versioned cross-module APIs | Decoupled, optional, null-safe |
-| Cmd+K admin search | `IFcmsAdminSearchProvider` per category | Universal search across pages, users, settings, modules |
-| Privacy analytics | `FcmsPageView` + daily-rotated SessionHash salt | Cookie-less GDPR-compliant |
-| PWA | manifest.json + sw.js + offline page | Install as app, offline support |
-| WP importer | `IFcmsMigrationImporter` — WXR XML parse | Posts/pages/media/comments/users + 301 redirects |
-| Multi-step forms | StepNumber field grouping + ConditionExpression | Save progress, conditional fields, funnel analytics |
-| AI provider | `IFcmsAiProvider` — NullProvider Phase 1 | OpenAI/Anthropic/Azure/Ollama plugin modules Phase 2 |
-| Prometheus | `prometheus-net.AspNetCore` `/metrics` endpoint | Built-in + custom counters, Grafana template |
-| Marketplace | `IFcmsMarketplaceClient` browse/install/update | License keys, paid modules, auto update check |
+| ~~Cmd+K admin search~~ | _Dropped 2026-05-06_ | Sidebar nav sufficient; UX polish only |
+| ~~Privacy analytics~~ | _Dropped 2026-05-06_ | Plausible / Umami / GA4 cover this externally |
+| ~~PWA~~ | _Dropped 2026-05-06_ | News/blog/marketing sites don't need to be installable |
+| ~~WP importer~~ | _Dropped 2026-05-06_ | Specialized migration tool — better as optional module |
+| ~~Multi-step forms~~ | _Dropped 2026-05-06_ | Phase 14 has basic Forms; multi-step is advanced UX add-on |
+| ~~AI provider~~ | _Dropped 2026-05-06_ | Scope creep for a CMS framework — ships as marketplace module |
+| ~~Prometheus~~ | _Dropped 2026-05-06_ | Phase 13 `/health` endpoints cover single-instance monitoring |
+| ~~Marketplace~~ | _Dropped 2026-05-06_ | Requires separate backend product; folder-based install is sufficient for v1 |
 
 ---
 
@@ -9902,14 +9902,14 @@ Tailwind: layout, light/dark/auto CSS, zones, language switcher
 | WCAG 2.1 AA accessibility | Skip-to-content link, ARIA on dynamic widgets, focus management (modal trap + restore), aria-live for toasts/errors, contrast checker on theme save, axe-core CI tests, accessibility audit page in admin, FcmsMedia.Alt enforced (decorative opt-in), 5 i18n keys |
 | Editorial workflow | PageStatus extended: SubmittedForReview, Approved. `FcmsContentReview` (status, comments, reviewer assignment) + `FcmsContentAnnotation` (Google Docs-style inline comments, threaded). Submit → Review → Approve/RequestChanges/Reject. Editorial Calendar with drag-drop reschedule. Hooks: review.submitted/approved/changes-requested. Permission gate (workflow.publish-direct) |
 | Module API Registry | `[FcmsModuleApi("1.0.0")]` interface attribute + `IFcmsModuleApiRegistry.Get<T>()` returns null if module inactive. Module manifest declares ProvidesApis + ConsumesApis (optional). Decoupled, version-aware, graceful null. Strict rule preserved (no DLL ref) — interface in shared NuGet only |
-| Cmd+K admin search | `IFcmsAdminSearchProvider` per category. Cmd+K (Mac) / Ctrl+K (Win) modal with fuzzy search, keyboard nav, recent pages tracking via FcmsAdminPageVisit. Module-extensible, permission-filtered. Built-in providers: pages, posts, users, settings, modules, menu, recent |
-| Privacy-first analytics | `FcmsPageView` cookie-less (daily-rotated SessionHash from SHA256(IP + UA + salt)) → GDPR compliant without consent. Admin dashboard (top pages, referrers, browser/OS/country, daily chart). Buffer + batch insert (10s). Optional GA4 alongside. Daily retention cleanup |
-| PWA + Service Worker | `manifest.json` admin-configurable + `/sw.js` generated by controller (cache versioning, static asset caching, offline fallback). Theme `<link rel="manifest">` + theme-color meta. "Add to Home Screen" prompt. Update notification on new version. PwaDisplayMode enum |
-| WordPress importer | `IFcmsMigrationImporter` — `WordPressXmlImporter` parses WXR XML. Authors (map or create), Categories (preserve hierarchy), Tags, Attachments (download or external), Posts/Pages (with comments preserving threading), Auto-create 301 redirects. MigrationOptions: DownloadMedia, ImportComments, CreateRedirects, DefaultAuthorId, DryRun. Phase 2: Drupal, Joomla, Ghost importers |
-| Multi-step forms + conditional | FcmsFormField extended: StepNumber + StepLabel + ConditionExpression + RegexValidation + SaveProgressForResume. FormConditionEvaluator (safe, no eval — only ==, !=, >, <, &&, \|\|, !). Partial save with ResumeToken (email user, 30-day expiry). FcmsFormStepEvent funnel analytics. Multi-step UI in builder with drag-drop |
-| AI Provider abstraction | `IFcmsAiProvider` — Completion/Image/Embedding/Moderation methods. Phase 1: NullAiProvider only. Phase 2 plugin modules: OpenAI, Anthropic, Azure OpenAI, Ollama (local LLM). AiSettings with budget limit + token tracking. Built-in features (when configured): title suggestion, meta description, alt text, translation, comment moderation, SEO keywords. Graceful degrade |
-| Prometheus metrics | `prometheus-net.AspNetCore` + `/metrics` endpoint (admin-only OR IP-restricted). Built-in: HTTP rate/duration/in-progress + flexcms_pages_published_total / login_attempts_total / cache_hits / sessions_active. Module custom metrics via IFcmsMetricsService. Grafana dashboard JSON template + alert rules YAML included |
-| Module marketplace | `IFcmsMarketplaceClient` — Browse/Install/Update/CheckUpdates/ValidateLicense. MarketplaceModule with rating, install count, price, license type. Custom marketplace URL support (private). License key validation (per-site BaseUrl, signed JWT for offline). Auto update check service (24h). Smart upgrade with rollback (Issue 93). Phases: 1 skeleton, 2 free modules, 3 paid + reviews |
+| ~~Cmd+K admin search~~ | _Dropped 2026-05-06 — sidebar nav sufficient; UX polish only. Original design moved out of core scope._ |
+| ~~Privacy-first analytics~~ | _Dropped 2026-05-06 — Plausible / Umami / GA4 cover this externally; building it in is duplicative._ |
+| ~~PWA + Service Worker~~ | _Dropped 2026-05-06 — news/blog/marketing sites don't need to be installable. Different architecture._ |
+| ~~WordPress importer~~ | _Dropped 2026-05-06 — specialized migration tool; better as an optional module if/when needed._ |
+| ~~Multi-step forms + conditional~~ | _Dropped 2026-05-06 — Phase 14 has basic Forms; multi-step is an advanced UX add-on._ |
+| ~~AI Provider abstraction~~ | _Dropped 2026-05-06 — scope creep for a CMS framework. If wanted, ships as a marketplace module._ |
+| ~~Prometheus metrics~~ | _Dropped 2026-05-06 — Phase 13 `/health` endpoints (DB / queue / disk) cover single-instance monitoring._ |
+| ~~Module marketplace~~ | _Dropped 2026-05-06 — requires a separate backend product. Folder-based install is sufficient for v1._ |
 
 ---
 
@@ -13675,668 +13675,16 @@ Admin sees "Module X depends on Module Y (optional)" in module page।
 
 **Files:** `Modules/IFcmsModuleApiRegistry.cs`, `FcmsModuleApiRegistry.cs`, `Modules/FcmsModuleApiAttribute.cs`, update `IFcmsModule` (`Configure` registers in registry), update module.json schema (`ProvidesApis`, `ConsumesApis`)
 
----
-
-#### Issue 111 RESOLVED — Universal Admin Search (Cmd+K)
-
-**সমস্যা:** 500 pages, 20 modules, 1000 settings — admin spends 30+ seconds finding things। Modern UX standard (Linear, GitHub, Notion all have it)।
-
-```csharp
-// FlexCms.Framework/Search/IFcmsAdminSearchProvider.cs
-public interface IFcmsAdminSearchProvider {
-    string Category { get; }   // "Pages", "Posts", "Users", "Settings", "Modules"
-    Task<List<AdminSearchResult>> SearchAsync(string query, int limit = 10);
-}
-
-public class AdminSearchResult {
-    public string Title;
-    public string? Subtitle;
-    public string Url;
-    public string? IconClass;     // bi-file-text
-    public string Category;
-    public string[]? Keywords;
-    public string? Permission;     // hide if user lacks
-}
-
-// Built-in providers:
-// - FcmsPageAdminSearchProvider — by title
-// - FcmsPostAdminSearchProvider — by title
-// - FcmsUserAdminSearchProvider — by name/email
-// - FcmsSettingsAdminSearchProvider — by setting key/label
-// - FcmsModuleAdminSearchProvider — by module name
-// - FcmsMenuAdminSearchProvider — admin menu items (jump to any admin page)
-// - FcmsRecentlyVisitedProvider — last 10 admin pages user visited
-
-// Modules add their own:
-public class BlogAdminSearchProvider : IFcmsAdminSearchProvider {
-    public string Category => "Blog";
-    public async Task<List<AdminSearchResult>> SearchAsync(string q, int limit) {
-        return await _postRepo.Where(p => p.Title.Contains(q))
-            .Take(limit).Select(p => new AdminSearchResult {
-                Title = p.Title, Subtitle = "Blog post",
-                Url = $"/admin/blog/posts/edit/{p.Id}",
-                IconClass = "bi-newspaper", Category = "Blog",
-                Permission = BlogPermissions.PostEdit
-            }).ToListAsync();
-    }
-}
-```
-
-**Endpoint:**
-```csharp
-[Route("/admin/search/global"), FcmsAuthorize]
-public async Task<IActionResult> GlobalSearch(string q, int limit = 20) {
-    var providers = _providers.OrderBy(p => p.Category);
-    var tasks = providers.Select(p => p.SearchAsync(q, 5));
-    var results = (await Task.WhenAll(tasks)).SelectMany(r => r)
-        .Where(r => r.Permission == null || HasPermission(r.Permission))
-        .GroupBy(r => r.Category)
-        .ToList();
-    return Json(results);
-}
-```
-
-**JS — Cmd+K modal (admin _Layout.cshtml):**
-```javascript
-$(document).on('keydown', function(e) {
-    if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
-        e.preventDefault();
-        fcms.adminSearch.open();
-    }
-});
-
-fcms.adminSearch = {
-    open: function() {
-        // Modal with search input — fuzzy match, keyboard arrows, Enter to navigate
-        // Shows recent pages first when input empty
-        // Debounced AJAX → /admin/search/global
-        // Grouped results: Pages, Posts, Users, Settings...
-        // Esc to close, Up/Down to navigate, Enter to go
-    }
-};
-```
-
-**Recently visited:** `FcmsAdminPageVisit { UserId, UrlPath, Title, VisitedAt }` — auto-recorded on every admin page load (FcmsAdminVisitFilter), shown when search input empty।
-
-**Files:** `Search/IFcmsAdminSearchProvider.cs`, `Search/AdminSearchResult.cs`, built-in providers, `Areas/Admin/Controllers/SearchController.cs`, `Areas/Admin/Views/Shared/_AdminSearchModal.cshtml`, `wwwroot/admin/admin-search.js`, `Models/Entities/FcmsAdminPageVisit.cs`, `Filters/FcmsAdminVisitFilter.cs`
-
----
-
-#### Issue 112 RESOLVED — Privacy-First Built-in Analytics
-
-**সমস্যা:** Plan mentions GoogleAnalyticsId — but: (1) GA4 illegal in some EU countries, (2) admin must leave site to see analytics, (3) cookie consent required, (4) 50KB+ JS impacts performance। Plausible/Umami pattern is better.
-
-```csharp
-public class FcmsPageView : IBaseEntity {
-    public Guid Id;
-    public string UrlPath;
-    public string? Referrer;
-    public string? RefererDomain;     // extracted: "google.com"
-    public string Country;            // GeoIP, optional
-    public string DeviceType;         // mobile/tablet/desktop
-    public string Browser;
-    public string OperatingSystem;
-    public string SessionHash;        // SHA256(IP + UA + daily-rotated-salt) — anonymous, not PII
-    public Guid? UserId;              // null if anonymous
-    public int? DurationSeconds;      // pageview duration (sent on unload)
-    public string Language;
-    public DateTime ViewedAt;
-}
-
-// Phase 1: in-process tracking via custom JS:
-// On page load → POST /track/pageview { url, referrer, lang } (cookie-less)
-// On page unload → POST /track/duration { sessionId, seconds } (sendBeacon)
-// Cookie-less! Daily-rotated salt makes SessionHash unable to track across days.
-// → No GDPR cookie consent needed for this analytics.
-
-[Route("/track")]
-[AllowAnonymous]
-public class TrackController : Controller {
-    [HttpPost("pageview")]
-    public async Task<IActionResult> PageView([FromBody] PageViewDto dto) {
-        var pv = new FcmsPageView {
-            UrlPath = dto.Url, Referrer = dto.Referrer,
-            SessionHash = ComputeAnonymousHash(HttpContext),
-            // ... browser/OS/device from User-Agent
-            ViewedAt = FcmsDateTime.UtcNow
-        };
-        // Buffer → batch insert every 10s (avoid DB hammering)
-        _trackingBuffer.Enqueue(pv);
-        return NoContent();
-    }
-    private string ComputeAnonymousHash(HttpContext ctx) {
-        var ip = ctx.Connection.RemoteIpAddress?.ToString() ?? "";
-        var ua = ctx.Request.Headers["User-Agent"].ToString();
-        var salt = _saltService.GetTodaySalt();  // rotates daily
-        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(ip + ua + salt)));
-    }
-}
-```
-
-**Daily salt rotation (`FcmsAnalyticsSaltService`):** Generates new salt at midnight UTC → previous day's hashes irreversibly different → cannot track user across days. **GDPR compliant without consent.**
-
-**Admin → Analytics dashboard:**
-```
-Today / Last 7 days / Last 30 days / Custom range
-─────────────────────────────────────────────────
-Total page views: 12,450
-Unique visitors: 3,210 (based on SessionHash count, last 24h)
-Average session: 2:34
-Bounce rate: 42%
-
-Top pages (last 30 days):
-  1. /                          5,200 views
-  2. /products/widget-x         1,800 views
-  3. /blog/welcome              1,200 views
-
-Top referrers:
-  1. google.com                 4,500
-  2. facebook.com               1,200
-  3. twitter.com                  800
-
-Browser breakdown / OS breakdown / Country map (chart.js)
-Daily traffic chart (last 30 days)
-```
-
-**Settings:**
-```
-Built-in Analytics:  [● Enable  ○ Disable]
-Retention:           [keep last X days: 365]
-External GA:         [GA4 Measurement ID: ____________________] (optional)
-                     If set → also fires GA4 events (with cookie consent banner)
-```
-
-**Auto-cleanup hosted service:** Daily job deletes `FcmsPageView` older than retention setting।
-
-**Files:** `Models/Entities/FcmsPageView.cs`, `Services/AnalyticsService.cs`, `Services/AnalyticsSaltService.cs` ([FcmsSingleton], rotates at midnight), `Services/AnalyticsBufferService.cs` ([FcmsHostedService], batch insert), `Services/AnalyticsCleanupService.cs` ([FcmsHostedService], daily retention), `Controllers/TrackController.cs`, `Areas/Admin/Controllers/AnalyticsController.cs`, `Areas/Admin/Views/Analytics/Dashboard.cshtml`, `wwwroot/track.js` (auto-injected by AnalyticsScriptTagHelper if enabled)
-
----
-
-#### Issue 113 RESOLVED — PWA + Service Worker (Mobile/Offline)
-
-**সমস্যা:** Mobile users on flaky network → site useless when offline। Modern web standard।
-
-```csharp
-// SiteSettings additions:
-public bool PwaEnabled = false;
-public string? PwaName, PwaShortName, PwaDescription;
-public Guid? PwaIconMediaId;   // 512×512 PNG
-public string PwaThemeColor = "#0d6efd";
-public string PwaBackgroundColor = "#ffffff";
-public PwaDisplayMode PwaDisplay = PwaDisplayMode.Standalone;
-public Guid? PwaOfflinePageId;   // page shown when offline
-
-// Manifest endpoint (FIXED v10 B10 — IFcmsOptionsMonitor sync):
-[Route("/manifest.json"), AllowAnonymous]
-public IActionResult Manifest([FromServices] IFcmsOptionsMonitor<SiteSettings> opt) {
-    var s = opt.CurrentValue;
-    return Json(new {
-        name = s.PwaName ?? s.SiteName,
-        short_name = s.PwaShortName ?? s.SiteName,
-        description = s.PwaDescription,
-        start_url = "/",
-        display = s.PwaDisplay.ToString().ToLower(),
-        theme_color = s.PwaThemeColor,
-        background_color = s.PwaBackgroundColor,
-        icons = new[] {
-            new { src = mediaUrl(s.PwaIconMediaId, 192), sizes = "192x192", type = "image/png" },
-            new { src = mediaUrl(s.PwaIconMediaId, 512), sizes = "512x512", type = "image/png" }
-        }
-    });
-}
-
-// Service worker — generated by ServiceWorkerController:
-[Route("/sw.js"), AllowAnonymous]
-public IActionResult ServiceWorker() {
-    Response.Headers.Append("Service-Worker-Allowed", "/");
-    var swCode = $@"
-const CACHE_VERSION = 'fcms-v{_assetVersion.GetAppVersion()}';
-const STATIC_ASSETS = ['/themes/Active/css/theme.css', '/themes/Active/js/theme.js', '/manifest.json'];
-
-self.addEventListener('install', event => {{
-    event.waitUntil(caches.open(CACHE_VERSION).then(c => c.addAll(STATIC_ASSETS)));
-}});
-self.addEventListener('activate', event => {{
-    event.waitUntil(caches.keys().then(keys =>
-        Promise.all(keys.filter(k => k !== CACHE_VERSION).map(k => caches.delete(k)))));
-}});
-self.addEventListener('fetch', event => {{
-    if (event.request.method !== 'GET') return;
-    event.respondWith(
-        caches.match(event.request).then(cached =>
-            cached || fetch(event.request).catch(() => caches.match('/offline')))
-    );
-}});";
-    return Content(swCode, "application/javascript");
-}
-```
-
-**Theme `_Layout.cshtml`:**
-```html
-@if (SiteSettings.PwaEnabled) {
-    <link rel="manifest" href="/manifest.json">
-    <meta name="theme-color" content="@SiteSettings.PwaThemeColor">
-    <link rel="apple-touch-icon" href="@FcmsAsset.Url(s.PwaIconMediaId, 180)">
-    <script>
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('/sw.js');
-        }
-    </script>
-}
-```
-
-**Update notification:** Service worker detects new version → user notified "New version available [Reload]"।
-
-**Admin → Settings → PWA:** Toggle, name/short name, icon picker, theme/background color, offline page selector।
-
-**Files:** `Controllers/PwaController.cs` (Manifest, ServiceWorker, Offline), update `SiteSettings.cs`, `Models/Enums/PwaDisplayMode.cs` (Standalone, Fullscreen, MinimalUi, Browser), `Areas/Admin/Views/Settings/Pwa.cshtml`, theme `_Layout.cshtml` PWA tags
-
----
-
-#### Issue 114 RESOLVED — WordPress Migration Importer
-
-**সমস্যা:** WordPress to FlexCms migration = manual nightmare। Big migration market।
-
-```csharp
-public interface IFcmsMigrationImporter {
-    string ImporterId { get; }    // "wordpress", "drupal", "joomla"
-    string DisplayName { get; }
-    Task<MigrationPreview> PreviewAsync(Stream source, MigrationOptions options);
-    Task<MigrationResult> ImportAsync(Stream source, MigrationOptions options, IProgress<int>? progress);
-}
-
-// WordPressXmlImporter — parses WordPress eXtended RSS (WXR) export:
-public class WordPressXmlImporter : IFcmsMigrationImporter {
-    public string ImporterId => "wordpress";
-
-    public async Task<MigrationResult> ImportAsync(Stream xml, MigrationOptions opt, IProgress<int>? p) {
-        var doc = XDocument.Load(xml);
-        var ns = (XNamespace)"http://wordpress.org/export/1.2/";
-
-        // 1. Authors → FcmsUser (or map to existing)
-        var authors = doc.Descendants(ns + "wp_author").Select(MapAuthor);
-        await CreateOrMapUsers(authors);
-
-        // 2. Categories → FcmsCategory (preserve hierarchy)
-        var categories = doc.Descendants(ns + "category");
-        await ImportCategories(categories);
-
-        // 3. Tags → FcmsTag
-        // 4. Attachments → FcmsMedia (download from URLs OR mark as external)
-
-        // 5. Posts/Pages → FcmsPost / FcmsPage
-        var items = doc.Descendants("item");
-        foreach (var item in items) {
-            var type = item.Element(ns + "post_type")?.Value;
-            if (type == "post") await ImportPost(item);
-            else if (type == "page") await ImportPage(item);
-            else if (type == "attachment" && opt.DownloadMedia) await ImportAttachment(item);
-
-            // 6. Auto-create 301 redirect (old slug → new slug if changed)
-            // 7. Comments — preserve threading via wp:comment_parent
-            await ImportComments(item);
-
-            p?.Report((int)((processed++ / (double)total) * 100));
-        }
-
-        return new MigrationResult { ImportedPosts = ..., FailedItems = ..., RedirectsCreated = ... };
-    }
-}
-
-public class MigrationOptions {
-    public bool DownloadMedia = true;       // pull images from WP server, store locally
-    public bool ImportComments = true;
-    public bool CreateRedirects = true;     // auto 301 from /?p=123 → /new-slug
-    public Guid? DefaultAuthorId;           // if WP author doesn't exist, use this
-    public bool DryRun = false;             // preview, don't write
-}
-
-public class MigrationPreview {
-    public int PostsCount, PagesCount, CommentsCount, MediaCount, UsersCount, CategoriesCount;
-    public List<string> Warnings = new();
-    public Dictionary<string, string> UrlMappings = new();   // old → new
-}
-```
-
-**Admin → Tools → Import:**
-```
-Source: [● WordPress  ○ Drupal (Phase 2)  ○ Joomla (Phase 2)]
-File:   [Choose File: site.wordpress.xml          ]
-Options:
-  ✓ Download media files from source
-  ✓ Import comments
-  ✓ Create 301 redirects from old URLs
-  Default author for unknown: [admin (current user) ▼]
-[Preview Import] → shows count + warnings → [Confirm Import] → progress bar
-```
-
-**Phase 2:** Drupal importer (JSON export), Joomla importer (CSV/XML), Ghost importer (JSON)।
-
-**Files:** `Migration/IFcmsMigrationImporter.cs`, `Migration/WordPressXmlImporter.cs`, `Migration/MigrationOptions.cs`, `MigrationResult.cs`, `MigrationPreview.cs`, `Areas/Admin/Controllers/MigrationController.cs`, `Areas/Admin/Views/Migration/Index.cshtml`, `Preview.cshtml`
-
----
-
-#### Issue 115 RESOLVED — Multi-Step Forms + Conditional Fields
-
-**সমস্যা:** Forms Builder (Issue 81) flat — no wizards, no conditional logic। Real-world forms (job application, survey) need both।
-
-```csharp
-// FcmsFormField extended:
-public class FcmsFormField {
-    // existing ...
-    public int? StepNumber;                  // 1, 2, 3 — null = single-step form (current behavior)
-    public string? StepLabel;                // step heading
-    public string? ConditionExpression;      // "field_age > 18 && field_country == 'BD'"
-    public string? RegexValidation;
-    public bool SaveProgressForResume;       // optional partial save
-}
-
-// FcmsFormStep (computed from fields' StepNumber):
-public class FormStep {
-    public int Number;
-    public string? Label;
-    public List<FcmsFormField> Fields;
-    public string? NextButtonText;           // "Continue" default
-    public string? PrevButtonText;           // "Back" default
-}
-
-// Conditional expression evaluator (safe — no eval):
-public class FormConditionEvaluator {
-    // Parses "field_X > 18 && field_Y == 'BD'"
-    // Operators: ==, !=, >, <, >=, <=, &&, ||, !
-    // Field references: field_<id> resolves from current submission state
-    // No code execution — pure expression eval
-}
-
-// Save partial progress:
-public class FcmsFormPartialSubmission : IBaseEntity {
-    public Guid Id;
-    public Guid FormId;
-    public string ResumeToken;               // shared with user via email
-    public string DataJson;                  // partial answers
-    public int CurrentStep;
-    public DateTime LastSavedAt;
-    public DateTime ExpiresAt;               // auto-delete after 30 days
-}
-```
-
-**Frontend rendering:**
-```javascript
-fcms.form = {
-    init: function(formId) {
-        // 1. Group fields by StepNumber → render steps
-        // 2. Show step 1, hide others
-        // 3. Step indicator: "● ○ ○" (Step 1 of 3)
-        // 4. On Next click → validate current step → evaluate next step's conditions:
-        //    - If condition false → skip to next step that passes
-        // 5. On Back → restore previous step state
-        // 6. On Save Progress → POST /form/save-progress → returns ResumeToken → email to user
-        // 7. On Final Submit → all data POST → FormController.Submit
-        // 8. Conditional fields within step: re-evaluate on field change → show/hide
-    },
-    evaluateCondition: function(expr, currentData) {
-        // Same evaluator as server-side (JS port)
-    }
-};
-```
-
-**Form Analytics:** Per-step drop-off tracking — `FcmsFormStepEvent { FormId, ResumeToken, StepNumber, Action (entered/exited/abandoned), Timestamp }` → admin dashboard shows funnel।
-
-**Admin Form Builder:**
-```
-[+ Add Step] → drag fields between steps via accordion
-Per-field "Show If" textarea: "field_country == 'BD'"
-"Validate help" tooltip: shows available field IDs + operators
-[Save Progress for Resume] checkbox per form
-```
-
-**Files:** Update `Models/Entities/FcmsForm.cs` (multi-step support), `Models/FormConditionEvaluator.cs` + JS port, `Models/Entities/FcmsFormPartialSubmission.cs`, `Models/Entities/FcmsFormStepEvent.cs`, update `Services/FormService.cs`, `Areas/Admin/Views/Forms/Builder.cshtml` (multi-step UI)
-
----
-
-#### Issue 116 RESOLVED — AI Provider Abstraction (IFcmsAiProvider)
-
-**সমস্যা:** Modern CMS expectation: AI content suggestions, AI moderation, AI summarization, semantic search। Hardcoding OpenAI = vendor lock-in।
-
-```csharp
-// FlexCms.Framework/Ai/IFcmsAiProvider.cs
-public interface IFcmsAiProvider {
-    string ProviderId { get; }               // "openai", "anthropic", "azure-openai", "local-llm"
-    string DisplayName { get; }
-    bool SupportsCompletion { get; }
-    bool SupportsImageGeneration { get; }
-    bool SupportsEmbeddings { get; }
-    bool SupportsModeration { get; }
-
-    Task<AiCompletionResult> CompleteAsync(string prompt, AiCompletionOptions options);
-    Task<AiImageResult> GenerateImageAsync(string prompt, AiImageOptions options);
-    Task<AiEmbeddingResult> EmbedAsync(string text);
-    Task<AiModerationResult> ModerateAsync(string content);
-}
-
-public class AiCompletionOptions {
-    public string Model = "default";
-    public int MaxTokens = 500;
-    public float Temperature = 0.7f;
-    public string? SystemPrompt;
-    public string? OutputFormat;             // "text", "json", "markdown"
-}
-
-public class AiCompletionResult {
-    public string Text;
-    public int PromptTokens, CompletionTokens;
-    public string Model;
-    public decimal? CostUsd;                 // for billing tracking
-}
-
-// Phase 1 — Framework provides interface + Null provider only.
-// Phase 2 — plugin modules:
-//   - FlexCms.Ai.OpenAi → OpenAiProvider (uses OpenAI SDK or direct HTTP)
-//   - FlexCms.Ai.Anthropic → AnthropicProvider (uses Anthropic SDK)
-//   - FlexCms.Ai.Azure → AzureOpenAiProvider
-//   - FlexCms.Ai.Ollama → LocalLlmProvider (Ollama HTTP)
-
-// Module usage examples:
-public class PostController : BaseAdminController {
-    public async Task<IActionResult> SuggestTitle([FromBody] string content) {
-        var ai = _moduleRegistry.Get<IFcmsAiProvider>();
-        if (ai == null) return BadRequest("AI not configured.");
-        var result = await ai.CompleteAsync($"Suggest 3 SEO titles for: {content}",
-            new AiCompletionOptions { MaxTokens = 100 });
-        return Json(new { titles = result.Text.Split('\n') });
-    }
-}
-
-// Comment moderation hook (auto-spam detection):
-_hookManager.Register("cms.comment.created", async payload => {
-    var comment = (FcmsComment)payload;
-    var ai = _serviceProvider.GetRequiredService<IFcmsAiProvider>();
-    if (ai.SupportsModeration) {
-        var mod = await ai.ModerateAsync(comment.Content);
-        if (mod.IsFlagged) comment.Status = CommentStatus.Spam;
-    }
-});
-```
-
-**AI Settings (admin):**
-```
-Active AI Provider: [● None  ○ OpenAI  ○ Anthropic  ○ Azure  ○ Ollama]
-[Per-provider config: API key (encrypted), model, base URL]
-
-Usage Tracking:
-  Total tokens consumed (this month): 1.2M
-  Estimated cost: $24.00
-[Set monthly budget limit: $50 — auto-disable AI features beyond]
-```
-
-**Built-in AI features (use IFcmsAiProvider when configured):**
-- Content title suggestions
-- Meta description auto-generate
-- Alt text auto-generate for images
-- Translation suggestion (EN → BN draft)
-- Comment auto-moderation
-- SEO keyword extraction
-- Tag auto-suggestion
-
-All gracefully degrade if `IFcmsAiProvider` is `NullAiProvider` (Phase 1 default)।
-
-**Files:** `Ai/IFcmsAiProvider.cs`, `Ai/AiCompletionOptions.cs` + result classes, `Ai/NullAiProvider.cs`, `Models/Settings/AiSettings.cs`, `Services/AiUsageTrackingService.cs` (track tokens + cost), `Areas/Admin/Views/Settings/Ai.cshtml`
-
----
-
-#### Issue 117 RESOLVED — Application Metrics (Prometheus Endpoint)
-
-**সমস্যা:** Health check tells alive/dead — no rate, latency histograms, error counts। Production monitoring standard missing।
-
-```csharp
-// NuGet: prometheus-net (MIT) + prometheus-net.AspNetCore (MIT)
-
-// AddFlexCms() — register metrics:
-services.AddMetrics();
-services.AddSingleton<IFcmsMetricsService, FcmsMetricsService>();
-
-// UseFlexCms() — middleware + endpoint:
-app.UseHttpMetrics();   // automatic per-request metrics
-app.UseEndpoints(e => {
-    e.MapMetrics("/metrics").RequireAuthorization("MetricsAccess");
-    // OR IP-restricted: only 10.0.0.0/8 for internal Prometheus scraper
-});
-
-// Built-in metrics (auto):
-// - http_requests_received_total (counter, labeled by route, status)
-// - http_request_duration_seconds (histogram)
-// - http_requests_in_progress (gauge)
-
-// FlexCms-specific metrics:
-public interface IFcmsMetricsService {
-    void IncCounter(string name, params (string label, string value)[] labels);
-    void ObserveHistogram(string name, double value, params (string label, string value)[] labels);
-    void SetGauge(string name, double value, params (string label, string value)[] labels);
-}
-
-// Built-in counters (added by Framework):
-// - flexcms_pages_published_total
-// - flexcms_users_registered_total
-// - flexcms_login_attempts_total{result="success|fail"}
-// - flexcms_comments_created_total{status="approved|spam"}
-// - flexcms_emails_sent_total{result="success|fail"}
-// - flexcms_search_queries_total{provider="..."}
-// - flexcms_cache_hits_total / flexcms_cache_misses_total
-// - flexcms_active_sessions (gauge)
-
-// Module developers add custom metrics:
-_metrics.IncCounter("blog_post_views_total", ("category", category));
-```
-
-**Grafana dashboard JSON included:** `dashboards/flexcms-overview.json` — pre-built panels:
-- Request rate (RPS)
-- Response time (p50, p95, p99)
-- Error rate
-- Cache hit ratio
-- Active sessions
-- Login success/fail trend
-
-**Alert rules suggested (`alerts.yml`):**
-```yaml
-- alert: HighErrorRate
-  expr: rate(http_requests_received_total{status=~"5.."}[5m]) > 0.05
-  for: 5m
-- alert: SlowResponseTime
-  expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 2
-- alert: AuditDbDown
-  expr: flexcms_health_check{check="audit_mongo"} == 0
-```
-
-**Files:** `Metrics/IFcmsMetricsService.cs`, `FcmsMetricsService.cs`, NuGet: `prometheus-net.AspNetCore` (MIT), `dashboards/flexcms-overview.json` (Grafana template), `dashboards/alerts.yml`
-
----
-
-#### Issue 118 RESOLVED — Module Marketplace (Phase 3 Design)
-
-**সমস্যা:** "Module marketplace" mentioned briefly — no design। Revenue model unclear। Admin can't easily discover modules।
-
-```csharp
-// FlexCms.Framework/Marketplace/IFcmsMarketplaceClient.cs
-public interface IFcmsMarketplaceClient {
-    Task<List<MarketplaceModule>> SearchAsync(string? query, string? category, int page);
-    Task<MarketplaceModule> GetDetailsAsync(string moduleId);
-    Task<Stream> DownloadAsync(string moduleId, string version, string? licenseKey = null);
-    Task<bool> ValidateLicenseAsync(string moduleId, string licenseKey);
-    Task<List<UpdateAvailable>> CheckUpdatesAsync(string[] installedModules);
-}
-
-public class MarketplaceModule {
-    public string ModuleId, Name, Description, Author, Website, IconUrl;
-    public string LatestVersion;
-    public string[] ScreenshotUrls;
-    public string[] Categories;       // "blog", "ecommerce", "seo"
-    public decimal? PriceUsd;          // null = free
-    public string LicenseType;         // "MIT", "Commercial-PerSite", "Commercial-Unlimited"
-    public int InstallCount;
-    public float AverageRating;
-    public int ReviewCount;
-    public DateTime UpdatedAt;
-    public string MinFlexCmsVersion;
-}
-
-// Default marketplace: public registry hosted by FlexCms team
-// Custom marketplace: SiteSettings.MarketplaceUrl override (private repos)
-
-// MarketplaceSettings:
-public class MarketplaceSettings {
-    public string MarketplaceUrl = "https://marketplace.flexcms.dev/api";
-    public bool AutoCheckUpdates = true;
-    public int CheckUpdateIntervalHours = 24;
-    public Dictionary<string, string> LicenseKeysEncrypted = new(); // ModuleId → encrypted key
-}
-```
-
-**Admin → Marketplace:**
-```
-[Browse]  [Installed (5)]  [Updates Available (2)]  [License Keys]
-
-Search: [_______________]  Category: [All ▼]  Sort: [Most Popular ▼]
-
-┌─────────────────────────────┐  ┌─────────────────────────────┐
-│ [Icon]                      │  │ [Icon]                      │
-│ FlexCms.Ecommerce           │  │ FlexCms.Blog                │
-│ ★★★★☆ (245 reviews)        │  │ ★★★★★ (520 reviews)        │
-│ Free • 12K installs          │  │ Free • 35K installs          │
-│ [Install]                   │  │ ✓ Installed                  │
-└─────────────────────────────┘  └─────────────────────────────┘
-```
-
-**Module installation flow:**
-```
-[Install] click → GET /marketplace/info/{moduleId}
-→ check requirements (FlexCms version, dependencies)
-→ if paid: prompt for license key OR redirect to purchase page
-→ Validate license → POST /marketplace/validate-license
-→ Download ZIP → extract to modules/ → activate (existing flow)
-→ Auto-register license key (encrypted in DB)
-```
-
-**Update flow:**
-```
-Daily background check → POST /marketplace/check-updates with installed list
-→ List of available updates → admin notification
-→ Click [Update All] OR per-module [Update] → smart upgrade with rollback (Issue 93)
-```
-
-**Module Reviews & Ratings (in marketplace):**
-- Admin can post review after install (anonymous, on remote marketplace)
-- Reviews aggregate to module page
-
-**License key validation:**
-- Per-site license: `FLEX-XXXX-XXXX-XXXX` valid for 1 BaseUrl
-- Validates on install + periodically (weekly) — graceful fail (warn but don't disable)
-- Offline mode: validate via signed JWT issued at purchase (works offline for 30 days)
-
-**Phase 1:** Skeleton (interface + null implementation, no actual marketplace)
-**Phase 2:** Basic marketplace API + browse + install free modules
-**Phase 3:** Paid modules + license keys + reviews + featured modules
-
-**Files:** `Marketplace/IFcmsMarketplaceClient.cs`, `Marketplace/MarketplaceModule.cs`, `Marketplace/HttpMarketplaceClient.cs`, `Models/Settings/MarketplaceSettings.cs`, `Areas/Admin/Controllers/MarketplaceController.cs`, `Areas/Admin/Views/Marketplace/Browse.cshtml`, `Detail.cshtml`, `Updates.cshtml`, `LicenseKeys.cshtml`, `Services/MarketplaceUpdateCheckService.cs` ([FcmsHostedService], 24h check)
+> **Issues 111-118 dropped from scope (2026-05-06).** The original plan
+> bundled Cmd+K admin search, privacy analytics, PWA, WordPress importer,
+> multi-step forms, AI provider, Prometheus metrics, and a module marketplace
+> under Group J. They were removed from the core scope because: (a) external
+> tools cover several (Plausible/Umami for analytics, GA4/Matomo for
+> tracking); (b) some require external products (marketplace backend, AI
+> provider credentials); (c) some fit a different site architecture (PWA for
+> installable apps); (d) the rest are optional UX polish (Cmd+K) better shipped
+> as marketplace modules. See the **Phase 17** section in "Development Phases"
+> below for the full rationale.
 
 ---
 
@@ -14434,7 +13782,7 @@ When saving new memories, follow the format in `~/.claude/CLAUDE.md` (auto-memor
 | 14 | API + Integrations + Engagement | ❌ pending | |
 | 15 | SEO + Performance + Operations + Compliance | ❌ pending | |
 | 16 | Performance Critical + Accessibility + Editorial | ❌ pending | |
-| 17 | Modern UX + AI + Marketplace | ❌ pending | |
+| 17 | Module API Registry (only) | ❌ pending | Scope reduced — Cmd+K, analytics, PWA, WP importer, multi-step forms, AI, Prometheus, marketplace dropped 2026-05-06 |
 
 **Test count:** 161 unit + integration tests passing (146 pre-menu + 15 new MenuService tests).
 **Active branch:** `phase-6-veryfy`
@@ -15195,64 +14543,40 @@ tests/FlexCms.Tests.Unit/Phase3/FcmsAuthorizeFilterTests.cs # +SuperAdmin upperc
 
 ---
 
-### Phase 17 — Modern UX + AI + Marketplace (Issues 110-118)
-> **❌ NOT STARTED**
+### Phase 17 — Module API Registry (Issue 110 only)
+> **❌ NOT STARTED** — scope reduced from the original 9 issues
+>
+> **Scope decision (2026-05-06):** the original Phase 17 plan bundled 9 features
+> (Cmd+K admin search, privacy analytics, PWA, WordPress importer, multi-step
+> forms, AI provider, Prometheus metrics, module marketplace) alongside the
+> Module API Registry. Reviewing them against typical FlexCMS deployments
+> (BD-targeted news / blog / marketing sites running single-instance), only
+> the **Module API Registry** is essential — it completes the Phase 4 module
+> system by letting modules call typed APIs on each other instead of just on
+> the framework. Everything else is either better solved by external tooling,
+> highly speculative, or fits the optional-marketplace-module model rather
+> than the framework core.
+>
+> The dropped scope is **explicitly out** — not "deferred" — because:
+> - **Cmd+K admin search:** sidebar nav is sufficient; UX polish only.
+> - **Privacy analytics:** Plausible / Umami / GA4 cover this externally; duplicating wastes effort.
+> - **PWA + Service Worker:** news/blog/marketing sites don't need to be installable. Different architecture.
+> - **WordPress importer:** specialized migration tool; ship as an optional module if/when needed.
+> - **Multi-step forms:** Phase 14 has basic Forms infrastructure; multi-step is an advanced UX add-on.
+> - **AI provider:** scope creep for a CMS framework. If wanted, ships as a marketplace module.
+> - **Prometheus metrics:** Phase 13 `/health` endpoints (DB / queue / disk) cover single-instance monitoring. Multi-node scale → optional module.
+> - **Module marketplace:** requires a separate backend marketplace product. Folder-based install is sufficient for v1.
+
 **কাজ:**
 - `IFcmsModuleApiRegistry` — controlled cross-module API exposure with `[FcmsModuleApi("1.0.0")]` versioning (Issue 110)
-- Universal admin search (Cmd+K) — `IFcmsAdminSearchProvider` per category + recently visited tracking (Issue 111)
-- Privacy-first analytics — `FcmsPageView` with daily-rotated SessionHash + admin dashboard + retention cleanup (Issue 112)
-- PWA + Service Worker — manifest.json + sw.js + offline page + theme color (Issue 113)
-- WordPress migration importer — WXR XML parse → posts/pages/media/comments/categories/users + 301 redirects (Issue 114)
-- Multi-step forms — StepNumber field grouping + ConditionExpression evaluator + partial save with ResumeToken + step analytics (Issue 115)
-- `IFcmsAiProvider` interface (Phase 1 NullProvider; Phase 2 plugin modules: OpenAI, Anthropic, Azure, Ollama) — completion, image, embedding, moderation methods + token/cost tracking (Issue 116)
-- Prometheus metrics — `prometheus-net.AspNetCore` + built-in counters + custom metrics interface + Grafana dashboard JSON template (Issue 117)
-- Module marketplace skeleton (Phase 1 interface, Phase 2 actual integration) — `IFcmsMarketplaceClient` + browse/install/update/license keys + auto update check service (Issue 118)
+  - Modules expose typed public interfaces (e.g. `IBlogPublicApi`)
+  - Other modules resolve via `_registry.Get<IBlogPublicApi>()` — null if the providing module is deactivated/uninstalled (graceful)
+  - Version compatibility check via the `[FcmsModuleApi]` attribute prevents cross-module breakage on upgrades
 
 **✅ Confirm করো:**
 - [ ] **Module API registry:** Blog module exposes `IBlogPublicApi` → e-commerce module calls `_registry.Get<IBlogPublicApi>()?.GetRecentAsync(5)` → returns 5 posts
 - [ ] **Module API registry — graceful null:** Blog module deactivated → e-commerce module's `Get<IBlogPublicApi>()` returns null → page renders without crash
 - [ ] **Module API versioning:** Module declares `[FcmsModuleApi("1.0.0")]` → registry validates version compatibility on Get
-- [ ] **Cmd+K search:** Press Cmd+K → modal opens → type "user" → shows User list, individual users (by name), Settings → User Management
-- [ ] **Cmd+K — recent:** Empty input → shows last 10 admin pages visited (FcmsAdminPageVisit log)
-- [ ] **Cmd+K — keyboard nav:** Up/Down arrows navigate results → Enter goes to selected → Esc closes
-- [ ] **Cmd+K — module-extensible:** Blog module registers BlogAdminSearchProvider → Cmd+K "react" → shows "React introduction (Blog post)" → click → /admin/blog/posts/edit/{id}
-- [ ] **Cmd+K — permission filter:** User without UserView permission → Cmd+K "user" → User-related results hidden
-- [ ] **Analytics — track:** Visit homepage → /track/pageview POST → FcmsPageView row inserted
-- [ ] **Analytics — daily salt:** Same IP+UA visits today vs tomorrow → SessionHash different (irreversible — daily salt rotation)
-- [ ] **Analytics — no cookies:** Browser DevTools → no analytics cookies set → GDPR-compliant without consent banner
-- [ ] **Analytics — dashboard:** /admin/analytics → 30-day chart → top pages → top referrers → device breakdown
-- [ ] **Analytics — retention:** Set retention = 1 day → cleanup job runs → previous-day FcmsPageView rows deleted
-- [ ] **PWA — manifest:** `GET /manifest.json` → returns site name, icons, theme color
-- [ ] **PWA — service worker:** Visit site → DevTools Application tab → service worker registered → static assets cached
-- [ ] **PWA — offline:** Disconnect network → reload site → offline page shows (or cached page if visited before)
-- [ ] **PWA — install:** Mobile Chrome → "Add to Home Screen" prompt → installs as standalone app
-- [ ] **PWA — update notif:** Deploy new version → user reloads → service worker detects → prompt "New version available [Reload]"
-- [ ] **WP import — preview:** Upload WordPress XML → /admin/migration/preview → shows "150 posts, 50 pages, 1200 comments, 200 media files"
-- [ ] **WP import — import:** [Confirm Import] → progress bar → posts/pages/categories/tags imported → users created → redirects from `/?p=123` to new slugs
-- [ ] **WP import — media download:** Option enabled → images downloaded from WP server → stored in /uploads/migration/
-- [ ] **WP import — comments:** Comments preserved with threading (ParentId mapping)
-- [ ] **WP import — author mapping:** Unknown WP author → fallback to default author setting
-- [ ] **Multi-step form:** Create form with 3 steps → frontend shows "Step 1 of 3 ●○○" → Next button validates current step → Step 2
-- [ ] **Conditional field:** Field B has `condition = "field_age > 18"` → field B hidden if age ≤ 18, visible if > 18
-- [ ] **Conditional step skip:** Step 2 condition evaluates false → auto-skip to Step 3
-- [ ] **Form save progress:** [Save & Continue Later] → ResumeToken generated → email sent with link → user returns later → form pre-filled to last step
-- [ ] **Form analytics:** 100 users start form → 60 reach Step 2 → 30 reach Step 3 → 25 submit → admin sees funnel: 60% → 50% → 83% completion
-- [ ] **AI — null provider:** No AI module installed → `IFcmsAiProvider.CompleteAsync` returns null gracefully → UI hides AI features
-- [ ] **AI — OpenAI plugin (Phase 2):** Install FlexCms.Ai.OpenAi → set API key → admin → blog post → [Suggest Title] → 3 titles returned
-- [ ] **AI — moderation:** Install AI module → user posts comment with toxic content → AI moderation flags → comment.Status=Spam automatically
-- [ ] **AI — usage tracking:** AI request → tokens recorded → admin Settings → AI → usage chart (this month: 1.2M tokens, $24)
-- [ ] **AI — budget limit:** Set $50 monthly limit → reached → AI features auto-disabled until next month → admin warning
-- [ ] **Prometheus — endpoint:** `GET /metrics` (admin/IP-restricted) → returns Prometheus-format metrics
-- [ ] **Prometheus — built-in:** `http_requests_received_total{path="/",status="200"}` increments on each home request
-- [ ] **Prometheus — custom:** Module increments `flexcms_blog_post_views_total{category="news"}` → visible in metrics endpoint
-- [ ] **Prometheus — Grafana:** Import flexcms-overview.json → Grafana shows RPS, p95 latency, error rate panels
-- [ ] **Prometheus — alerts:** alerts.yml in Prometheus → trigger high error rate (kill DB) → alert fires
-- [ ] **Marketplace — browse:** /admin/marketplace → list of available modules with rating, installs, price
-- [ ] **Marketplace — install free:** Click [Install] on free module → ZIP downloaded → activated → restart → module visible in modules list
-- [ ] **Marketplace — install paid:** Paid module → prompt for license key → POST /marketplace/validate-license → license stored encrypted → module installed
-- [ ] **Marketplace — update check:** MarketplaceUpdateCheckService runs daily → POST /marketplace/check-updates with installed modules → bell notification "2 module updates available"
-- [ ] **Marketplace — update:** Click [Update] → pre-update backup → download new version → smart upgrade → module on new version
-- [ ] **Marketplace — license expire:** License key expires after 30 days offline → admin warning → re-validate → continues working
 
 ---
 
@@ -15276,4 +14600,4 @@ tests/FlexCms.Tests.Unit/Phase3/FcmsAuthorizeFilterTests.cs # +SuperAdmin upperc
 | **14** | API + Integrations + Engagement | API tokens, webhooks, CORS, CAPTCHA, CDN, asset versioning, revisions, comments, forms, newsletter, custom fields |
 | **15** | SEO + Performance + Ops + Compliance | SEO pack, output cache, backup, maintenance mode, module update/sandbox/versioning, editor conflict, multi-language, admin widgets, GDPR, feature flags |
 | **16** | Performance Critical + A11y + Editorial | Cache stampede, image optimization, full-text search, real-time admin notify, WCAG 2.1 AA, editorial workflow |
-| **17** | Modern UX + AI + Marketplace | Module API registry, Cmd+K search, privacy analytics, PWA, WP importer, multi-step forms, AI provider, Prometheus, marketplace |
+| **17** | Module API Registry (scope reduced) | Just Issue 110 — typed cross-module APIs with `[FcmsModuleApi]` versioning. Original 111-118 (Cmd+K, analytics, PWA, WP importer, multi-step forms, AI, Prometheus, marketplace) dropped — better as optional modules / external tooling. |

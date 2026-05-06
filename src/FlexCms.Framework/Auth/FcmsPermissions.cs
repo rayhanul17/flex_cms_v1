@@ -63,4 +63,10 @@ public static class FcmsPermissions
     // ── Admin: Messaging (Phase 8) ───────────────────────────────────────────
     public const string MessagingBroadcast = "messaging.broadcast";
     public const string MessagingView = "messaging.view";
+
+    // ── Admin: Payments + Exports (Phase 12) ─────────────────────────────────
+    public const string PaymentsView = "payments.view";
+    public const string PaymentsManage = "payments.manage";
+    public const string ExportsRequest = "exports.request";
+    public const string ExportsView = "exports.view";
 }

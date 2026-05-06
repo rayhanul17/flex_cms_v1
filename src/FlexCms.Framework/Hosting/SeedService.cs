@@ -244,6 +244,10 @@ public class SeedService : IHostedService
         new() { Key = FcmsPermissions.MessagingBroadcast,DisplayName = "Messaging: Broadcast",       Group = "Messaging" },
         new() { Key = Chat.ChatPermissions.Send,         DisplayName = "Chat: Send (user)",          Group = "Chat" },
         new() { Key = Chat.ChatPermissions.Reply,        DisplayName = "Chat: Reply (admin)",        Group = "Chat" },
+        new() { Key = FcmsPermissions.PaymentsView,      DisplayName = "Payments: View",             Group = "Payments" },
+        new() { Key = FcmsPermissions.PaymentsManage,    DisplayName = "Payments: Manage",           Group = "Payments" },
+        new() { Key = FcmsPermissions.ExportsRequest,    DisplayName = "Exports: Request",           Group = "Exports" },
+        new() { Key = FcmsPermissions.ExportsView,       DisplayName = "Exports: View",              Group = "Exports" },
     ];
 
     private async Task SeedPermissionsAsync(CancellationToken ct)

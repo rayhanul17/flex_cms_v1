@@ -1,6 +1,7 @@
 using FlexCms.Framework.Auth;
 using FlexCms.Framework.Chat;
 using FlexCms.Framework.Cms;
+using FlexCms.Framework.Exports;
 using FlexCms.Framework.Helpers;
 using FlexCms.Framework.Messaging;
 using FlexCms.Framework.Modules;
@@ -180,6 +181,13 @@ public class MongoIndexService : IHostedService
                 .Ascending(m => m.ThreadId)
                 .Ascending(m => m.CreatedAt),
             "ix_chat_messages_thread_created", ct);
+
+        // ── Exports (Phase 12) ────────────────────────────────────────────────
+        await IndexAsync<FcmsPendingExport>(
+            Builders<FcmsPendingExport>.IndexKeys
+                .Ascending(e => e.ExportStatus)
+                .Ascending(e => e.CreatedAt),
+            "ix_pending_exports_status_created", ct);
 
         // ── Modules ───────────────────────────────────────────────────────────
 

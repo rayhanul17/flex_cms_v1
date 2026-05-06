@@ -14978,18 +14978,17 @@ tests/FlexCms.Tests.Unit/Phase3/FcmsAuthorizeFilterTests.cs # +SuperAdmin upperc
 ---
 
 ### Phase 12 — Payment + PDF + Excel + Export
-> **❌ NOT STARTED**
+> **✅ DONE** (2026-05-06) — see [phase-12-test-cases.md](phase-12-test-cases.md)
 **কাজ:**
-- `IFcmsPaymentGateway` + `FcmsPaymentGatewayResolver`
-- `BkashPaymentGateway`, `SslcommerzPaymentGateway`, `NagadPaymentGateway`
-- `PaymentWebhookController` (POST /payment/webhook/{gatewayId}, AllowAnonymous)
-- `PaymentSettings` (typed, IDataProtector encrypted keys)
-- Admin Settings → Payment UI (gateway select, test mode)
-- `IFcmsPdfService` + `PdfSharpPdfService` (MIT, manual layout)
-- `ClosedXML` Excel export
-- `FcmsPendingExport` entity + `ExportProcessorService` (30s poll)
-- `IFcmsExportHandler` — module registers own handler
-- In-app notification on export complete → download link
+- `IFcmsPaymentGateway` + `DispatchingPaymentGateway` (resolver) + `PaymentSettings` (DataProtection-encrypted ApiKey + MerchantPassword via `PaymentSettingsService`)
+- 3 BD gateway impls registered as typed HttpClient consumers: `BkashPaymentGateway` (Tokenized Checkout — sandbox + production endpoints, create/status flow wired; webhook signature verification deferred per stub doc), `SslcommerzPaymentGateway` (full create-session + validation API; IPN routes through VerifyAsync for server-to-server confirmation), `NagadPaymentGateway` (initialize/verify wired; RSA encrypt + SHA-256 sign placeholders for live integration). Each one returns `PaymentResult` instead of throwing.
+- `PaymentWebhookController` (POST `/payment/webhook/{gatewayId}`, `[AllowAnonymous]`) — normalizes form/JSON bodies, dispatches to the gateway named in the URL (not active gateway in settings — handles in-flight webhooks during a switch)
+- `IFcmsPdfService` + `PdfSharpPdfService` (PdfSharpCore MIT, pure managed): `RenderTextAsync` + `RenderTableAsync`, single-page A4
+- `IFcmsExcelService` + `ClosedXmlExcelService` (ClosedXML): bold/grey header, auto-fit columns capped at 80, sheet-name sanitization
+- `FcmsPendingExport` entity (EF + Mongo, `(ExportStatus, CreatedAt)` index) + `ExportProcessorService` (30s poll, batch 5, async scope) + `IFcmsExportHandler` interface (module-registered render handler)
+- Processor flow: Pending → Running → render → save bytes via `IFcmsFileStorage` → URL written back → `IFcmsNotificationService.NotifyUserAsync` fires download notification → Done. Missing handler / throwing handler → Failed with reason.
+- Permissions seeded: `payments.view`, `payments.manage`, `exports.request`, `exports.view`
+- Tests: 13 unit (PaymentSettings encryption round-trip, dispatcher routing, PDF/Excel magic-byte assertions) + 6 integration (4 ExportProcessor EF in-memory: happy path, missing handler, throwing handler, idempotent done-skip; 2 Mongo via Testcontainers: pending-export persist + terminal-state round-trip). Project total 264 unit + 216 integration.
 
 **✅ Confirm করো:**
 - [ ] bKash test mode: `InitiateAsync` → returns redirect URL (bKash sandbox)

@@ -3,6 +3,7 @@ using FlexCms.Framework.Chat;
 using FlexCms.Framework.Cms;
 using FlexCms.Framework.Clock;
 using FlexCms.Framework.Db;
+using FlexCms.Framework.Exports;
 using FlexCms.Framework.Helpers;
 using FlexCms.Framework.Messaging;
 using FlexCms.Framework.Modules;
@@ -75,6 +76,9 @@ public class FcmsDbContext : IdentityDbContext<FcmsUser, FcmsRole, Guid>
     // Phase 10 — chat
     public DbSet<FcmsChatThread> ChatThreads => Set<FcmsChatThread>();
     public DbSet<FcmsChatMessage> ChatMessages => Set<FcmsChatMessage>();
+
+    // Phase 12 — async exports
+    public DbSet<FcmsPendingExport> PendingExports => Set<FcmsPendingExport>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -271,6 +275,11 @@ public class FcmsDbContext : IdentityDbContext<FcmsUser, FcmsRole, Guid>
         // (ThreadId, CreatedAt) — message timeline render.
         modelBuilder.Entity<FcmsChatMessage>()
             .HasIndex(m => new { m.ThreadId, m.CreatedAt });
+
+        // ── Exports (Phase 12) ─────────────────────────────────────────────────
+        // Processor scan: WHERE export_status = Pending ORDER BY created_at.
+        modelBuilder.Entity<FcmsPendingExport>()
+            .HasIndex(e => new { e.ExportStatus, e.CreatedAt });
 
         // Audit log entities are append-only — strip the inherited lifecycle
         // columns and skip the soft-delete query filter (no Status column means

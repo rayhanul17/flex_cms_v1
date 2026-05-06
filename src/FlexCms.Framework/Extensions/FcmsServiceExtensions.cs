@@ -9,6 +9,8 @@ using FlexCms.Framework.Db;
 using FlexCms.Framework.Db.Ef;
 using FlexCms.Framework.Db.Migration;
 using FlexCms.Framework.Db.MongoDb;
+using FlexCms.Framework.Documents;
+using FlexCms.Framework.Exports;
 using FlexCms.Framework.Hosting;
 using FlexCms.Framework.I18n;
 using FlexCms.Framework.Messaging;
@@ -128,6 +130,22 @@ public static class FcmsServiceExtensions
 
         // ── Phase 10: Chat (SignalR is added at the host level via AddSignalR) ─
         services.AddScoped<IChatService, ChatService>();
+
+        // ── Phase 12: Payments + PDF/Excel + Async Exports ───────────────────
+        services.AddScoped<Payments.Services.IPaymentSettingsService, Payments.Services.PaymentSettingsService>();
+        services.AddHttpClient<Payments.Gateways.BkashPaymentGateway>();
+        services.AddHttpClient<Payments.Gateways.SslcommerzPaymentGateway>();
+        services.AddHttpClient<Payments.Gateways.NagadPaymentGateway>();
+        services.AddScoped<Payments.IFcmsPaymentGateway>(sp => sp.GetRequiredService<Payments.Gateways.BkashPaymentGateway>());
+        services.AddScoped<Payments.IFcmsPaymentGateway>(sp => sp.GetRequiredService<Payments.Gateways.SslcommerzPaymentGateway>());
+        services.AddScoped<Payments.IFcmsPaymentGateway>(sp => sp.GetRequiredService<Payments.Gateways.NagadPaymentGateway>());
+        services.AddScoped<Payments.DispatchingPaymentGateway>();
+
+        services.AddSingleton<IFcmsPdfService, PdfSharpPdfService>();
+        services.AddSingleton<IFcmsExcelService, ClosedXmlExcelService>();
+
+        services.AddSingleton(new ExportProcessorOptions());
+        services.AddHostedService<ExportProcessorService>();
 
         // ── Phase 11: Themes ─────────────────────────────────────────────────
         var themesRoot = Path.Combine(options.AppDataPath, "..", "themes");

@@ -37,6 +37,9 @@
 
 <fcms-env-banner />
 
+<!-- Mobile/tablet sidebar backdrop. Tap = close. Hidden on desktop via CSS. -->
+<div id="sidebar-backdrop" hidden></div>
+
 <!-- ── Sidebar ─────────────────────────────────────────────── -->
 <nav id="sidebar">
     <a class="sidebar-brand" asp-controller="Dashboard" asp-action="Index">
@@ -90,17 +93,24 @@
 <div id="main-content">
     <!-- Topbar -->
     <div id="topbar">
-        <span class="text-muted small">@ViewData["Title"]</span>
-        <div class="d-flex align-items-center gap-3">
+        <div class="d-flex align-items-center gap-2 flex-grow-1 min-w-0">
+            <!-- Hamburger — visible <992px (Bootstrap d-lg-none). Toggles sidebar via JS. -->
+            <button type="button" id="sidebar-toggle" class="btn btn-sm btn-outline-secondary d-lg-none"
+                    aria-label="Toggle navigation" aria-expanded="false" aria-controls="sidebar">
+                <i class="bi bi-list"></i>
+            </button>
+            <span class="text-muted small text-truncate">@ViewData["Title"]</span>
+        </div>
+        <div class="d-flex align-items-center gap-2 gap-md-3 flex-shrink-0">
             <partial name="_NotificationBell" />
             <partial name="_ThemeModeToggle" />
             <partial name="_LangSwitcher" />
-            <a href="/" target="_blank" class="text-muted small">
+            <a href="/" target="_blank" class="text-muted small d-none d-md-inline">
                 <i class="bi bi-box-arrow-up-right"></i> View site
             </a>
             <form asp-controller="Auth" asp-action="Logout" method="post" class="d-inline">
-                <button type="submit" class="btn btn-sm btn-outline-secondary">
-                    <i class="bi bi-box-arrow-right"></i> Logout
+                <button type="submit" class="btn btn-sm btn-outline-secondary" title="Logout">
+                    <i class="bi bi-box-arrow-right"></i><span class="d-none d-md-inline ms-1">Logout</span>
                 </button>
             </form>
         </div>
@@ -131,6 +141,48 @@
         var toastType = TempData["Toast.Type"]?.ToString() ?? "success";
         <text>document.addEventListener('DOMContentLoaded', () => fcms.toast.@(toastType)(@Html.Raw(System.Text.Json.JsonSerializer.Serialize(toastMsg))));</text>
     }
+
+    // ── Mobile sidebar toggle ─────────────────────────────────────────────
+    // The sidebar lives off-screen by default on <992px viewports (CSS
+    // transform). Hamburger click toggles `.show` on body which slides it in,
+    // shows the backdrop, and locks body scroll. Esc / backdrop tap closes it.
+    (() => {
+        const body     = document.body;
+        const btn      = document.getElementById('sidebar-toggle');
+        const sidebar  = document.getElementById('sidebar');
+        const backdrop = document.getElementById('sidebar-backdrop');
+        if (!btn || !sidebar || !backdrop) return;
+
+        function open() {
+            body.classList.add('sidebar-open');
+            backdrop.hidden = false;
+            btn.setAttribute('aria-expanded', 'true');
+        }
+        function close() {
+            body.classList.remove('sidebar-open');
+            backdrop.hidden = true;
+            btn.setAttribute('aria-expanded', 'false');
+        }
+        function toggle() { body.classList.contains('sidebar-open') ? close() : open(); }
+
+        btn.addEventListener('click', toggle);
+        backdrop.addEventListener('click', close);
+        document.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
+
+        // Auto-close after navigating to a sidebar link on mobile so the
+        // newly-loaded page isn't covered by the open drawer.
+        sidebar.addEventListener('click', e => {
+            const a = e.target.closest('a.nav-link');
+            // Skip group toggles (data-bs-toggle="collapse") — they expand sub-menus.
+            if (a && !a.hasAttribute('data-bs-toggle')) close();
+        });
+
+        // If the viewport grows past the lg breakpoint while the drawer is
+        // open (rotate to landscape, resize window) drop the open state so we
+        // don't leave the body locked.
+        const mql = window.matchMedia('(min-width: 992px)');
+        mql.addEventListener('change', e => { if (e.matches) close(); });
+    })();
 </script>
 @await RenderSectionAsync("Scripts", required: false)
 </body>

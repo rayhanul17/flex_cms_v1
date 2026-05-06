@@ -1,10 +1,17 @@
-/* ── FlexCMS Admin Layout (placeholder — Phase 11 will replace with AdminLTE) ── */
+/* ── FlexCMS Admin Layout ─────────────────────────────────────────────────
+   Responsive breakpoint: 992px (Bootstrap lg).
+   ≥992px → fixed 240px sidebar, content margin-left: 240px (desktop default)
+   <992px → sidebar hidden off-screen, hamburger toggles a slide-in drawer
+            with a tap-to-close backdrop and locked body scroll.
+*/
 
 body {
     display: flex;
     min-height: 100vh;
     margin: 0;
 }
+
+/* ── Sidebar ─────────────────────────────────────────────────────────── */
 
 #sidebar {
     width: 240px;
@@ -18,7 +25,8 @@ body {
     bottom: 0;
     left: 0;
     overflow-y: auto;
-    z-index: 1000;
+    z-index: 1040; /* above backdrop (1035), below offcanvas-modal (1050) */
+    transition: transform .25s ease;
 }
 
 #sidebar .sidebar-brand {
@@ -32,9 +40,7 @@ body {
     align-items: center;
 }
 
-#sidebar .nav {
-    padding: .5rem 0;
-}
+#sidebar .nav { padding: .5rem 0; }
 
 #sidebar .nav-link {
     color: #adbccf;
@@ -45,17 +51,12 @@ body {
     gap: .65rem;
     font-size: .9rem;
     text-decoration: none;
+    /* iOS / Android tap targets — at least 44px for accessibility */
+    min-height: 44px;
 }
 
-#sidebar .nav-link:hover {
-    color: #fff;
-    background: #2d3f53;
-}
-
-#sidebar .nav-link.active {
-    color: #fff;
-    background: #0d6efd;
-}
+#sidebar .nav-link:hover { color: #fff; background: #2d3f53; }
+#sidebar .nav-link.active { color: #fff; background: #0d6efd; }
 
 #sidebar .nav-link i {
     width: 1.1rem;
@@ -64,9 +65,7 @@ body {
     flex-shrink: 0;
 }
 
-#sidebar .nav-link span {
-    flex: 1;
-}
+#sidebar .nav-link span { flex: 1; }
 
 /* Group toggle (parent items) */
 #sidebar .nav-toggle .chevron {
@@ -80,10 +79,7 @@ body {
     transform: rotate(90deg);
 }
 
-#sidebar .nav-children {
-    background: #17222f;
-    padding: 0;
-}
+#sidebar .nav-children { background: #17222f; padding: 0; }
 
 #sidebar .nav-children .nav-link {
     padding-left: 2.75rem;
@@ -91,14 +87,10 @@ body {
     color: #9aa9bd;
 }
 
-#sidebar .nav-children .nav-link:hover {
-    background: #243443;
-}
+#sidebar .nav-children .nav-link:hover { background: #243443; }
+#sidebar .nav-children .nav-link.active { background: #0d6efd; color: #fff; }
 
-#sidebar .nav-children .nav-link.active {
-    background: #0d6efd;
-    color: #fff;
-}
+/* ── Main content ────────────────────────────────────────────────────── */
 
 #main-content {
     margin-left: 240px;
@@ -107,15 +99,21 @@ body {
     flex-direction: column;
     min-height: 100vh;
     background: #f5f7fa;
+    min-width: 0; /* allow flex children to shrink below their content */
 }
 
 #topbar {
     background: #fff;
     border-bottom: 1px solid #dee2e6;
-    padding: .6rem 1.5rem;
+    padding: .6rem 1rem;
     display: flex;
     align-items: center;
     justify-content: space-between;
+    gap: .5rem;
+    /* Sticky on mobile so the hamburger stays reachable when scrolling. */
+    position: sticky;
+    top: 0;
+    z-index: 1030;
 }
 
 #page-body {
@@ -125,6 +123,45 @@ body {
     box-sizing: border-box;
 }
 
-.toast-container {
-    z-index: 1100;
+.toast-container { z-index: 1100; }
+
+/* ── Backdrop (mobile only — created in _AdminLayout) ───────────────── */
+
+#sidebar-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, .45);
+    z-index: 1035;
+    /* hidden=true on the element handles display; nothing extra needed */
+}
+
+/* ──────────────────────────────────────────────────────────────────────
+   Mobile + tablet: <992px (Bootstrap lg breakpoint)
+   ────────────────────────────────────────────────────────────────────── */
+@media (max-width: 991.98px) {
+    /* Sidebar hidden by default — slide in when body has .sidebar-open */
+    #sidebar {
+        transform: translateX(-100%);
+        box-shadow: 4px 0 12px rgba(0, 0, 0, .2);
+    }
+    body.sidebar-open #sidebar { transform: translateX(0); }
+
+    /* Lock background scroll while drawer is open */
+    body.sidebar-open { overflow: hidden; }
+
+    /* Main content takes full viewport width — no left margin reserved */
+    #main-content { margin-left: 0; }
+
+    /* Tighten paddings so 320–375px viewports keep usable canvas */
+    #page-body { padding: 1rem; }
+    #topbar { padding: .5rem .75rem; }
+}
+
+/* Extra-small (<576px): full-screen drawer rather than 240px panel */
+@media (max-width: 575.98px) {
+    #sidebar {
+        width: 85vw;
+        min-width: 0;
+        max-width: 320px;
+    }
 }

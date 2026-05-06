@@ -34,6 +34,19 @@ public class SettingsViewModel
 
     public List<TimeZoneOption> AvailableTimeZones { get; set; } = [];
     public string SampleFormatted { get; set; } = "";
+
+    // ── Themes (Phase 11) ────────────────────────────────────────────────────
+    [Display(Name = "Public theme")]
+    public string PublicThemeId { get; set; } = "FlexCms.Default";
+
+    public List<ThemeOption> AvailableThemes { get; set; } = [];
+}
+
+public class ThemeOption
+{
+    public string Id { get; set; } = "";
+    public string Name { get; set; } = "";
+    public bool IsBuiltIn { get; set; }
 }
 
 public class TimeZoneOption

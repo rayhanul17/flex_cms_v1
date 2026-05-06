@@ -14937,9 +14937,11 @@ tests/FlexCms.Tests.Unit/Phase3/FcmsAuthorizeFilterTests.cs # +SuperAdmin upperc
 ---
 
 ### Phase 11 — Themes + Setup Wizard
-> **🔄 IN PROGRESS — 2026-04-28**
-> Setup Wizard ✅ DONE (4-step: DB → Site Info → Admin Account → Done; two-path Program.cs; SeedService; EnsureCreatedAsync migration; restart on completion)
-> Themes ❌ NOT STARTED (AdminLte, Bootstrap, Tailwind)
+> **✅ DONE** (2026-05-06) — see [phase-11-test-cases.md](phase-11-test-cases.md)
+> Setup Wizard ✅ done earlier (4-step: DB → Site Info → Admin Account → Done; two-path Program.cs; SeedService; EnsureCreatedAsync migration; restart on completion)
+> Theme infrastructure ✅ done in this phase: `ThemeManifest`, `IThemeManager`+`ThemeManager` (filesystem discovery, hot-reload via Refresh, built-in `FlexCms.Default` always present), `ThemeViewLocationExpander` (per-request theme via SiteSettings.PublicThemeId, view fallback to host defaults), dark/light/auto mode (`ThemeMode` cookie helper + `_ThemeModeToggle` partial wired into admin top bar, emits `data-theme-mode` + `data-bs-theme` on `<html>`), `/theme/mode` POST endpoint (anonymous-allowed, antiforgery-protected). Theme selector in admin Settings → Appearance. Default views serve as the built-in Bootstrap theme.
+> The originally-planned separate theme PROJECTS (`FlexCms.Theme.AdminLte`, `FlexCms.Theme.Bootstrap`, `FlexCms.Theme.Tailwind`) are deferred — they're designed-asset bundles needing real visual design work, not framework code. Theme infrastructure is in place to host them whenever the design effort happens.
+> Tests: 16 unit (8 ThemeManager + 8 ThemeMode). Project total 251 unit + 210 integration.
 
 **কাজ:**
 - `ThemeViewLocationExpander` — theme paths in Razor engine

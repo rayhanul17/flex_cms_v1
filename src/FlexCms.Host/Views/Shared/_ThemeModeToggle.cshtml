@@ -1,0 +1,49 @@
+@*
+    Light / dark / auto mode toggle. Posts to /theme/mode and lets a
+    full-page redirect re-render the layout with the new <html data-theme-mode="...">.
+
+    The toggle button is intentionally minimal Bootstrap markup so any
+    theme that ships its own _ThemeModeToggle.cshtml override can replace it
+    while still posting to the same endpoint.
+*@
+@using FlexCms.Framework.Themes
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
+@{
+    var current = ThemeMode.Resolve(Context);
+    var token = Antiforgery.GetAndStoreTokens(Context).RequestToken;
+    var returnUrl = Context.Request.Path + Context.Request.QueryString;
+    var (icon, title) = current switch
+    {
+        ThemeMode.Dark  => ("bi bi-moon-stars", "Dark mode"),
+        ThemeMode.Light => ("bi bi-sun",        "Light mode"),
+        _               => ("bi bi-circle-half","Auto mode (system)")
+    };
+}
+
+<div class="dropdown">
+    <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button"
+            data-bs-toggle="dropdown" aria-expanded="false" title="@title">
+        <i class="@icon"></i>
+    </button>
+    <ul class="dropdown-menu dropdown-menu-end">
+        @foreach (var m in ThemeMode.All)
+        {
+            var active = string.Equals(m, current, StringComparison.OrdinalIgnoreCase);
+            <li>
+                <form asp-controller="Theme" asp-action="SetMode" method="post" class="m-0">
+                    <input type="hidden" name="__RequestVerificationToken" value="@token" />
+                    <input type="hidden" name="mode" value="@m" />
+                    <input type="hidden" name="returnUrl" value="@returnUrl" />
+                    <button type="submit" class="dropdown-item @(active ? "active" : "")">
+                        @switch (m)
+                        {
+                            case ThemeMode.Light: <i class="bi bi-sun me-2"></i> <text>Light</text> break;
+                            case ThemeMode.Dark:  <i class="bi bi-moon-stars me-2"></i> <text>Dark</text> break;
+                            default:              <i class="bi bi-circle-half me-2"></i> <text>Auto</text> break;
+                        }
+                    </button>
+                </form>
+            </li>
+        }
+    </ul>
+</div>

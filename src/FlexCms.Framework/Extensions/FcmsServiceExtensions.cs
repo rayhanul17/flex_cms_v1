@@ -18,6 +18,7 @@ using FlexCms.Framework.Middleware;
 using FlexCms.Framework.Notifications;
 using FlexCms.Framework.Rendering;
 using FlexCms.Framework.Security;
+using FlexCms.Framework.Themes;
 using FlexCms.Framework.Widgets;
 using FlexCms.Framework.Modules;
 using FlexCms.Framework.Services;
@@ -127,6 +128,13 @@ public static class FcmsServiceExtensions
 
         // ── Phase 10: Chat (SignalR is added at the host level via AddSignalR) ─
         services.AddScoped<IChatService, ChatService>();
+
+        // ── Phase 11: Themes ─────────────────────────────────────────────────
+        var themesRoot = Path.Combine(options.AppDataPath, "..", "themes");
+        services.AddSingleton<IThemeManager>(sp =>
+            new ThemeManager(themesRoot, sp.GetService<Microsoft.Extensions.Logging.ILogger<ThemeManager>>()));
+        services.Configure<Microsoft.AspNetCore.Mvc.Razor.RazorViewEngineOptions>(o =>
+            o.ViewLocationExpanders.Add(new ThemeViewLocationExpander()));
 
         // Permission service (15min IMemoryCache — requires IRepository<> to be registered)
         services.AddMemoryCache();

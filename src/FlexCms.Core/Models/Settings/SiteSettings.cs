@@ -84,7 +84,7 @@ public class SiteSettings
     public string HotlinkWhitelist { get; set; } = "";
 
     // ── UI / UX ────────────────────────────────────────────────────────────
-    public string PublicThemeId { get; set; } = "Bootstrap";
+    public string PublicThemeId { get; set; } = "FlexCms.Default";
     public int NotificationFallbackPollSeconds { get; set; } = 60;
     public string AdminSearchHotkey { get; set; } = "k";
 

@@ -177,4 +177,7 @@ public class EfRepository<T> : IRepository<T> where T : BaseEfEntity
 
     public Task<List<T>> FindByTextAsync(string searchTerm, CancellationToken ct = default)
         => throw new NotSupportedException("Text search is only supported with MongoDB.");
+
+    public IQueryable<T> Query()
+        => _set.Where(e => e.Status != EntityStatus.Deleted);
 }

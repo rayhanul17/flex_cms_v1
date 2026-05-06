@@ -2,7 +2,7 @@ using System.Linq.Expressions;
 using FlexCms.Framework.Auth;
 using FlexCms.Framework.Clock;
 using FlexCms.Framework.Cms;
-using FlexCms.Framework.Db.Ef;
+using FlexCms.Framework.Db;
 using FlexCms.Framework.Helpers;
 using FlexCms.Framework.Models;
 using FlexCms.Host.Models.Admin;
@@ -15,12 +15,12 @@ namespace FlexCms.Host.Controllers.Admin;
 public class PageController : BaseAdminController
 {
     private readonly IPageService _pages;
-    private readonly FcmsDbContext _db;
+    private readonly IRepository<FcmsPage> _pageRepo;
 
-    public PageController(IPageService pages, FcmsDbContext db)
+    public PageController(IPageService pages, IRepository<FcmsPage> pageRepo)
     {
         _pages = pages;
-        _db = db;
+        _pageRepo = pageRepo;
     }
 
     // ── List ──────────────────────────────────────────────────────────────────
@@ -43,7 +43,7 @@ public class PageController : BaseAdminController
             p => p.UpdatedAt
         };
         return DataTableResult(
-            _db.Pages,
+            _pageRepo.Query(),
             req,
             select: p => new
             {

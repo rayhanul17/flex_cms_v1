@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Http;
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
 using MongoDB.Driver;
+using MongoDB.Driver.Linq;
 
 namespace FlexCms.Framework.Db.MongoDb;
 
@@ -307,6 +308,9 @@ public class MongoRepository<T> : IRepository<T>, IMongoSessionAware where T : c
 
         return PagedResponse<T>.Create(items, total, page, pageSize > 0 ? pageSize : total);
     }
+
+    public IQueryable<T> Query()
+        => _collection.AsQueryable().Where(e => e.Status != EntityStatus.Deleted);
 
     public async Task<List<T>> FindByTextAsync(string searchTerm, CancellationToken ct = default)
     {

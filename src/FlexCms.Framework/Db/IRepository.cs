@@ -42,6 +42,18 @@ public interface IRepository<T> where T : class, IBaseEntity
     /// </summary>
     Task DeleteRangeAsync(IEnumerable<T> entities, CancellationToken ct = default);
 
+    /// <summary>
+    /// Returns a non-deleted <see cref="IQueryable{T}"/> for advanced LINQ
+    /// composition (joins, projections, server-side DataTables). The query
+    /// already excludes <see cref="EntityStatus.Deleted"/> rows.
+    ///
+    /// EF returns <c>IQueryable&lt;T&gt;</c>; Mongo returns
+    /// <c>MongoDB.Driver.Linq.IMongoQueryable&lt;T&gt;</c> (which derives
+    /// from <c>IQueryable&lt;T&gt;</c>) — callers using
+    /// <c>BaseAdminController.DataTableResult</c> get correct behavior either way.
+    /// </summary>
+    IQueryable<T> Query();
+
     // --- QueryFilter overloads ---
 
     /// <summary>

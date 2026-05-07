@@ -5,7 +5,7 @@
 
 <div class="d-flex align-items-center mb-3 gap-2">
     <a asp-action="Index" class="btn btn-sm btn-outline-secondary">← Back</a>
-    <h4 class="mb-0">@Model.Name</h4>
+    <h4 class="mb-0 text-break">@Model.Name</h4>
     @if (Model.Name == "SuperAdmin")
     {
         <span class="badge text-bg-danger">System — bypasses all permission checks</span>
@@ -101,6 +101,7 @@
         }
         else
         {
+            <div class="table-responsive">
             <table class="table table-sm">
                 <thead class="table-light">
                     <tr><th>Email</th><th></th></tr>
@@ -109,12 +110,13 @@
                     @foreach (var u in Model.Users)
                     {
                         <tr>
-                            <td>@u.Email</td>
+                            <td class="text-break">@u.Email</td>
                             <td><a asp-controller="User" asp-action="Edit" asp-route-id="@u.Id" class="btn btn-xs btn-outline-secondary">Edit</a></td>
                         </tr>
                     }
                 </tbody>
             </table>
+            </div>
         }
     </div>
 

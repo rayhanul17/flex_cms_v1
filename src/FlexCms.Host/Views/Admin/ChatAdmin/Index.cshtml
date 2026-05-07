@@ -14,11 +14,11 @@
                 @foreach (var t in Model)
                 {
                     <li class="list-group-item list-group-item-action thread-item" data-id="@t.Id" style="cursor:pointer">
-                        <div class="d-flex justify-content-between align-items-start">
-                            <strong>@t.UserDisplayName</strong>
-                            <small class="text-muted">@(t.LastMessageAt is null ? "" : FcmsTime.Format(t.LastMessageAt.Value))</small>
+                        <div class="d-flex justify-content-between align-items-start gap-2">
+                            <strong class="text-truncate">@t.UserDisplayName</strong>
+                            <small class="text-muted text-nowrap flex-shrink-0">@(t.LastMessageAt is null ? "" : FcmsTime.Format(t.LastMessageAt.Value))</small>
                         </div>
-                        <div class="small text-muted">@t.LastMessagePreview</div>
+                        <div class="small text-muted text-truncate">@t.LastMessagePreview</div>
                         <span class="badge text-bg-@(t.ThreadStatus == ChatThreadStatus.Open ? "success" : t.ThreadStatus == ChatThreadStatus.Resolved ? "secondary" : "dark")">@t.ThreadStatus</span>
                     </li>
                 }

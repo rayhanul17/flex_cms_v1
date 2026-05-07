@@ -15,6 +15,7 @@
 else
 {
     <form id="csrf-form" style="display:none">@Html.AntiForgeryToken()</form>
+    <div class="table-responsive">
     <table class="table table-hover align-middle">
         <thead class="table-light">
             <tr>
@@ -30,8 +31,8 @@ else
         @foreach (var r in Model)
         {
             <tr>
-                <td><code>@r.FromPath</code></td>
-                <td><code class="text-truncate" style="max-width:260px;display:inline-block">@r.ToPath</code></td>
+                <td><code class="text-break">@r.FromPath</code></td>
+                <td><code class="text-break">@r.ToPath</code></td>
                 <td><span class="badge @(r.StatusCode == 301 ? "text-bg-secondary" : "text-bg-info")">@r.StatusCode</span></td>
                 <td>
                     @if (r.IsActive)
@@ -52,6 +53,7 @@ else
         }
         </tbody>
     </table>
+    </div>
 }
 
 @section Scripts {

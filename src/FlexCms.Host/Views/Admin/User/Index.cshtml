@@ -12,6 +12,7 @@
 
 <div class="card shadow-sm">
     <div class="card-body p-0">
+        <div class="table-responsive">
         <table id="userTable" class="table table-hover mb-0 align-middle">
             <thead class="table-light">
                 <tr>
@@ -33,7 +34,7 @@
                         _ => "text-bg-light"
                     };
                     <tr>
-                        <td>
+                        <td class="text-break">
                             @u.Email
                             @if (u.ForcePasswordChange)
                             {
@@ -62,5 +63,6 @@
                 }
             </tbody>
         </table>
+        </div>
     </div>
 </div>

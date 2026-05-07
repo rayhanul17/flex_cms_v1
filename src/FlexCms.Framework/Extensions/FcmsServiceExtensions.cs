@@ -448,6 +448,10 @@ public static class FcmsServiceExtensions
                 .AddPasswordValidator<FcmsPasswordValidator>()
                 .AddDefaultTokenProviders();
 
+            // Scoped so it can access IFcmsContextService (per-request user/IP context)
+            // and ISettingsService without requiring a service locator.
+            services.AddScoped<FlexCms.Framework.Cms.FcmsAuditInterceptor>();
+
             if (options.UseMySQL)
             {
                 services.AddDbContext<FcmsDbContext>((sp, o) =>
@@ -455,7 +459,9 @@ public static class FcmsServiceExtensions
                         options.MySqlConnectionString,
                         Microsoft.EntityFrameworkCore.ServerVersion.AutoDetect(options.MySqlConnectionString),
                         m => { m.EnableRetryOnFailure(3); m.CommandTimeout(30); })
-                     .AddInterceptors(sp.GetRequiredService<SlowQueryInterceptor>()));
+                     .AddInterceptors(
+                         sp.GetRequiredService<SlowQueryInterceptor>(),
+                         sp.GetRequiredService<FlexCms.Framework.Cms.FcmsAuditInterceptor>()));
 
                 RegisterEfServices(services, identityBuilder);
             }
@@ -465,7 +471,9 @@ public static class FcmsServiceExtensions
                     o.UseSqlServer(
                         options.MsSqlConnectionString,
                         m => { m.EnableRetryOnFailure(3); m.CommandTimeout(30); })
-                     .AddInterceptors(sp.GetRequiredService<SlowQueryInterceptor>()));
+                     .AddInterceptors(
+                         sp.GetRequiredService<SlowQueryInterceptor>(),
+                         sp.GetRequiredService<FlexCms.Framework.Cms.FcmsAuditInterceptor>()));
 
                 RegisterEfServices(services, identityBuilder);
             }
@@ -475,7 +483,9 @@ public static class FcmsServiceExtensions
                     o.UseNpgsql(
                         options.PostgreSqlConnectionString,
                         m => { m.EnableRetryOnFailure(3); m.CommandTimeout(30); })
-                     .AddInterceptors(sp.GetRequiredService<SlowQueryInterceptor>()));
+                     .AddInterceptors(
+                         sp.GetRequiredService<SlowQueryInterceptor>(),
+                         sp.GetRequiredService<FlexCms.Framework.Cms.FcmsAuditInterceptor>()));
 
                 RegisterEfServices(services, identityBuilder);
             }

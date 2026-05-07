@@ -36,14 +36,15 @@ public sealed class EnvironmentBannerTagHelper : TagHelper
             _ => ("#6f42c1", $"{_env.EnvironmentName.ToUpperInvariant()} ENVIRONMENT")
         };
 
-        // position:fixed at the top so the banner overlays page chrome
-        // without participating in the parent's layout. Without this, when
-        // the host's body is a flex container the banner becomes a flex
-        // child and reserves a vertical strip of whitespace between
-        // siblings (the sidebar and the main-content margin).
-        // pointer-events:none lets clicks land on whatever is underneath.
+        // position:fixed BOTTOM-right (corner pill) so the banner is
+        // unmissable but does NOT overlay or push the rest of the layout.
+        // Earlier versions used a top strip which overlapped the topbar
+        // and made the hamburger / page title look squashed against the
+        // top of the viewport. pointer-events:none lets clicks land on
+        // whatever is underneath. Small + corner-pinned = visible to a
+        // developer, invisible to layout.
         output.Content.SetHtmlContent(
-            $@"<div style=""position:fixed;top:0;left:0;right:0;z-index:1100;background:{color};color:#fff;text-align:center;font-size:.75rem;font-weight:600;padding:2px 0;letter-spacing:.5px;pointer-events:none"">
+            $@"<div style=""position:fixed;bottom:8px;right:8px;z-index:1100;background:{color};color:#fff;font-size:.7rem;font-weight:600;padding:3px 10px;letter-spacing:.4px;pointer-events:none;border-radius:999px;box-shadow:0 2px 6px rgba(0,0,0,.25);opacity:.85"">
                 {label}
             </div>");
     }

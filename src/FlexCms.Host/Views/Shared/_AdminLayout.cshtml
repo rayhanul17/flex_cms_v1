@@ -153,24 +153,23 @@
     }
 
     // ── Sidebar toggle (mobile drawer + desktop rail) ─────────────────────
-    // Delegated click handler on document.body so it works regardless of
-    // when the toggle buttons enter the DOM (after view re-render, after
-    // a partial swap, etc.) AND survives any other script earlier in the
-    // page throwing. Diagnostic log fires on first toggle so the user
-    // can verify the wiring from the browser console.
-    (function () {
+    // BOTH a direct per-button listener AND a delegated capture-phase
+    // listener on document. Belt + braces: if one path is intercepted
+    // (browser extension, JS error in an earlier script), the other
+    // still fires. State lives entirely on document.body classlist.
+    window.fcmsSidebar = window.fcmsSidebar || (function () {
         const LS_KEY = 'fcms-sidebar-collapsed';
+        const MQ     = window.matchMedia('(min-width: 992px)');
 
-        function getSidebar()  { return document.getElementById('sidebar'); }
-        function getBackdrop() { return document.getElementById('sidebar-backdrop'); }
-        function isDesktop()   { return window.matchMedia('(min-width: 992px)').matches; }
+        const getBackdrop = () => document.getElementById('sidebar-backdrop');
+        const isDesktop   = () => MQ.matches;
 
         // Restore desktop collapsed state on first paint.
         try {
             if (isDesktop() && localStorage.getItem(LS_KEY) === '1') {
                 document.body.classList.add('sidebar-collapsed');
             }
-        } catch { /* private mode */ }
+        } catch (_) { /* private mode */ }
 
         function setExpanded(state) {
             document.querySelectorAll('.js-sidebar-toggle')
@@ -189,18 +188,14 @@
         function toggleDesktop() {
             const willCollapse = !document.body.classList.contains('sidebar-collapsed');
             document.body.classList.toggle('sidebar-collapsed', willCollapse);
-            try { localStorage.setItem(LS_KEY, willCollapse ? '1' : '0'); } catch {}
+            try { localStorage.setItem(LS_KEY, willCollapse ? '1' : '0'); } catch (_) {}
             setExpanded(!willCollapse);
         }
-
-        // ONE delegated listener on body; survives DOM swaps + partial
-        // rendering. Matches any descendant of a `.js-sidebar-toggle`
-        // element (the icon inside the button counts).
-        document.body.addEventListener('click', function (e) {
-            const trigger = e.target.closest('.js-sidebar-toggle');
-            if (!trigger) return;
-            e.preventDefault();
-            e.stopPropagation();
+        function handleToggle(e) {
+            if (e) { e.preventDefault(); e.stopPropagation(); }
+            console.log('[fcms-admin] toggle fired. desktop=', isDesktop(),
+                'collapsed=', document.body.classList.contains('sidebar-collapsed'),
+                'open=', document.body.classList.contains('sidebar-open'));
             if (isDesktop()) {
                 toggleDesktop();
             } else if (document.body.classList.contains('sidebar-open')) {
@@ -208,11 +203,35 @@
             } else {
                 openMobile();
             }
-        }, true);   // capture phase so nothing else can swallow the click
+        }
+
+        // Direct binding on each existing button (no delegation hop).
+        function bindDirect() {
+            document.querySelectorAll('.js-sidebar-toggle').forEach(btn => {
+                if (btn.__fcmsBound) return;
+                btn.__fcmsBound = true;
+                btn.addEventListener('click', handleToggle);
+            });
+        }
+        bindDirect();
+        // Re-bind on DOMContentLoaded too, in case the script ran before
+        // the buttons existed (defensive — they should already exist).
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', bindDirect);
+        }
+
+        // Delegated capture-phase listener on document — fallback for the
+        // case where the direct listener didn't bind (e.g. button added
+        // by a partial swap after this IIFE ran).
+        document.addEventListener('click', function (e) {
+            const trigger = e.target.closest && e.target.closest('.js-sidebar-toggle');
+            if (!trigger) return;
+            handleToggle(e);
+        }, true);
 
         // Backdrop tap closes the mobile drawer.
-        document.body.addEventListener('click', function (e) {
-            if (e.target.id === 'sidebar-backdrop') closeMobile();
+        document.addEventListener('click', function (e) {
+            if (e.target && e.target.id === 'sidebar-backdrop') closeMobile();
         });
 
         // Esc closes the drawer.
@@ -222,22 +241,25 @@
 
         // Auto-close mobile drawer after navigating to a sidebar link so
         // the newly-loaded page isn't covered by the open drawer.
-        document.body.addEventListener('click', function (e) {
+        document.addEventListener('click', function (e) {
             if (isDesktop()) return;
-            const sb = getSidebar();
+            const sb = document.getElementById('sidebar');
             if (!sb || !sb.contains(e.target)) return;
-            if (e.target.closest('.js-sidebar-toggle')) return;
-            const a = e.target.closest('a.nav-link');
+            if (e.target.closest && e.target.closest('.js-sidebar-toggle')) return;
+            const a = e.target.closest && e.target.closest('a.nav-link');
             if (a && !a.hasAttribute('data-bs-toggle')) closeMobile();
         });
 
         // Crossing the breakpoint: drop the mobile-only state.
-        window.matchMedia('(min-width: 992px)').addEventListener('change', function (e) {
+        MQ.addEventListener('change', function (e) {
             if (e.matches) closeMobile();
         });
 
-        console.log('[fcms-admin] sidebar toggle wired (delegated). Buttons present:',
-            document.querySelectorAll('.js-sidebar-toggle').length);
+        console.log('[fcms-admin] sidebar toggle wired. Buttons:',
+            document.querySelectorAll('.js-sidebar-toggle').length,
+            'desktop=', isDesktop());
+
+        return { toggle: handleToggle, openMobile, closeMobile, toggleDesktop };
     })();
 </script>
 @await RenderSectionAsync("Scripts", required: false)

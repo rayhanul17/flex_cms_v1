@@ -53,41 +53,31 @@
             text-transform: uppercase;
         }
 
-        /* Hero artwork — 3×3 CSS grid. Critical: each row gets an EXPLICIT
-           height (`minmax(110px, 1fr)`) so empty cells (top-middle,
-           mid-left, mid-right, bottom-middle) still hold their slot.
-           Without the minmax, `1fr` rows collapse to 0 when the cell is
-           empty, leaving only the 5 occupied cells stacked vertically —
-           exactly the broken render in the screenshot. */
-        .hero-mosaic {
+        /* Hero artwork — single self-contained inline SVG with its own
+           viewBox. Replaces the previous mosaic that kept collapsing under
+           Bootstrap's grid in narrow column widths (the `1fr` rows had
+           nothing forcing height when the column shrank, and even
+           `minmax(110px, 1fr)` couldn't recover when the parent .col-lg-5
+           was narrower than expected on the user's viewport). SVG scales
+           predictably regardless of column width — viewBox handles the
+           aspect ratio, no grid math involved. */
+        .hero-artwork {
             width: 100%;
-            max-width: 380px;
+            max-width: 420px;
             margin-left: auto;
-            display: grid;
-            grid-template-columns: repeat(3, minmax(0, 1fr));
-            grid-template-rows: repeat(3, minmax(110px, 1fr));
-            gap: 16px;
+            display: block;
         }
-        .hero-mosaic .tile {
-            border-radius: 18px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 2.4rem;
-            box-shadow: 0 12px 30px rgba(15, 23, 42, .08), 0 1px 2px rgba(15, 23, 42, .05);
-            transition: transform .25s ease, box-shadow .25s ease;
+        .hero-artwork svg { width: 100%; height: auto; }
+        .hero-artwork .float-anim {
+            animation: heroFloat 6s ease-in-out infinite;
+            transform-origin: center;
         }
-        .hero-mosaic .tile:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 18px 40px rgba(15, 23, 42, .14);
+        .hero-artwork .float-anim.delay-1 { animation-delay: -2s; }
+        .hero-artwork .float-anim.delay-2 { animation-delay: -4s; }
+        @@keyframes heroFloat {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-6px); }
         }
-        /* 4 corners + 1 larger center tile. The empty cells stay in the
-           grid because of the row minmax above. */
-        .hero-mosaic .tile.t1 { grid-row: 1; grid-column: 1; color: #0d6efd; background: linear-gradient(135deg, #cfe2ff 0%, #eaf3ff 100%); }
-        .hero-mosaic .tile.t2 { grid-row: 1; grid-column: 3; color: #6f42c1; background: linear-gradient(135deg, #ddccff 0%, #f0e8ff 100%); }
-        .hero-mosaic .tile.t3 { grid-row: 2; grid-column: 2; color: #fd7e14; background: linear-gradient(135deg, #ffd8a8 0%, #fff1e3 100%); font-size: 2.9rem; }
-        .hero-mosaic .tile.t4 { grid-row: 3; grid-column: 1; color: #198754; background: linear-gradient(135deg, #b8e0c2 0%, #e3f4e8 100%); }
-        .hero-mosaic .tile.t5 { grid-row: 3; grid-column: 3; color: #d63384; background: linear-gradient(135deg, #f8c4dc 0%, #fde4ee 100%); }
 
         /* Highlight cards — subtle hover lift + colored top stripe per card. */
         .highlight-card {
@@ -203,12 +193,102 @@
                 </div>
             </div>
             <div class="col-lg-5 d-none d-lg-block">
-                <div class="hero-mosaic">
-                    <div class="tile t1"><i class="bi bi-grid-3x3-gap"></i></div>
-                    <div class="tile t2"><i class="bi bi-shield-check"></i></div>
-                    <div class="tile t3"><i class="bi bi-translate"></i></div>
-                    <div class="tile t4"><i class="bi bi-lightning-charge"></i></div>
-                    <div class="tile t5"><i class="bi bi-puzzle"></i></div>
+                <div class="hero-artwork" aria-hidden="true">
+                    <!-- Single inline SVG so the artwork can never collapse
+                         under unexpected column widths. viewBox handles
+                         scaling; no Bootstrap grid math involved. -->
+                    <svg viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg">
+                        <defs>
+                            <linearGradient id="bgBlue" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" stop-color="#cfe2ff" />
+                                <stop offset="100%" stop-color="#e7f1ff" />
+                            </linearGradient>
+                            <linearGradient id="bgPurple" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" stop-color="#ddccff" />
+                                <stop offset="100%" stop-color="#f0e8ff" />
+                            </linearGradient>
+                            <linearGradient id="bgOrange" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" stop-color="#ffd8a8" />
+                                <stop offset="100%" stop-color="#fff1e3" />
+                            </linearGradient>
+                            <linearGradient id="bgGreen" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" stop-color="#b8e0c2" />
+                                <stop offset="100%" stop-color="#e3f4e8" />
+                            </linearGradient>
+                            <linearGradient id="bgPink" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" stop-color="#f8c4dc" />
+                                <stop offset="100%" stop-color="#fde4ee" />
+                            </linearGradient>
+                            <filter id="cardShadow" x="-20%" y="-20%" width="140%" height="140%">
+                                <feDropShadow dx="0" dy="8" stdDeviation="6" flood-color="#0f172a" flood-opacity=".10" />
+                            </filter>
+                        </defs>
+
+                        <!-- Decorative dashed ring + corner dots -->
+                        <circle cx="200" cy="200" r="170" fill="none" stroke="#e9ecef" stroke-width="2" stroke-dasharray="3 7" opacity=".7" />
+                        <circle cx="40" cy="60" r="3" fill="#0d6efd" opacity=".4" />
+                        <circle cx="370" cy="100" r="4" fill="#6f42c1" opacity=".4" />
+                        <circle cx="50" cy="350" r="3" fill="#198754" opacity=".4" />
+                        <circle cx="360" cy="330" r="4" fill="#d63384" opacity=".4" />
+
+                        <!-- Top-left tile: Modular (3×3 dot grid) -->
+                        <g class="float-anim" filter="url(#cardShadow)">
+                            <rect x="40" y="40" width="100" height="100" rx="20" fill="url(#bgBlue)" />
+                            <g fill="#0d6efd">
+                                <rect x="68" y="68" width="10" height="10" rx="2" />
+                                <rect x="85" y="68" width="10" height="10" rx="2" />
+                                <rect x="102" y="68" width="10" height="10" rx="2" />
+                                <rect x="68" y="85" width="10" height="10" rx="2" />
+                                <rect x="85" y="85" width="10" height="10" rx="2" />
+                                <rect x="102" y="85" width="10" height="10" rx="2" />
+                                <rect x="68" y="102" width="10" height="10" rx="2" />
+                                <rect x="85" y="102" width="10" height="10" rx="2" />
+                                <rect x="102" y="102" width="10" height="10" rx="2" />
+                            </g>
+                        </g>
+
+                        <!-- Top-right tile: Secure (shield + check) -->
+                        <g class="float-anim delay-1" filter="url(#cardShadow)">
+                            <rect x="260" y="40" width="100" height="100" rx="20" fill="url(#bgPurple)" />
+                            <path d="M310 65 L335 75 V95 Q335 110 310 120 Q285 110 285 95 V75 Z"
+                                  fill="#6f42c1" opacity=".15" />
+                            <path d="M310 65 L335 75 V95 Q335 110 310 120 Q285 110 285 95 V75 Z"
+                                  fill="none" stroke="#6f42c1" stroke-width="3.5" stroke-linejoin="round" />
+                            <path d="M298 92 L307 101 L322 84"
+                                  fill="none" stroke="#6f42c1" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
+                        </g>
+
+                        <!-- Center tile: Lightning (larger) -->
+                        <g class="float-anim delay-2" filter="url(#cardShadow)">
+                            <rect x="140" y="150" width="120" height="120" rx="22" fill="url(#bgOrange)" />
+                            <path d="M209 175 L182 220 L198 220 L191 245 L218 200 L202 200 L209 175 Z"
+                                  fill="#fd7e14" />
+                        </g>
+
+                        <!-- Bottom-left tile: Translate (Aあ) -->
+                        <g class="float-anim delay-1" filter="url(#cardShadow)">
+                            <rect x="40" y="260" width="100" height="100" rx="20" fill="url(#bgGreen)" />
+                            <text x="68" y="320" font-family="Georgia, serif" font-size="38" font-weight="700" fill="#198754">A</text>
+                            <text x="95" y="335" font-family="serif" font-size="32" font-weight="700" fill="#198754">あ</text>
+                            <path d="M68 340 L122 340" stroke="#198754" stroke-width="2.5" stroke-linecap="round" />
+                        </g>
+
+                        <!-- Bottom-right tile: Puzzle (4 connected blocks) -->
+                        <g class="float-anim" filter="url(#cardShadow)">
+                            <rect x="260" y="260" width="100" height="100" rx="20" fill="url(#bgPink)" />
+                            <g fill="#d63384">
+                                <rect x="280" y="280" width="18" height="18" rx="3" />
+                                <rect x="302" y="280" width="18" height="18" rx="3" />
+                                <rect x="324" y="280" width="18" height="18" rx="3" />
+                                <rect x="280" y="302" width="18" height="18" rx="3" opacity=".6" />
+                                <rect x="302" y="302" width="18" height="18" rx="3" />
+                                <rect x="324" y="302" width="18" height="18" rx="3" opacity=".6" />
+                                <rect x="280" y="324" width="18" height="18" rx="3" />
+                                <rect x="302" y="324" width="18" height="18" rx="3" opacity=".6" />
+                                <rect x="324" y="324" width="18" height="18" rx="3" />
+                            </g>
+                        </g>
+                    </svg>
                 </div>
             </div>
         </div>

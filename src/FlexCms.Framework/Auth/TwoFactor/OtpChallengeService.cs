@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using FlexCms.Framework.Clock;
+using FlexCms.Framework.Cms;
 using FlexCms.Framework.Db;
 using FlexCms.Framework.Messaging;
 using Microsoft.AspNetCore.Identity;
@@ -20,6 +21,7 @@ public sealed class OtpChallengeService : IOtpChallengeService
     private readonly IFcmsSmsSender _sms;
     private readonly IRepository<FcmsRecoveryCode> _recovery;
     private readonly IFcmsUnitOfWork _uow;
+    private readonly IFcmsLogService _audit;
     private readonly ILogger<OtpChallengeService> _logger;
 
     public OtpChallengeService(
@@ -28,6 +30,7 @@ public sealed class OtpChallengeService : IOtpChallengeService
         IFcmsSmsSender sms,
         IRepository<FcmsRecoveryCode> recovery,
         IFcmsUnitOfWork uow,
+        IFcmsLogService audit,
         ILogger<OtpChallengeService> logger)
     {
         _userManager = userManager;
@@ -35,6 +38,7 @@ public sealed class OtpChallengeService : IOtpChallengeService
         _sms = sms;
         _recovery = recovery;
         _uow = uow;
+        _audit = audit;
         _logger = logger;
     }
 
@@ -59,13 +63,22 @@ public sealed class OtpChallengeService : IOtpChallengeService
             if (!smsResult.Success)
             {
                 _logger.LogWarning("OTP SMS send failed for user {UserId}: {Error}", user.Id, smsResult.Error);
+                await ClearPendingOtpAsync(user);
+                await _audit.LogAsync(FcmsAuditActions.OtpSendFailed, nameof(FcmsUser), user.Id.ToString(),
+                    value: new { channel = "SMS", error = smsResult.Error },
+                    severity: FcmsLogSeverity.Warning, ct: ct);
                 return new OtpIssueResult(false, Error: "Could not send code via SMS. Try again or contact admin.");
             }
+            await _audit.LogAsync(FcmsAuditActions.OtpIssued, nameof(FcmsUser), user.Id.ToString(),
+                value: new { channel = "SMS", destination = MaskPhone(user.PhoneNumber) }, ct: ct);
             return new OtpIssueResult(true, MaskedDestination: MaskPhone(user.PhoneNumber));
         }
 
         if (string.IsNullOrWhiteSpace(user.Email))
+        {
+            await ClearPendingOtpAsync(user);
             return new OtpIssueResult(false, Error: "No deliverable channel — set an email address first.");
+        }
 
         var html = $"""
             <p>Your FlexCMS sign-in code is:</p>
@@ -76,8 +89,14 @@ public sealed class OtpChallengeService : IOtpChallengeService
         if (!emailResult.Success)
         {
             _logger.LogWarning("OTP email send failed for user {UserId}: {Error}", user.Id, emailResult.Error);
+            await ClearPendingOtpAsync(user);
+            await _audit.LogAsync(FcmsAuditActions.OtpSendFailed, nameof(FcmsUser), user.Id.ToString(),
+                value: new { channel = "Email", error = emailResult.Error },
+                severity: FcmsLogSeverity.Warning, ct: ct);
             return new OtpIssueResult(false, Error: "Could not send code via email. Try again or contact admin.");
         }
+        await _audit.LogAsync(FcmsAuditActions.OtpIssued, nameof(FcmsUser), user.Id.ToString(),
+            value: new { channel = "Email", destination = MaskEmail(user.Email) }, ct: ct);
         return new OtpIssueResult(true, MaskedDestination: MaskEmail(user.Email));
     }
 
@@ -98,9 +117,13 @@ public sealed class OtpChallengeService : IOtpChallengeService
         {
             user.PendingOtpAttempts++;
             await _userManager.UpdateAsync(user);
-            return user.PendingOtpAttempts >= MaxAttempts
+            var result = user.PendingOtpAttempts >= MaxAttempts
                 ? OtpVerifyResult.TooManyAttempts
                 : OtpVerifyResult.Invalid;
+            await _audit.LogAsync(FcmsAuditActions.OtpFailed, nameof(FcmsUser), user.Id.ToString(),
+                value: new { reason = result.ToString(), attempts = user.PendingOtpAttempts },
+                severity: FcmsLogSeverity.Warning, ct: ct);
+            return result;
         }
 
         // Clear the pending OTP — single use.
@@ -108,6 +131,7 @@ public sealed class OtpChallengeService : IOtpChallengeService
         user.PendingOtpExpiresAt = null;
         user.PendingOtpAttempts = 0;
         await _userManager.UpdateAsync(user);
+        await _audit.LogAsync(FcmsAuditActions.OtpVerified, nameof(FcmsUser), user.Id.ToString(), ct: ct);
         return OtpVerifyResult.Ok;
     }
 
@@ -127,6 +151,7 @@ public sealed class OtpChallengeService : IOtpChallengeService
         match.UsedAt = FcmsTime.Now;
         await _recovery.UpdateAsync(match, ct);
         await _uow.SaveChangesAsync(ct);
+        await _audit.LogAsync(FcmsAuditActions.RecoveryCodeUsed, nameof(FcmsUser), user.Id.ToString(), ct: ct);
         return true;
     }
 
@@ -157,6 +182,14 @@ public sealed class OtpChallengeService : IOtpChallengeService
     {
         var rows = await _recovery.FindAsync(r => r.UserId == userId && !r.IsUsed, ct);
         return rows.Count;
+    }
+
+    private async Task ClearPendingOtpAsync(FcmsUser user)
+    {
+        user.PendingOtpHash = null;
+        user.PendingOtpExpiresAt = null;
+        user.PendingOtpAttempts = 0;
+        await _userManager.UpdateAsync(user);
     }
 
     // ── helpers ──────────────────────────────────────────────────────────────

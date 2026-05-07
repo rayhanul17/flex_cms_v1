@@ -13,11 +13,23 @@
 > (already in earlier phases via `EnableRetryOnFailure(3)` — Issue 92),
 > environment banner (Issue 91), login redirect service (Issue 102).
 >
-> **Deferred**: 2FA TOTP (Issue 71), OAuth providers (Issue 72), full email-
-> verification flow polish (Issue 70), custom 401/403/404/500 styled pages
-> (Issue 103) — require external service integration or substantial UI
-> design work; the framework's existing error handling middleware covers
-> the unstyled defaults.
+> **Shipped post-audit** (replaces TOTP plan): 2FA via email/SMS OTP
+> (Issue 71 modified) — reuses the Phase 8 email + SMS infra; admins
+> don't need to install authenticator apps. Recovery codes shown once
+> at enrollment. See [phase-hardening-test-cases.md](phase-hardening-test-cases.md)
+> §4 for the full manual checklist.
+>
+> **Dropped (intentional, NOT deferred)**: OAuth providers (Issue 72) —
+> Google/Facebook/Microsoft/GitHub. Reason: BD-market FlexCMS deployments
+> are admin-heavy + email/phone-first; provider maintenance burden
+> (deprecated scopes, callback juggling) outweighs onboarding benefit.
+> Plan-doc rationale spelled out in the Phase 13 entry. Community module
+> slot if anyone needs it.
+>
+> **Deferred**: full email-verification flow polish (Issue 70), custom
+> 401/403/404/500 styled pages (Issue 103) — substantial UI design work;
+> the framework's existing error handling middleware covers the unstyled
+> defaults.
 
 ## 1. Health endpoints (`/health`, `/health/ready`, `/health/live`)
 

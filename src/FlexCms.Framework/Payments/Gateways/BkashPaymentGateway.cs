@@ -1,5 +1,6 @@
 using System.Net.Http.Json;
 using System.Text.Json;
+using FlexCms.Framework.Payments.Services;
 using Microsoft.Extensions.Logging;
 
 namespace FlexCms.Framework.Payments.Gateways;
@@ -7,20 +8,21 @@ namespace FlexCms.Framework.Payments.Gateways;
 /// <summary>
 /// bKash Tokenized Checkout (PGW). Two-phase: <c>create</c> returns a redirect
 /// url + paymentID; client completes the flow on bKash's hosted page; we
-/// later verify via <c>execute</c>.
+/// later verify via <c>execute</c> / <c>payment/status</c>.
+///
+/// <para>
+/// Reads <see cref="BkashSettings"/> on each call so credential changes apply
+/// without restart. Forward charges are added to the order amount before it's
+/// sent to bKash; Backward charges are deducted from the merchant payout (no
+/// adjustment to the customer's payable amount).
+/// </para>
 ///
 /// <para>
 /// <b>Stub note:</b> the production endpoints + token-grant flow require live
-/// merchant credentials and a sandbox account. This implementation maps the
-/// shape of the contract and returns the gateway's response verbatim, so once
-/// real credentials are configured the wiring is in place.
+/// merchant credentials. This implementation maps the contract shape and
+/// returns the gateway's response verbatim, so once real credentials are
+/// configured the wiring is in place.
 /// </para>
-///
-/// Default endpoints:
-/// <list type="bullet">
-///   <item>Sandbox: <c>https://tokenized.sandbox.bka.sh/v1.2.0-beta</c></item>
-///   <item>Production: <c>https://tokenized.pay.bka.sh/v1.2.0-beta</c></item>
-/// </list>
 /// </summary>
 public sealed class BkashPaymentGateway : IFcmsPaymentGateway
 {
@@ -28,26 +30,40 @@ public sealed class BkashPaymentGateway : IFcmsPaymentGateway
     public const string ProductionBase = "https://tokenized.pay.bka.sh/v1.2.0-beta";
 
     private readonly HttpClient _http;
+    private readonly IPaymentSettingsService _settings;
+    private readonly IPaymentChargeCalculator _charges;
     private readonly ILogger<BkashPaymentGateway> _logger;
 
-    public BkashPaymentGateway(HttpClient http, ILogger<BkashPaymentGateway> logger)
+    public BkashPaymentGateway(
+        HttpClient http,
+        IPaymentSettingsService settings,
+        IPaymentChargeCalculator charges,
+        ILogger<BkashPaymentGateway> logger)
     {
         _http = http;
+        _settings = settings;
+        _charges = charges;
         _logger = logger;
     }
 
     public string GatewayId => PaymentGateways.Bkash;
 
-    public async Task<PaymentInitiateResult> InitiateAsync(PaymentInitiateRequest request, PaymentSettings settings, string apiKey, CancellationToken ct = default)
+    public async Task<PaymentInitiateResult> InitiateAsync(PaymentInitiateRequest request, CancellationToken ct = default)
     {
-        var baseUrl = ResolveBaseUrl(settings);
+        var (cfg, appSecret, _password) = await _settings.GetBkashWithSecretsAsync(ct);
+        if (!cfg.Enabled) return PaymentInitiateResult.Fail("bKash gateway not enabled.");
+
+        var charge = _charges.Calculate(request.Amount, cfg.Charge);
+        var amountToCharge = charge.CustomerPays;
+
+        var baseUrl = ResolveBaseUrl(cfg);
         var url = $"{baseUrl}/checkout/create";
         var payload = new
         {
             mode = "0011",
             payerReference = request.OrderReference,
             callbackURL = request.CallbackUrl,
-            amount = request.Amount.ToString("0.00"),
+            amount = amountToCharge.ToString("0.00"),
             currency = request.Currency ?? "BDT",
             intent = "sale",
             merchantInvoiceNumber = request.OrderReference
@@ -56,8 +72,8 @@ public sealed class BkashPaymentGateway : IFcmsPaymentGateway
         try
         {
             using var req = new HttpRequestMessage(HttpMethod.Post, url) { Content = JsonContent.Create(payload) };
-            req.Headers.Add("X-APP-Key", apiKey);
-            req.Headers.Add("Authorization", "Bearer " + settings.MerchantId);
+            req.Headers.Add("X-APP-Key", cfg.AppKey);
+            req.Headers.Add("X-APP-Secret", appSecret);
             using var resp = await _http.SendAsync(req, ct);
             var raw = await resp.Content.ReadAsStringAsync(ct);
             if (!resp.IsSuccessStatusCode)
@@ -69,7 +85,7 @@ public sealed class BkashPaymentGateway : IFcmsPaymentGateway
             if (string.IsNullOrEmpty(redirect) || string.IsNullOrEmpty(pid))
                 return PaymentInitiateResult.Fail("bKash response missing fields.");
 
-            return PaymentInitiateResult.Ok(redirect, pid);
+            return PaymentInitiateResult.Ok(redirect, pid, charge);
         }
         catch (Exception ex)
         {
@@ -78,17 +94,20 @@ public sealed class BkashPaymentGateway : IFcmsPaymentGateway
         }
     }
 
-    public async Task<PaymentResult> VerifyAsync(string transactionId, PaymentSettings settings, string apiKey, CancellationToken ct = default)
+    public async Task<PaymentResult> VerifyAsync(string transactionId, CancellationToken ct = default)
     {
-        var baseUrl = ResolveBaseUrl(settings);
+        var (cfg, appSecret, _password) = await _settings.GetBkashWithSecretsAsync(ct);
+        if (!cfg.Enabled) return PaymentResult.Fail("bKash gateway not enabled.");
+
+        var baseUrl = ResolveBaseUrl(cfg);
         var url = $"{baseUrl}/checkout/payment/status";
         var payload = new { paymentID = transactionId };
 
         try
         {
             using var req = new HttpRequestMessage(HttpMethod.Post, url) { Content = JsonContent.Create(payload) };
-            req.Headers.Add("X-APP-Key", apiKey);
-            req.Headers.Add("Authorization", "Bearer " + settings.MerchantId);
+            req.Headers.Add("X-APP-Key", cfg.AppKey);
+            req.Headers.Add("X-APP-Secret", appSecret);
             using var resp = await _http.SendAsync(req, ct);
             var raw = await resp.Content.ReadAsStringAsync(ct);
             if (!resp.IsSuccessStatusCode) return PaymentResult.Fail($"HTTP {(int)resp.StatusCode}", raw);
@@ -108,7 +127,7 @@ public sealed class BkashPaymentGateway : IFcmsPaymentGateway
         }
     }
 
-    public Task<PaymentResult> HandleWebhookAsync(IDictionary<string, string> payload, PaymentSettings settings, string apiKey, CancellationToken ct = default)
+    public Task<PaymentResult> HandleWebhookAsync(IDictionary<string, string> payload, CancellationToken ct = default)
     {
         // bKash's IPN signature scheme is account-tier dependent — implement
         // when real merchant docs are available. For now: reject unsigned
@@ -117,11 +136,10 @@ public sealed class BkashPaymentGateway : IFcmsPaymentGateway
             return Task.FromResult(PaymentResult.Fail("Missing paymentID."));
         if (!payload.TryGetValue("signature", out var sig) || string.IsNullOrEmpty(sig))
             return Task.FromResult(PaymentResult.Fail("Missing signature."));
-        // Verification deferred to live integration phase.
         return Task.FromResult(PaymentResult.Fail("Webhook verification not yet implemented for bKash."));
     }
 
-    private static string ResolveBaseUrl(PaymentSettings settings)
-        => !string.IsNullOrWhiteSpace(settings.EndpointOverride) ? settings.EndpointOverride
-           : settings.TestMode ? SandboxBase : ProductionBase;
+    private static string ResolveBaseUrl(BkashSettings cfg)
+        => !string.IsNullOrWhiteSpace(cfg.EndpointOverride) ? cfg.EndpointOverride
+           : cfg.TestMode ? SandboxBase : ProductionBase;
 }

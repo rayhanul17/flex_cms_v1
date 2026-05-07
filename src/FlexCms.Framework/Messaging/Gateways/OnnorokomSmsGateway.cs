@@ -36,7 +36,9 @@ public sealed class OnnorokomSmsGateway : ISmsGateway
             userPassword = apiKey,
             mobileNumber = message.To,
             smsText = message.Text,
-            type = "TEXT",
+            // Onnorokom expects "TEXT" or "UNICODE" — Bengali content sent
+            // as TEXT renders as ?'s on the handset.
+            type = settings.BulkSmsType == BulkSmsType.Unicode ? "UNICODE" : "TEXT",
             maskName = settings.SenderId,
             campaignName = ""
         };

@@ -59,5 +59,9 @@ public class MessagingSettingsViewModel
     [Display(Name = "Endpoint override (advanced)")]
     public string SmsEndpointOverride { get; set; } = "";
 
+    /// <summary>Encoding hint passed to the gateway — Unicode for Bengali, Text for English-only.</summary>
+    [Display(Name = "Bulk SMS type")]
+    public BulkSmsType SmsBulkType { get; set; } = BulkSmsType.Text;
+
     public bool SmsHasApiKey { get; set; }
 }

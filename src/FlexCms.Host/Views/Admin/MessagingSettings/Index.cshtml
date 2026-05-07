@@ -100,6 +100,16 @@
                     <input asp-for="SmsEndpointOverride" class="form-control"
                            placeholder="Default endpoint will be used if blank" />
                 </div>
+                <div class="col-md-6">
+                    <label asp-for="SmsBulkType" class="form-label"></label>
+                    <select asp-for="SmsBulkType" class="form-select">
+                        @foreach (var t in Enum.GetValues<BulkSmsType>())
+                        {
+                            <option value="@t">@t</option>
+                        }
+                    </select>
+                    <small class="text-muted">Use Unicode for Bengali content; Text for English-only (cheaper).</small>
+                </div>
             </div>
             <hr />
             <div class="d-flex gap-2 align-items-center">

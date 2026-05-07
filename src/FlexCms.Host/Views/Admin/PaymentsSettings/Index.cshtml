@@ -1,0 +1,232 @@
+@using FlexCms.Framework.Payments
+@model FlexCms.Host.Models.Admin.PaymentsSettingsViewModel
+@{
+    ViewData["Title"] = "Payment Settings";
+}
+
+<h4 class="mb-3">Payment Settings</h4>
+
+<form method="post" asp-action="Index">
+    @Html.AntiForgeryToken()
+    <div asp-validation-summary="ModelOnly" class="alert alert-danger"
+         style="display:@(ViewData.ModelState.IsValid ? "none" : "block")"></div>
+
+    @* ── General ────────────────────────────────────────────────── *@
+    <div class="card shadow-sm mb-3">
+        <div class="card-header fw-semibold">General</div>
+        <div class="card-body">
+            <div class="form-check form-switch mb-3">
+                <input asp-for="Enabled" class="form-check-input" role="switch" />
+                <label asp-for="Enabled" class="form-check-label"></label>
+            </div>
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label asp-for="ActiveGateway" class="form-label"></label>
+                    <select asp-for="ActiveGateway" class="form-select">
+                        @foreach (var gw in PaymentGateways.All)
+                        {
+                            <option value="@gw">@gw</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label asp-for="Currency" class="form-label"></label>
+                    <input asp-for="Currency" class="form-control" />
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @* ── Tabs ────────────────────────────────────────────────────── *@
+    <ul class="nav nav-tabs" id="payTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-bkash" type="button">bKash</button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-sslcommerz" type="button">SSLCommerz</button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-nagad" type="button">Nagad</button>
+        </li>
+    </ul>
+    <div class="tab-content border border-top-0 p-3 mb-3 bg-white">
+
+        @* ── bKash ─────────────────────────────────────────────── *@
+        <div class="tab-pane fade show active" id="tab-bkash" role="tabpanel">
+            <div class="form-check form-switch mb-2">
+                <input asp-for="Bkash.Enabled" class="form-check-input" role="switch" />
+                <label asp-for="Bkash.Enabled" class="form-check-label"></label>
+            </div>
+            <div class="form-check form-switch mb-3">
+                <input asp-for="Bkash.TestMode" class="form-check-input" role="switch" />
+                <label asp-for="Bkash.TestMode" class="form-check-label"></label>
+            </div>
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label asp-for="Bkash.AppKey" class="form-label"></label>
+                    <input asp-for="Bkash.AppKey" class="form-control" autocomplete="off" />
+                </div>
+                <div class="col-md-6">
+                    <label asp-for="Bkash.AppSecret" class="form-label"></label>
+                    <input asp-for="Bkash.AppSecret" class="form-control" autocomplete="new-password"
+                           placeholder="@(Model.Bkash.HasAppSecret ? "•••••••• (set — leave blank to keep)" : "Enter App Secret")" />
+                </div>
+                <div class="col-md-6">
+                    <label asp-for="Bkash.Username" class="form-label"></label>
+                    <input asp-for="Bkash.Username" class="form-control" autocomplete="off" />
+                </div>
+                <div class="col-md-6">
+                    <label asp-for="Bkash.Password" class="form-label"></label>
+                    <input asp-for="Bkash.Password" class="form-control" autocomplete="new-password"
+                           placeholder="@(Model.Bkash.HasPassword ? "•••••••• (set — leave blank to keep)" : "Enter password")" />
+                </div>
+                <div class="col-md-6">
+                    <label asp-for="Bkash.MerchantNumber" class="form-label"></label>
+                    <input asp-for="Bkash.MerchantNumber" class="form-control" />
+                </div>
+                <div class="col-md-6">
+                    <label asp-for="Bkash.EndpointOverride" class="form-label"></label>
+                    <input asp-for="Bkash.EndpointOverride" class="form-control"
+                           placeholder="Default endpoint will be used if blank" />
+                </div>
+            </div>
+            <hr />
+            <h6 class="mb-2">Charge configuration</h6>
+            @await Html.PartialAsync("_ChargeFields", Model.Bkash.Charge, new ViewDataDictionary(ViewData) { ["Prefix"] = "Bkash.Charge" })
+        </div>
+
+        @* ── SSLCommerz ────────────────────────────────────────── *@
+        <div class="tab-pane fade" id="tab-sslcommerz" role="tabpanel">
+            <div class="form-check form-switch mb-2">
+                <input asp-for="Sslcommerz.Enabled" class="form-check-input" role="switch" />
+                <label asp-for="Sslcommerz.Enabled" class="form-check-label"></label>
+            </div>
+            <div class="form-check form-switch mb-3">
+                <input asp-for="Sslcommerz.TestMode" class="form-check-input" role="switch" />
+                <label asp-for="Sslcommerz.TestMode" class="form-check-label"></label>
+            </div>
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label asp-for="Sslcommerz.StoreId" class="form-label"></label>
+                    <input asp-for="Sslcommerz.StoreId" class="form-control" autocomplete="off" />
+                </div>
+                <div class="col-md-6">
+                    <label asp-for="Sslcommerz.StorePassword" class="form-label"></label>
+                    <input asp-for="Sslcommerz.StorePassword" class="form-control" autocomplete="new-password"
+                           placeholder="@(Model.Sslcommerz.HasStorePassword ? "•••••••• (set — leave blank to keep)" : "Enter store password")" />
+                </div>
+                <div class="col-md-12">
+                    <label asp-for="Sslcommerz.EndpointOverride" class="form-label"></label>
+                    <input asp-for="Sslcommerz.EndpointOverride" class="form-control"
+                           placeholder="Default endpoint will be used if blank" />
+                </div>
+            </div>
+            <hr />
+            <h6 class="mb-2">Charge configuration</h6>
+            @await Html.PartialAsync("_ChargeFields", Model.Sslcommerz.Charge, new ViewDataDictionary(ViewData) { ["Prefix"] = "Sslcommerz.Charge" })
+        </div>
+
+        @* ── Nagad ────────────────────────────────────────────── *@
+        <div class="tab-pane fade" id="tab-nagad" role="tabpanel">
+            <div class="form-check form-switch mb-2">
+                <input asp-for="Nagad.Enabled" class="form-check-input" role="switch" />
+                <label asp-for="Nagad.Enabled" class="form-check-label"></label>
+            </div>
+            <div class="form-check form-switch mb-3">
+                <input asp-for="Nagad.TestMode" class="form-check-input" role="switch" />
+                <label asp-for="Nagad.TestMode" class="form-check-label"></label>
+            </div>
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label asp-for="Nagad.MerchantId" class="form-label"></label>
+                    <input asp-for="Nagad.MerchantId" class="form-control" autocomplete="off" />
+                </div>
+                <div class="col-md-6">
+                    <label asp-for="Nagad.MerchantNumber" class="form-label"></label>
+                    <input asp-for="Nagad.MerchantNumber" class="form-control" />
+                </div>
+                <div class="col-12">
+                    <label asp-for="Nagad.MerchantPublicKey" class="form-label"></label>
+                    <textarea asp-for="Nagad.MerchantPublicKey" class="form-control" rows="3"
+                              placeholder="-----BEGIN PUBLIC KEY-----..."></textarea>
+                </div>
+                <div class="col-12">
+                    <label asp-for="Nagad.MerchantPrivateKey" class="form-label"></label>
+                    <textarea asp-for="Nagad.MerchantPrivateKey" class="form-control" rows="4" autocomplete="new-password"
+                              placeholder="@(Model.Nagad.HasMerchantPrivateKey ? "•••••••• (set — leave blank to keep)" : "-----BEGIN PRIVATE KEY-----...")"></textarea>
+                </div>
+                <div class="col-12">
+                    <label asp-for="Nagad.NagadPublicKey" class="form-label"></label>
+                    <textarea asp-for="Nagad.NagadPublicKey" class="form-control" rows="3"
+                              placeholder="Nagad-issued PEM"></textarea>
+                </div>
+                <div class="col-md-12">
+                    <label asp-for="Nagad.EndpointOverride" class="form-label"></label>
+                    <input asp-for="Nagad.EndpointOverride" class="form-control"
+                           placeholder="Default endpoint will be used if blank" />
+                </div>
+            </div>
+            <hr />
+            <h6 class="mb-2">Charge configuration</h6>
+            @await Html.PartialAsync("_ChargeFields", Model.Nagad.Charge, new ViewDataDictionary(ViewData) { ["Prefix"] = "Nagad.Charge" })
+        </div>
+    </div>
+
+    @* ── Test bench ────────────────────────────────────────────── *@
+    <div class="card shadow-sm mb-3">
+        <div class="card-header fw-semibold">Test bench</div>
+        <div class="card-body">
+            <div class="row g-2 align-items-end">
+                <div class="col-md-3">
+                    <label class="form-label">Test gateway (preview)</label>
+                    <select id="previewGateway" class="form-select">
+                        @foreach (var gw in PaymentGateways.All)
+                        {
+                            <option value="@gw">@gw</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Order amount</label>
+                    <input id="previewAmount" type="number" min="1" step="0.01" class="form-control" value="1000" />
+                </div>
+                <div class="col-md-3">
+                    <button type="button" id="btnPreview" class="btn btn-outline-secondary">
+                        <i class="bi bi-calculator"></i> Preview charge
+                    </button>
+                </div>
+                <div class="col-md-3">
+                    <button type="button" id="btnTestInitiate" class="btn btn-outline-primary">
+                        <i class="bi bi-cash-coin"></i> Test initiate (active gateway)
+                    </button>
+                </div>
+            </div>
+            <pre id="testOut" class="small mt-3 mb-0 text-muted" style="white-space:pre-wrap"></pre>
+        </div>
+    </div>
+
+    <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg"></i> Save settings</button>
+</form>
+
+@section Scripts {
+<script>
+    function csrf() { return document.querySelector('input[name="__RequestVerificationToken"]').value; }
+    async function postForm(url, fd) {
+        const res = await fetch(url, { method: 'POST', headers: { 'X-FlexCms-Csrf': csrf() }, body: fd });
+        return res.json().catch(() => ({}));
+    }
+    document.getElementById('btnPreview').onclick = async () => {
+        const fd = new FormData();
+        fd.append('gateway', document.getElementById('previewGateway').value);
+        fd.append('amount', document.getElementById('previewAmount').value);
+        const j = await postForm('@Url.Action("PreviewCharge")', fd);
+        document.getElementById('testOut').textContent = JSON.stringify(j, null, 2);
+    };
+    document.getElementById('btnTestInitiate').onclick = async () => {
+        const fd = new FormData();
+        fd.append('amount', document.getElementById('previewAmount').value);
+        const j = await postForm('@Url.Action("TestInitiate")', fd);
+        document.getElementById('testOut').textContent = JSON.stringify(j, null, 2);
+    };
+</script>
+}

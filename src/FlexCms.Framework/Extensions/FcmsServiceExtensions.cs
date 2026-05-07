@@ -144,6 +144,7 @@ public static class FcmsServiceExtensions
 
         // ── Phase 12: Payments + PDF/Excel + Async Exports ───────────────────
         services.AddScoped<Payments.Services.IPaymentSettingsService, Payments.Services.PaymentSettingsService>();
+        services.AddSingleton<Payments.IPaymentChargeCalculator, Payments.PaymentChargeCalculator>();
         services.AddHttpClient<Payments.Gateways.BkashPaymentGateway>();
         services.AddHttpClient<Payments.Gateways.SslcommerzPaymentGateway>();
         services.AddHttpClient<Payments.Gateways.NagadPaymentGateway>();

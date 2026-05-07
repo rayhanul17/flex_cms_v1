@@ -61,7 +61,8 @@ public class MessagingSettingsController : BaseAdminController
             Gateway = vm.SmsGateway ?? SmsGateways.Alpha,
             SenderId = vm.SmsSenderId?.Trim() ?? "",
             Username = vm.SmsUsername?.Trim() ?? "",
-            EndpointOverride = vm.SmsEndpointOverride?.Trim() ?? ""
+            EndpointOverride = vm.SmsEndpointOverride?.Trim() ?? "",
+            BulkSmsType = vm.SmsBulkType
         }, vm.SmsApiKey, ct);
 
         ShowSuccess("Messaging settings saved.");
@@ -111,6 +112,7 @@ public class MessagingSettingsController : BaseAdminController
             SmsSenderId = sms.SenderId,
             SmsUsername = sms.Username,
             SmsEndpointOverride = sms.EndpointOverride,
+            SmsBulkType = sms.BulkSmsType,
             SmsHasApiKey = !string.IsNullOrEmpty(sms.ApiKeyEncrypted)
         };
     }

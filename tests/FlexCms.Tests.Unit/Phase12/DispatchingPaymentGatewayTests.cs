@@ -7,10 +7,10 @@ namespace FlexCms.Tests.Unit.Phase12;
 
 public class DispatchingPaymentGatewayTests
 {
-    private static IPaymentSettingsService Settings(PaymentSettings s, string apiKey = "k", string pwd = "p")
+    private static IPaymentSettingsService Settings(PaymentSettings s)
     {
         var m = Substitute.For<IPaymentSettingsService>();
-        m.GetWithSecretsAsync(Arg.Any<CancellationToken>()).Returns((s, apiKey, pwd));
+        m.GetGeneralAsync(Arg.Any<CancellationToken>()).Returns(s);
         return m;
     }
 
@@ -23,13 +23,13 @@ public class DispatchingPaymentGatewayTests
 
         public FakeGateway(string id) { GatewayId = id; }
 
-        public Task<PaymentInitiateResult> InitiateAsync(PaymentInitiateRequest r, PaymentSettings s, string k, CancellationToken ct = default)
+        public Task<PaymentInitiateResult> InitiateAsync(PaymentInitiateRequest r, CancellationToken ct = default)
         { InitiateCalled = true; return Task.FromResult(PaymentInitiateResult.Ok("https://x", "tx1")); }
 
-        public Task<PaymentResult> VerifyAsync(string tx, PaymentSettings s, string k, CancellationToken ct = default)
+        public Task<PaymentResult> VerifyAsync(string tx, CancellationToken ct = default)
         { VerifyCalled = true; return Task.FromResult(PaymentResult.Ok(tx, 100m, "Completed")); }
 
-        public Task<PaymentResult> HandleWebhookAsync(IDictionary<string, string> p, PaymentSettings s, string k, CancellationToken ct = default)
+        public Task<PaymentResult> HandleWebhookAsync(IDictionary<string, string> p, CancellationToken ct = default)
         { WebhookCalled = true; return Task.FromResult(PaymentResult.Ok("tx1", 100m, "Completed")); }
     }
 
@@ -85,6 +85,8 @@ public class DispatchingPaymentGatewayTests
     public async Task HandleWebhook_uses_explicit_gateway_id_not_active()
     {
         // Active = bKash but webhook arrives for SSLCommerz → SSLCommerz handles it.
+        // Webhook is also independent of the global Enabled toggle (gateways may
+        // need to ack disable-but-still-arriving notifications).
         var bkash = new FakeGateway(PaymentGateways.Bkash);
         var ssl = new FakeGateway(PaymentGateways.Sslcommerz);
         var d = new DispatchingPaymentGateway(

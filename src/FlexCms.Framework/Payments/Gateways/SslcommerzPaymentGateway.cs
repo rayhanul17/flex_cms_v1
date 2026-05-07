@@ -1,4 +1,5 @@
 using System.Text.Json;
+using FlexCms.Framework.Payments.Services;
 using Microsoft.Extensions.Logging;
 
 namespace FlexCms.Framework.Payments.Gateways;
@@ -7,6 +8,12 @@ namespace FlexCms.Framework.Payments.Gateways;
 /// SSLCommerz: form-encoded create-session POST returns a JSON envelope
 /// containing <c>GatewayPageURL</c>; verification reads <c>val_id</c> from
 /// the IPN/return-url and POSTs to <c>/validator/api/validationserverAPI.php</c>.
+///
+/// <para>
+/// Reads <see cref="SslcommerzSettings"/> on each call. Forward charges are
+/// added to <c>total_amount</c> before send; Backward charges are absorbed by
+/// the merchant payout.
+/// </para>
 ///
 /// Default endpoints:
 /// <list type="bullet">
@@ -20,26 +27,40 @@ public sealed class SslcommerzPaymentGateway : IFcmsPaymentGateway
     public const string ProductionBase = "https://securepay.sslcommerz.com";
 
     private readonly HttpClient _http;
+    private readonly IPaymentSettingsService _settings;
+    private readonly IPaymentChargeCalculator _charges;
     private readonly ILogger<SslcommerzPaymentGateway> _logger;
 
-    public SslcommerzPaymentGateway(HttpClient http, ILogger<SslcommerzPaymentGateway> logger)
+    public SslcommerzPaymentGateway(
+        HttpClient http,
+        IPaymentSettingsService settings,
+        IPaymentChargeCalculator charges,
+        ILogger<SslcommerzPaymentGateway> logger)
     {
         _http = http;
+        _settings = settings;
+        _charges = charges;
         _logger = logger;
     }
 
     public string GatewayId => PaymentGateways.Sslcommerz;
 
-    public async Task<PaymentInitiateResult> InitiateAsync(PaymentInitiateRequest request, PaymentSettings settings, string apiKey, CancellationToken ct = default)
+    public async Task<PaymentInitiateResult> InitiateAsync(PaymentInitiateRequest request, CancellationToken ct = default)
     {
-        var baseUrl = ResolveBaseUrl(settings);
+        var (cfg, storePassword) = await _settings.GetSslcommerzWithSecretsAsync(ct);
+        if (!cfg.Enabled) return PaymentInitiateResult.Fail("SSLCommerz gateway not enabled.");
+
+        var charge = _charges.Calculate(request.Amount, cfg.Charge);
+        var amountToCharge = charge.CustomerPays;
+
+        var baseUrl = ResolveBaseUrl(cfg);
         var url = $"{baseUrl}/gwprocess/v4/api.php";
 
         var form = new Dictionary<string, string>
         {
-            ["store_id"] = settings.Username,
-            ["store_passwd"] = apiKey,
-            ["total_amount"] = request.Amount.ToString("0.00"),
+            ["store_id"] = cfg.StoreId,
+            ["store_passwd"] = storePassword,
+            ["total_amount"] = amountToCharge.ToString("0.00"),
             ["currency"] = request.Currency ?? "BDT",
             ["tran_id"] = request.OrderReference,
             ["success_url"] = request.CallbackUrl,
@@ -67,7 +88,7 @@ public sealed class SslcommerzPaymentGateway : IFcmsPaymentGateway
             var redirect = doc.RootElement.TryGetProperty("GatewayPageURL", out var u) ? u.GetString() : null;
             var sessionkey = doc.RootElement.TryGetProperty("sessionkey", out var k) ? k.GetString() : null;
             if (string.IsNullOrEmpty(redirect)) return PaymentInitiateResult.Fail("Missing GatewayPageURL.");
-            return PaymentInitiateResult.Ok(redirect, sessionkey ?? request.OrderReference);
+            return PaymentInitiateResult.Ok(redirect, sessionkey ?? request.OrderReference, charge);
         }
         catch (Exception ex)
         {
@@ -76,10 +97,13 @@ public sealed class SslcommerzPaymentGateway : IFcmsPaymentGateway
         }
     }
 
-    public async Task<PaymentResult> VerifyAsync(string transactionId, PaymentSettings settings, string apiKey, CancellationToken ct = default)
+    public async Task<PaymentResult> VerifyAsync(string transactionId, CancellationToken ct = default)
     {
-        var baseUrl = ResolveBaseUrl(settings);
-        var url = $"{baseUrl}/validator/api/validationserverAPI.php?val_id={Uri.EscapeDataString(transactionId)}&store_id={Uri.EscapeDataString(settings.Username)}&store_passwd={Uri.EscapeDataString(apiKey)}&v=1&format=json";
+        var (cfg, storePassword) = await _settings.GetSslcommerzWithSecretsAsync(ct);
+        if (!cfg.Enabled) return PaymentResult.Fail("SSLCommerz gateway not enabled.");
+
+        var baseUrl = ResolveBaseUrl(cfg);
+        var url = $"{baseUrl}/validator/api/validationserverAPI.php?val_id={Uri.EscapeDataString(transactionId)}&store_id={Uri.EscapeDataString(cfg.StoreId)}&store_passwd={Uri.EscapeDataString(storePassword)}&v=1&format=json";
 
         try
         {
@@ -103,17 +127,17 @@ public sealed class SslcommerzPaymentGateway : IFcmsPaymentGateway
         }
     }
 
-    public async Task<PaymentResult> HandleWebhookAsync(IDictionary<string, string> payload, PaymentSettings settings, string apiKey, CancellationToken ct = default)
+    public async Task<PaymentResult> HandleWebhookAsync(IDictionary<string, string> payload, CancellationToken ct = default)
     {
         // SSLCommerz IPN: payload contains tran_id + val_id; we round-trip val_id
         // through VerifyAsync to confirm authenticity (the docs explicitly recommend
         // server-to-server validation rather than trusting the IPN alone).
         if (!payload.TryGetValue("val_id", out var valId) || string.IsNullOrEmpty(valId))
             return PaymentResult.Fail("Missing val_id.");
-        return await VerifyAsync(valId, settings, apiKey, ct);
+        return await VerifyAsync(valId, ct);
     }
 
-    private static string ResolveBaseUrl(PaymentSettings settings)
-        => !string.IsNullOrWhiteSpace(settings.EndpointOverride) ? settings.EndpointOverride
-           : settings.TestMode ? SandboxBase : ProductionBase;
+    private static string ResolveBaseUrl(SslcommerzSettings cfg)
+        => !string.IsNullOrWhiteSpace(cfg.EndpointOverride) ? cfg.EndpointOverride
+           : cfg.TestMode ? SandboxBase : ProductionBase;
 }

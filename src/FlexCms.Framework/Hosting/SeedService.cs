@@ -298,6 +298,9 @@ public class SeedService : IHostedService
 
         // Chat (Phase 10)
         new() { DefaultName = "Chat", Icon = "bi bi-chat-dots", Url = "/admin/chat", Order = 75, ParentDefaultName = "Messaging", RequiredPermission = Chat.ChatPermissions.Reply },
+
+        // Payments (Phase 12)
+        new() { DefaultName = "Payments", Icon = "bi bi-credit-card-2-front", Url = "/admin/payments-settings", Order = 86, ParentDefaultName = "System", RequiredPermission = FcmsPermissions.PaymentsView },
     ];
 
     private async Task SeedMenuItemsAsync(CancellationToken ct)

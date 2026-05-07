@@ -8,8 +8,16 @@ namespace FlexCms.Framework.Payments;
 /// <see cref="PaymentSettings.ActiveGateway"/>.
 ///
 /// <para>
+/// Each impl owns its own credential DTO (<see cref="BkashSettings"/>,
+/// <see cref="SslcommerzSettings"/>, <see cref="NagadSettings"/>) — fetched
+/// internally via <see cref="Services.IPaymentSettingsService"/>. The interface
+/// stays generic so module-shipped gateways can plug in with their own
+/// credential shape.
+/// </para>
+///
+/// <para>
 /// All methods return <see cref="PaymentResult"/> and never throw for
-/// upstream-API errors — failure mode is the same as in
+/// upstream-API errors — failure mode mirrors
 /// <see cref="Messaging.IFcmsEmailService"/> / <see cref="Messaging.IFcmsSmsSender"/>.
 /// </para>
 /// </summary>
@@ -18,14 +26,14 @@ public interface IFcmsPaymentGateway
     /// <summary>Identifier — must match a value from <see cref="PaymentGateways"/>.</summary>
     string GatewayId { get; }
 
-    /// <summary>Step 1: ask the gateway to start a transaction. Returns the redirect URL the user should be sent to.</summary>
-    Task<PaymentInitiateResult> InitiateAsync(PaymentInitiateRequest request, PaymentSettings settings, string apiKey, CancellationToken ct = default);
+    /// <summary>Step 1: ask the gateway to start a transaction. The amount on the request is the ORDER amount; the impl is responsible for applying any Forward charge before sending.</summary>
+    Task<PaymentInitiateResult> InitiateAsync(PaymentInitiateRequest request, CancellationToken ct = default);
 
     /// <summary>Step 2 (after callback): verify a transaction id with the gateway.</summary>
-    Task<PaymentResult> VerifyAsync(string transactionId, PaymentSettings settings, string apiKey, CancellationToken ct = default);
+    Task<PaymentResult> VerifyAsync(string transactionId, CancellationToken ct = default);
 
     /// <summary>Webhook: validate the gateway's signed payload + return the parsed result.</summary>
-    Task<PaymentResult> HandleWebhookAsync(IDictionary<string, string> payload, PaymentSettings settings, string apiKey, CancellationToken ct = default);
+    Task<PaymentResult> HandleWebhookAsync(IDictionary<string, string> payload, CancellationToken ct = default);
 }
 
 public record PaymentInitiateRequest(
@@ -36,9 +44,15 @@ public record PaymentInitiateRequest(
     string? CustomerPhone = null,
     string? CustomerEmail = null);
 
-public record PaymentInitiateResult(bool Success, string? RedirectUrl = null, string? TransactionId = null, string? Error = null)
+public record PaymentInitiateResult(
+    bool Success,
+    string? RedirectUrl = null,
+    string? TransactionId = null,
+    string? Error = null,
+    PaymentCharge? Charge = null)
 {
-    public static PaymentInitiateResult Ok(string redirectUrl, string transactionId) => new(true, redirectUrl, transactionId);
+    public static PaymentInitiateResult Ok(string redirectUrl, string transactionId, PaymentCharge? charge = null)
+        => new(true, redirectUrl, transactionId, null, charge);
     public static PaymentInitiateResult Fail(string error) => new(false, Error: error);
 }
 

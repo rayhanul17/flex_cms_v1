@@ -26,8 +26,10 @@ public sealed class MramSmsGateway : ISmsGateway
     public async Task<SmsSendResult> SendAsync(SmsMessage message, SmsSettings settings, string apiKey, CancellationToken ct = default)
     {
         var endpoint = string.IsNullOrWhiteSpace(settings.EndpointOverride) ? DefaultEndpoint : settings.EndpointOverride;
+        // MRAM takes lowercase "text" / "unicode" on the type query parameter.
+        var smsType = settings.BulkSmsType == BulkSmsType.Unicode ? "unicode" : "text";
         var url = $"{endpoint}?api_key={Uri.EscapeDataString(apiKey)}" +
-                  $"&type=text&contacts={Uri.EscapeDataString(message.To)}" +
+                  $"&type={smsType}&contacts={Uri.EscapeDataString(message.To)}" +
                   $"&senderid={Uri.EscapeDataString(settings.SenderId)}" +
                   $"&msg={Uri.EscapeDataString(message.Text)}";
 

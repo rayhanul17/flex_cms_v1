@@ -1,18 +1,25 @@
 using System.Net.Http.Json;
 using System.Text.Json;
+using FlexCms.Framework.Payments.Services;
 using Microsoft.Extensions.Logging;
 
 namespace FlexCms.Framework.Payments.Gateways;
 
 /// <summary>
 /// Nagad merchant gateway. The full handshake is: <c>checkout/initialize</c>
-/// → <c>checkout/complete</c> with RSA-encrypted sensitive fields. Production
-/// integration requires merchant-specific keys.
+/// → <c>checkout/complete</c> with RSA-encrypted sensitive fields.
+///
+/// <para>
+/// Reads <see cref="NagadSettings"/> on each call. Forward charges are added
+/// to the amount sent to Nagad; Backward charges come out of the merchant's
+/// settlement.
+/// </para>
 ///
 /// <para>
 /// <b>Stub note:</b> the structural shape of the request/response is wired,
-/// but the RSA encryption step and SHA-256 signature build are deferred to
-/// the live integration pass — they require a real merchant keypair.
+/// but the RSA encryption step (using <c>MerchantPrivateKey</c> + Nagad's
+/// public key) and SHA-256 signature build are deferred to the live
+/// integration pass — they require a real merchant keypair.
 /// </para>
 ///
 /// Default endpoints:
@@ -27,24 +34,39 @@ public sealed class NagadPaymentGateway : IFcmsPaymentGateway
     public const string ProductionBase = "https://api.mynagad.com/api/dfs";
 
     private readonly HttpClient _http;
+    private readonly IPaymentSettingsService _settings;
+    private readonly IPaymentChargeCalculator _charges;
     private readonly ILogger<NagadPaymentGateway> _logger;
 
-    public NagadPaymentGateway(HttpClient http, ILogger<NagadPaymentGateway> logger)
+    public NagadPaymentGateway(
+        HttpClient http,
+        IPaymentSettingsService settings,
+        IPaymentChargeCalculator charges,
+        ILogger<NagadPaymentGateway> logger)
     {
         _http = http;
+        _settings = settings;
+        _charges = charges;
         _logger = logger;
     }
 
     public string GatewayId => PaymentGateways.Nagad;
 
-    public async Task<PaymentInitiateResult> InitiateAsync(PaymentInitiateRequest request, PaymentSettings settings, string apiKey, CancellationToken ct = default)
+    public async Task<PaymentInitiateResult> InitiateAsync(PaymentInitiateRequest request, CancellationToken ct = default)
     {
-        var baseUrl = ResolveBaseUrl(settings);
-        var url = $"{baseUrl}/check-out/initialize/{Uri.EscapeDataString(settings.MerchantId)}/{Uri.EscapeDataString(request.OrderReference)}";
+        var (cfg, _privateKey) = await _settings.GetNagadWithSecretsAsync(ct);
+        if (!cfg.Enabled) return PaymentInitiateResult.Fail("Nagad gateway not enabled.");
+
+        var charge = _charges.Calculate(request.Amount, cfg.Charge);
+        var amountToCharge = charge.CustomerPays;
+
+        var baseUrl = ResolveBaseUrl(cfg);
+        var url = $"{baseUrl}/check-out/initialize/{Uri.EscapeDataString(cfg.MerchantId)}/{Uri.EscapeDataString(request.OrderReference)}";
         var payload = new
         {
-            accountNumber = settings.MerchantId,
+            accountNumber = cfg.MerchantNumber,
             dateTime = DateTime.UtcNow.ToString("yyyyMMddHHmmss"),
+            amount = amountToCharge.ToString("0.00"),
             sensitiveData = "deferred-rsa-encryption",   // placeholder — see class doc
             signature = "deferred-sha256-signature"
         };
@@ -63,7 +85,7 @@ public sealed class NagadPaymentGateway : IFcmsPaymentGateway
             var redirect = doc.RootElement.TryGetProperty("callBackUrl", out var u) ? u.GetString() : null;
             var paymentRef = doc.RootElement.TryGetProperty("paymentReferenceId", out var p) ? p.GetString() : null;
             if (string.IsNullOrEmpty(redirect)) return PaymentInitiateResult.Fail("Missing callBackUrl.");
-            return PaymentInitiateResult.Ok(redirect, paymentRef ?? request.OrderReference);
+            return PaymentInitiateResult.Ok(redirect, paymentRef ?? request.OrderReference, charge);
         }
         catch (Exception ex)
         {
@@ -72,9 +94,12 @@ public sealed class NagadPaymentGateway : IFcmsPaymentGateway
         }
     }
 
-    public async Task<PaymentResult> VerifyAsync(string transactionId, PaymentSettings settings, string apiKey, CancellationToken ct = default)
+    public async Task<PaymentResult> VerifyAsync(string transactionId, CancellationToken ct = default)
     {
-        var baseUrl = ResolveBaseUrl(settings);
+        var (cfg, _privateKey) = await _settings.GetNagadWithSecretsAsync(ct);
+        if (!cfg.Enabled) return PaymentResult.Fail("Nagad gateway not enabled.");
+
+        var baseUrl = ResolveBaseUrl(cfg);
         var url = $"{baseUrl}/verify/payment/{Uri.EscapeDataString(transactionId)}";
 
         try
@@ -98,7 +123,7 @@ public sealed class NagadPaymentGateway : IFcmsPaymentGateway
         }
     }
 
-    public Task<PaymentResult> HandleWebhookAsync(IDictionary<string, string> payload, PaymentSettings settings, string apiKey, CancellationToken ct = default)
+    public Task<PaymentResult> HandleWebhookAsync(IDictionary<string, string> payload, CancellationToken ct = default)
     {
         // Nagad IPN signature scheme requires the merchant private key —
         // implement during live integration. Reject for now rather than
@@ -108,7 +133,7 @@ public sealed class NagadPaymentGateway : IFcmsPaymentGateway
         return Task.FromResult(PaymentResult.Fail("Webhook verification not yet implemented for Nagad."));
     }
 
-    private static string ResolveBaseUrl(PaymentSettings settings)
-        => !string.IsNullOrWhiteSpace(settings.EndpointOverride) ? settings.EndpointOverride
-           : settings.TestMode ? SandboxBase : ProductionBase;
+    private static string ResolveBaseUrl(NagadSettings cfg)
+        => !string.IsNullOrWhiteSpace(cfg.EndpointOverride) ? cfg.EndpointOverride
+           : cfg.TestMode ? SandboxBase : ProductionBase;
 }

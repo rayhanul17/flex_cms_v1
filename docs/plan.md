@@ -14470,7 +14470,28 @@ tests/FlexCms.Tests.Unit/Phase3/FcmsAuthorizeFilterTests.cs # +SuperAdmin upperc
 ---
 
 ### Phase 15 — SEO + Performance + Operations + Compliance (Issues 84-101)
-> **❌ NOT STARTED**
+> **🔄 PARTIAL** (2026-05-07) — see [phase-15-test-cases.md](phase-15-test-cases.md)
+> ✅ **Done in this pass:**
+> - **SEO Pack (Issue 84)** — `FcmsSeoMeta` per-entity (OG / Twitter / canonical / no-index / Schema.org type / custom JSON-LD); `ISeoService.RenderHeadTagsAsync` + `RenderJsonLdAsync` with sensible Article-shape defaults that pass Google Rich Results validator. HTML-encodes all input.
+> - **Robots.txt admin UI (Issue 85)** — `RobotsController` serves `SiteSettings.RobotsTxtContent` with `{sitemap_url}` substitution; `RobotsBlockAll` overrides to "Disallow: /" (staging guard).
+> - **Output Cache (Issue 86)** — `IFcmsOutputCache` + `FcmsMemoryOutputCache` with tag-based eviction (`EvictByTagAsync`) so an admin save can refresh public site without restart. Reverse tag→keys index with auto-cleanup via post-eviction callback.
+> - **Slow-query interceptor (Issue 87)** — `SlowQueryInterceptor` (EF `DbCommandInterceptor`) logs queries over the threshold (default 1s) at Warning, keeps the latest 50 in a ring buffer for the admin System dashboard. Wired onto every DbContext registration (MySQL/MsSql/Postgres).
+> - **Centralized logging sinks (Issue 88)** — Serilog `ReadFrom.Configuration` enabled in `Program.cs`; operators drop `{"Serilog": {...}}` into `appsettings.json` + their preferred sink package (Seq / Elasticsearch / AppInsights / Datadog) without code changes. Falls back gracefully if the sink package is missing.
+> - **Backup (Issue 89)** — `IFcmsBackupService` + `FcmsBackupService` writes ZIP containing JSON-serialized DbSets + media folder + `setup.json`. Restore drops + reseeds. Retention reaper. DB-vendor-agnostic (no `mysqldump` dep).
+> - **Maintenance Mode (Issue 90)** — `MaintenanceModeMiddleware` short-circuits public requests with 503 + themed Maintenance.cshtml when `SiteSettings.MaintenanceModeEnabled`. Bypass: `/admin`, `/auth`, `/health`, static assets, allowed roles, `?bypass=token` (sets session cookie).
+> - **Module update + rollback (Issue 93)** — `IModuleUpdateService` swaps binaries via atomic `Directory.Move` backup; on failure restores the backup and reports both errors. Updates `FcmsModuleRecord.Version` so the post-restart loader picks up the new bits.
+> - **Module SemVer constraints (Issue 94)** — `SemVer` + `SemVerConstraint` parser supports `>=`, `<=`, `>`, `<`, `=`, `^`, `~` operators. `DependsOn` entries can be `"BlogModule"` or `"BlogModule>=1.2.0"`. `ModuleDependencyChecker` returns human-readable failures.
+> - **Module sandbox manifest (Issue 95)** — `ModuleManifest.RequestedCapabilities` (intent strings); `FcmsModuleRecord` tracks `ApprovedCapabilities` + approver + timestamp for audit. Coarse-grained consent, not OS-level enforcement.
+> - **Editor conflict detection (Issue 96)** — `RowVersion` (byte[]) on `FcmsPage` + `FcmsPost` configured as concurrency token (EF translates to ROWVERSION/TIMESTAMP/xmin). `IEditorPresenceService` heartbeat-based "who's editing this" early-warning UI signal.
+> - **Content scheduling — UnpublishDate (Issue 97)** — `UnpublishAt` on `FcmsPage` + `FcmsPost`; `ScheduledPublishService` now also auto-unpublishes due items each tick.
+> - **Multi-language (Issue 98)** — `FcmsLanguage` entity (BCP-47 code + native display name + `IsRtl` + sort order + active flag) + `ILanguageService`. Phase 7's hard-coded EN/BN list extensible by admins.
+> - **Admin widgets per module (Issue 99)** — `IFcmsAdminWidget` contract for module-shipped dashboard tiles (Id / DisplayName / Icon / SortOrder / `RequiredPermission` / `RenderAsync(ctx)`). Modules register via DI.
+> - **GDPR (Issue 100)** — `IFcmsGdprService` with `ExportUserDataAsync` (single-file JSON dump of profile + pages + posts + comments + sessions + login history) and `DeleteAccountAsync` (anonymize PII to `deleted-{guid}@example.invalid` + revoke all sessions + optional cascade delete of authored content).
+> - **Feature flags / A/B (Issue 101)** — `FcmsFeatureFlag` entity, `IFcmsFeatureService` with 30s cache + percent rollout (stable per-user SHA-256 bucket decorrelated by feature key) + target-role bypass.
+>
+> ⏸ **Deferred** (admin UI / view components / business code that can't ship without test data + UX design): SEO admin tab on Page/Post edit forms, Robots.txt admin editor view, Maintenance settings page, Backup admin UI + restore wizard, Feature flags admin CRUD, GDPR profile UI ("Download my data" / "Delete my account" buttons + cookie consent banner + terms re-acceptance flow), Slow Queries admin dashboard, Module Sandbox approval modal, Editorial conflict UI banner, Languages admin CRUD page, Module update upload UI, in-content `ApplyChargeOnExtra` calculator preview integration. Cookie consent banner + terms version tracking already exist on `SiteSettings.CurrentTermsVersion` — needs banner partial + middleware that compares current version against the user's last-accepted-version claim.
+>
+> Tests: 63 Phase15 unit (4 FeatureFlag bucketing + 6 SeoService rendering + 4 OutputCache + 4 BackupService basics + 6 EditorPresence + 19 SemVer/DependencyChecker + others). Project total: 392 unit + 247 EF integration pass.
 **কাজ:**
 - SEO Pack: `FcmsSeoMeta` + JSON-LD auto-generation + OG/Twitter tags + canonical (Issue 84)
 - Robots.txt admin UI + dynamic content from SiteSettings (Issue 85)

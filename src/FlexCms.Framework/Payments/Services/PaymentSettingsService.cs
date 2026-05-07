@@ -1,5 +1,6 @@
 using FlexCms.Framework.Services;
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.Extensions.Logging;
 
 namespace FlexCms.Framework.Payments.Services;
 
@@ -21,13 +22,15 @@ public sealed class PaymentSettingsService : IPaymentSettingsService
     private readonly IDataProtector _bkashProtector;
     private readonly IDataProtector _sslcommerzProtector;
     private readonly IDataProtector _nagadProtector;
+    private readonly ILogger<PaymentSettingsService> _logger;
 
-    public PaymentSettingsService(ISettingsService settings, IDataProtectionProvider dp)
+    public PaymentSettingsService(ISettingsService settings, IDataProtectionProvider dp, ILogger<PaymentSettingsService> logger)
     {
         _settings = settings;
         _bkashProtector = dp.CreateProtector(BkashPurpose);
         _sslcommerzProtector = dp.CreateProtector(SslcommerzPurpose);
         _nagadProtector = dp.CreateProtector(NagadPurpose);
+        _logger = logger;
     }
 
     // ---------- General ----------
@@ -109,10 +112,16 @@ public sealed class PaymentSettingsService : IPaymentSettingsService
 
     // ---------- helpers ----------
 
-    private static string Decrypt(IDataProtector protector, string ciphertext)
+    private string Decrypt(IDataProtector protector, string ciphertext)
     {
         if (string.IsNullOrEmpty(ciphertext)) return "";
         try { return protector.Unprotect(ciphertext); }
-        catch { return ""; }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex,
+                "Payment gateway secret ciphertext present but DataProtection could not decrypt it. " +
+                "Re-save the gateway settings to refresh the ciphertext.");
+            return "";
+        }
     }
 }

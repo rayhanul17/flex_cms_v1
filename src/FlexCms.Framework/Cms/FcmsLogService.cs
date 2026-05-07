@@ -72,40 +72,77 @@ public class FcmsLogService : IFcmsLogService
         await _db.SaveChangesAsync(ct);
     }
 
+    /// <summary>
+    /// Pages through old logs in fixed-size chunks rather than loading the
+    /// full result set into memory. Old impl hit OOM on large log tables —
+    /// a busy site accumulating ~10k log rows / hour would push hundreds
+    /// of thousands of rows through one ToListAsync per archive tick.
+    /// </summary>
+    public const int ArchiveBatchSize = 1000;
+
     public async Task ArchiveOlderThanAsync(TimeSpan age, CancellationToken ct = default)
     {
         var cutoff = FcmsTime.Now - age;
-        var old = await _db.Logs.Where(l => l.CreatedAt < cutoff).ToListAsync(ct);
-        if (old.Count == 0) return;
 
-        var archiveEntries = old.Select(log => new FcmsLogArchive
+        while (!ct.IsCancellationRequested)
         {
-            CreatedAt = log.CreatedAt,
-            UserId = log.UserId,
-            UserName = log.UserName,
-            UserIp = log.UserIp,
-            UserAgent = log.UserAgent,
-            Action = log.Action,
-            EntityType = log.EntityType,
-            EntityId = log.EntityId,
-            Value = log.Value,
-            Module = log.Module,
-            Severity = log.Severity
-        }).ToList();
+            // Fetch one batch ordered by oldest-first so we never re-scan
+            // newly-arriving logs into the same window.
+            var batch = await _db.Logs
+                .Where(l => l.CreatedAt < cutoff)
+                .OrderBy(l => l.CreatedAt)
+                .Take(ArchiveBatchSize)
+                .ToListAsync(ct);
+            if (batch.Count == 0) break;
 
-        _db.LogArchives.AddRange(archiveEntries);
-        // Hard-delete originals — they are now in the archive table.
-        _db.Logs.RemoveRange(old);
-        await _db.SaveChangesAsync(ct);
+            var archiveEntries = batch.Select(log => new FcmsLogArchive
+            {
+                CreatedAt = log.CreatedAt,
+                UserId = log.UserId,
+                UserName = log.UserName,
+                UserIp = log.UserIp,
+                UserAgent = log.UserAgent,
+                Action = log.Action,
+                EntityType = log.EntityType,
+                EntityId = log.EntityId,
+                Value = log.Value,
+                Module = log.Module,
+                Severity = log.Severity
+            }).ToList();
+
+            _db.LogArchives.AddRange(archiveEntries);
+            _db.Logs.RemoveRange(batch);
+            await _db.SaveChangesAsync(ct);
+
+            // Detach so the next iteration's tracker stays small. Without
+            // this the change tracker would grow to N entries by the end
+            // of a multi-batch archive pass.
+            foreach (var e in batch) _db.Entry(e).State = EntityState.Detached;
+            foreach (var a in archiveEntries) _db.Entry(a).State = EntityState.Detached;
+
+            // Last partial batch — nothing more to archive.
+            if (batch.Count < ArchiveBatchSize) break;
+        }
     }
 
     public async Task ClearArchiveAsync(CancellationToken ct = default)
     {
-        var all = await _db.LogArchives.ToListAsync(ct);
-        if (all.Count > 0)
+        // Prefer ExecuteDeleteAsync (single server-side DELETE, no tracker
+        // rows) on relational providers. EF InMemory throws
+        // InvalidOperationException for it, so fall back to a tracked
+        // delete — fine for tests, never hit in production.
+        try
         {
-            _db.LogArchives.RemoveRange(all);
-            await _db.SaveChangesAsync(ct);
+            await _db.LogArchives.ExecuteDeleteAsync(ct);
+        }
+        catch (InvalidOperationException)
+        {
+            var all = await _db.LogArchives.ToListAsync(ct);
+            if (all.Count > 0)
+            {
+                _db.LogArchives.RemoveRange(all);
+                await _db.SaveChangesAsync(ct);
+            }
         }
     }
 

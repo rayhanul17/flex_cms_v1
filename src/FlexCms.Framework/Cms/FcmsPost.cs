@@ -23,6 +23,10 @@ public class FcmsPost : BaseEfEntity
     /// <summary>Optimistic-concurrency token — see <see cref="FcmsPage.RowVersion"/>.</summary>
     public byte[]? RowVersion { get; set; }
 
+    /// <summary>Shareable preview token — see <see cref="FcmsPage.PreviewToken"/>.</summary>
+    public string? PreviewToken { get; set; }
+    public DateTime? PreviewTokenExpiresAt { get; set; }
+
     public ICollection<FcmsPostTag> PostTags { get; set; } = [];
 
     public ICollection<FcmsPostTranslation> Translations { get; set; } = [];

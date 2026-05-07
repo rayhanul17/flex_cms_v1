@@ -8,6 +8,8 @@ using FlexCms.Framework.Chat;
 using FlexCms.Framework.Cms;
 using FlexCms.Framework.Cms.Comments;
 using FlexCms.Framework.Cms.CustomFields;
+using FlexCms.Framework.Cms.Drafts;
+using FlexCms.Framework.Cms.Preview;
 using FlexCms.Framework.Cms.Revisions;
 using FlexCms.Framework.Backup;
 using FlexCms.Framework.Caching;
@@ -202,6 +204,8 @@ public static class FcmsServiceExtensions
         services.AddScoped<ICommentService, CommentService>();
         services.AddScoped<ISubscriberService, SubscriberService>();
         services.AddScoped<ICustomFieldService, CustomFieldService>();
+        services.AddScoped<IPreviewTokenService, PreviewTokenService>();
+        services.AddScoped<IDraftSnapshotService, DraftSnapshotService>();
 
         // ── Phase 15: SEO + Backup + Feature Flags + Maintenance ─────────────
         services.AddScoped<ISeoService, SeoService>();
@@ -219,6 +223,12 @@ public static class FcmsServiceExtensions
         services.AddSingleton<IImageOptimizer, SkiaImageOptimizer>();
         services.AddScoped<IFcmsSearchAnalytics, FcmsSearchAnalytics>();
         services.AddScoped<IFcmsSearchProvider, LikeSearchProvider>();
+        // Default LIKE-based sources for the framework's own entities. Admins
+        // swap in vendor providers (MySqlFullTextSearchSource /
+        // PostgresFullTextSearchSource) by registering them additionally —
+        // the dispatcher fan-outs to all registered sources.
+        services.AddScoped<IFcmsSearchableSource, FlexCms.Framework.Search.Providers.PageSearchSource>();
+        services.AddScoped<IFcmsSearchableSource, FlexCms.Framework.Search.Providers.PostSearchSource>();
         services.AddScoped<IEditorialService, EditorialService>();
         services.AddSingleton<IAdminNotificationPusher, AdminNotificationPusher>();
 
@@ -324,12 +334,65 @@ public static class FcmsServiceExtensions
 
                 // "otp" policy: 5 attempts/min per IP
                 if (ctx.Request.Path.StartsWithSegments("/auth/forgot-password") ||
-                    ctx.Request.Path.StartsWithSegments("/auth/verify-otp"))
+                    ctx.Request.Path.StartsWithSegments("/auth/verify-otp") ||
+                    ctx.Request.Path.StartsWithSegments("/auth/reset-password"))
                     return RateLimitPartition.GetFixedWindowLimiter($"otp:{ip}", _ =>
                         new FixedWindowRateLimiterOptions
                         {
                             Window = TimeSpan.FromMinutes(1),
                             PermitLimit = 5,
+                            AutoReplenishment = true
+                        });
+
+                // "registration" policy: 5 signups/hour per IP. Prevents
+                // botnets from creating throw-away accounts to abuse the
+                // free tier of any module that gates content by user.
+                if (ctx.Request.Method == "POST" &&
+                    (ctx.Request.Path.StartsWithSegments("/auth/register") ||
+                     ctx.Request.Path.StartsWithSegments("/auth/signup")))
+                    return RateLimitPartition.GetFixedWindowLimiter($"register:{ip}", _ =>
+                        new FixedWindowRateLimiterOptions
+                        {
+                            Window = TimeSpan.FromHours(1),
+                            PermitLimit = 5,
+                            AutoReplenishment = true
+                        });
+
+                // "comment" policy: 10 comments / 5 min per IP. Hits both
+                // public comment submission and the form-builder POST path.
+                if (ctx.Request.Method == "POST" &&
+                    (ctx.Request.Path.StartsWithSegments("/comments") ||
+                     ctx.Request.Path.StartsWithSegments("/forms/submit")))
+                    return RateLimitPartition.GetFixedWindowLimiter($"comment:{ip}", _ =>
+                        new FixedWindowRateLimiterOptions
+                        {
+                            Window = TimeSpan.FromMinutes(5),
+                            PermitLimit = 10,
+                            AutoReplenishment = true
+                        });
+
+                // "subscribe" policy: 5 subscribe attempts / hour per IP.
+                if (ctx.Request.Method == "POST" &&
+                    ctx.Request.Path.StartsWithSegments("/subscribe"))
+                    return RateLimitPartition.GetFixedWindowLimiter($"subscribe:{ip}", _ =>
+                        new FixedWindowRateLimiterOptions
+                        {
+                            Window = TimeSpan.FromHours(1),
+                            PermitLimit = 5,
+                            AutoReplenishment = true
+                        });
+
+                // "webhook" policy: 60 inbound IPN POSTs / minute per IP.
+                // Real BD payment gateways stay well below this; the cap
+                // exists to absorb a misbehaving gateway retry loop or
+                // someone hammering the unauthenticated endpoint.
+                if (ctx.Request.Method == "POST" &&
+                    ctx.Request.Path.StartsWithSegments("/payment/webhook"))
+                    return RateLimitPartition.GetFixedWindowLimiter($"webhook:{ip}", _ =>
+                        new FixedWindowRateLimiterOptions
+                        {
+                            Window = TimeSpan.FromMinutes(1),
+                            PermitLimit = 60,
                             AutoReplenishment = true
                         });
 

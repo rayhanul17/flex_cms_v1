@@ -1,4 +1,5 @@
 using FlexCms.Framework.Cms;
+using FlexCms.Framework.Cms.Preview;
 using FlexCms.Framework.I18n;
 using Microsoft.AspNetCore.Mvc;
 
@@ -10,12 +11,14 @@ public class BlogController : Controller
     private readonly IPostService _posts;
     private readonly ICategoryService _categories;
     private readonly IFcmsTranslator _translator;
+    private readonly IPreviewTokenService _previewTokens;
 
-    public BlogController(IPostService posts, ICategoryService categories, IFcmsTranslator translator)
+    public BlogController(IPostService posts, ICategoryService categories, IFcmsTranslator translator, IPreviewTokenService previewTokens)
     {
         _posts = posts;
         _categories = categories;
         _translator = translator;
+        _previewTokens = previewTokens;
     }
 
     [HttpGet("")]
@@ -41,12 +44,19 @@ public class BlogController : Controller
     }
 
     [HttpGet("{slug}")]
-    public async Task<IActionResult> Post(string slug, CancellationToken ct)
+    public async Task<IActionResult> Post(string slug, [FromQuery(Name = "preview")] string? previewToken, CancellationToken ct)
     {
         var resolved = await _posts.ResolveBySlugAsync(slug, _translator.CurrentLanguage, ct);
         if (resolved is null) return NotFound();
         var (post, translation) = resolved.Value;
-        if (!post.IsPublished) return NotFound();
+
+        var isPreview = false;
+        if (!post.IsPublished)
+        {
+            isPreview = await _previewTokens.ValidateAsync(nameof(FcmsPost), post.Id, previewToken, ct);
+            if (!isPreview) return NotFound();
+            Response.Headers["X-Robots-Tag"] = "noindex, nofollow";
+        }
 
         if (translation is not null)
         {
@@ -57,7 +67,9 @@ public class BlogController : Controller
             post.MetaDescription = translation.MetaDescription;
         }
 
-        await _posts.IncrementViewCountAsync(post.Id, ct);
+        // Don't pollute the public view-count from preview/draft sharing.
+        if (!isPreview)
+            await _posts.IncrementViewCountAsync(post.Id, ct);
         return View(post);
     }
 }

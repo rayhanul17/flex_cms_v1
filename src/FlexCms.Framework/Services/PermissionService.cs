@@ -42,13 +42,46 @@ public class PermissionService : IPermissionService
         var roleNames = user.FindAll(ClaimTypes.Role).Select(c => c.Value).ToList();
         if (roleNames.Count == 0) return false;
 
-        var userPerms = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var roleName in roleNames)
+        // Resolve role ids first (cheap — cached or one query per first-seen
+        // role name). Cache hits avoid the DB entirely for the typical
+        // returning-user case.
+        var roleIds = new List<Guid>(roleNames.Count);
+        foreach (var rn in roleNames)
         {
-            var roleId = await ResolveRoleIdAsync(roleName, ct);
-            if (roleId == Guid.Empty) continue;
-            var keys = await GetRolePermissionKeysAsync(roleId, ct);
-            userPerms.UnionWith(keys);
+            var rid = await ResolveRoleIdAsync(rn, ct);
+            if (rid != Guid.Empty) roleIds.Add(rid);
+        }
+        if (roleIds.Count == 0) return false;
+
+        // Split into "already cached" + "needs lookup". For the cold-cache
+        // case, batch the misses into ONE query covering all uncached roles
+        // — previous impl issued one query per role.
+        var userPerms = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var missing = new List<Guid>();
+        foreach (var rid in roleIds)
+        {
+            if (_cache.TryGetValue(CacheKey(rid), out HashSet<string>? cached) && cached is not null)
+                userPerms.UnionWith(cached);
+            else
+                missing.Add(rid);
+        }
+
+        if (missing.Count > 0)
+        {
+            // One round-trip for every uncached role, then group by role id
+            // and back-fill each role's cache so the next request is hot.
+            var rows = await _rolePerms.FindAsync(rp => missing.Contains(rp.RoleId), ct);
+            var byRole = rows
+                .GroupBy(rp => rp.RoleId)
+                .ToDictionary(g => g.Key,
+                    g => g.Select(rp => rp.PermissionKey)
+                          .ToHashSet(StringComparer.OrdinalIgnoreCase));
+            foreach (var rid in missing)
+            {
+                var keys = byRole.TryGetValue(rid, out var k) ? k : new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                _cache.Set(CacheKey(rid), keys, CacheTtl);
+                userPerms.UnionWith(keys);
+            }
         }
 
         return PermissionExpression.Evaluate(permissionExpr, userPerms);

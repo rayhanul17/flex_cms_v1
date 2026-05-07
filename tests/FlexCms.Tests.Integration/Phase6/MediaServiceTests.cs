@@ -1,6 +1,7 @@
 using FlexCms.Framework.Db;
 using FlexCms.Framework.Cms;
 using FlexCms.Framework.Db.Ef;
+using FlexCms.Framework.Services;
 using FlexCms.Framework.Storage;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
@@ -33,8 +34,11 @@ public class MediaServiceTests : IDisposable
             .Returns(Task.CompletedTask);
 
         var mediaRepo = new EfRepository<FcmsMedia>(_db);
+        // ISettingsService stub: GetAsync<T> returns a default-constructed
+        // T so the upload size cap defaults to MediaService.AbsoluteMaxBytes.
+        var settings = Substitute.For<ISettingsService>();
 #pragma warning disable CA2000
-        _svc = new MediaService(mediaRepo, new EfUnitOfWork(_db), _storage, Substitute.For<IFcmsLogService>());
+        _svc = new MediaService(mediaRepo, new EfUnitOfWork(_db), _storage, Substitute.For<IFcmsLogService>(), settings);
 #pragma warning restore CA2000
     }
 

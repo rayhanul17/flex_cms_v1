@@ -5,6 +5,7 @@ using FlexCms.Framework.Chat;
 using FlexCms.Framework.Cms;
 using FlexCms.Framework.Cms.Comments;
 using FlexCms.Framework.Cms.CustomFields;
+using FlexCms.Framework.Cms.Drafts;
 using FlexCms.Framework.Cms.Revisions;
 using FlexCms.Framework.Clock;
 using FlexCms.Framework.Editorial;
@@ -115,6 +116,9 @@ public class FcmsDbContext : IdentityDbContext<FcmsUser, FcmsRole, Guid>
     public DbSet<FcmsSearchQuery> SearchQueries => Set<FcmsSearchQuery>();
     public DbSet<FcmsContentReview> ContentReviews => Set<FcmsContentReview>();
     public DbSet<FcmsContentAnnotation> ContentAnnotations => Set<FcmsContentAnnotation>();
+
+    // ── Post-phase hardening: draft autosave snapshots ────────────────────
+    public DbSet<FcmsContentDraftSnapshot> ContentDraftSnapshots => Set<FcmsContentDraftSnapshot>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -394,6 +398,12 @@ public class FcmsDbContext : IdentityDbContext<FcmsUser, FcmsRole, Guid>
 
         modelBuilder.Entity<FcmsContentAnnotation>()
             .HasIndex(a => new { a.EntityType, a.EntityId, a.IsResolved });
+
+        // Draft autosave: lookup is always (type, id, user) — one row per
+        // user per entity. Unique index lets the upsert be a 1-row read.
+        modelBuilder.Entity<FcmsContentDraftSnapshot>()
+            .HasIndex(s => new { s.EntityType, s.EntityId, s.UserId })
+            .IsUnique();
 
         // Audit log entities are append-only — strip the inherited lifecycle
         // columns and skip the soft-delete query filter (no Status column means

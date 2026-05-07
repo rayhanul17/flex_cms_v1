@@ -1,5 +1,6 @@
 using FlexCms.Framework.Services;
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.Extensions.Logging;
 
 namespace FlexCms.Framework.Messaging.Services;
 
@@ -10,11 +11,13 @@ public class SmsSettingsService : ISmsSettingsService
 
     private readonly ISettingsService _settings;
     private readonly IDataProtector _protector;
+    private readonly ILogger<SmsSettingsService> _logger;
 
-    public SmsSettingsService(ISettingsService settings, IDataProtectionProvider protectionProvider)
+    public SmsSettingsService(ISettingsService settings, IDataProtectionProvider protectionProvider, ILogger<SmsSettingsService> logger)
     {
         _settings = settings;
         _protector = protectionProvider.CreateProtector(ProtectorPurpose);
+        _logger = logger;
     }
 
     public Task<SmsSettings> GetAsync(CancellationToken ct = default)
@@ -47,6 +50,12 @@ public class SmsSettingsService : ISmsSettingsService
     {
         if (string.IsNullOrEmpty(ciphertext)) return "";
         try { return _protector.Unprotect(ciphertext); }
-        catch { return ""; }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex,
+                "SMS API key ciphertext present but DataProtection could not decrypt it. " +
+                "Re-save the SMS settings with the API key to refresh the ciphertext.");
+            return "";
+        }
     }
 }

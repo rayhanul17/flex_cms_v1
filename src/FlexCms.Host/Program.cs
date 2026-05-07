@@ -159,6 +159,9 @@ if (!app.Environment.IsDevelopment())
 app.UseStatusCodePagesWithReExecute("/Home/Error/{0}");
 
 app.UseHttpsRedirection();
+// Hotlink protection runs BEFORE static files — otherwise the static-file
+// middleware would serve /uploads/* and we'd never see the request.
+app.UseMiddleware<FlexCms.Framework.Middleware.HotlinkProtectionMiddleware>();
 app.UseStaticFiles();
 // CORS runs before routing + auth so preflight OPTIONS replies fast even
 // when the eventual endpoint requires authentication.

@@ -1,7 +1,9 @@
 using FlexCms.Framework.Auth;
+using FlexCms.Framework.Db.Ef;
 using FlexCms.Host.Models.Admin;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace FlexCms.Host.Controllers.Admin;
 
@@ -10,11 +12,13 @@ public class UserController : BaseAdminController
 {
     private readonly UserManager<FcmsUser> _userManager;
     private readonly RoleManager<FcmsRole> _roleManager;
+    private readonly FcmsDbContext _db;
 
-    public UserController(UserManager<FcmsUser> userManager, RoleManager<FcmsRole> roleManager)
+    public UserController(UserManager<FcmsUser> userManager, RoleManager<FcmsRole> roleManager, FcmsDbContext db)
     {
         _userManager = userManager;
         _roleManager = roleManager;
+        _db = db;
     }
 
     // ── List ──────────────────────────────────────────────────────────────────
@@ -22,23 +26,37 @@ public class UserController : BaseAdminController
     [HttpGet("")]
     public async Task<IActionResult> Index(CancellationToken ct)
     {
-        var users = _userManager.Users.OrderByDescending(u => u.CreatedAt).ToList();
-        var list = new List<UserListItemViewModel>();
+        // Single round-trip for users + a single round-trip for the role
+        // map. Previous loop did N+1 queries (one GetRolesAsync per user)
+        // — broke on instances with even a few hundred users.
+        var users = await _userManager.Users
+            .OrderByDescending(u => u.CreatedAt)
+            .ToListAsync(ct);
+        if (users.Count == 0) return View(new List<UserListItemViewModel>());
 
-        foreach (var u in users)
+        var ids = users.Select(u => u.Id).ToList();
+        var roleMap = await _db.Set<IdentityUserRole<Guid>>()
+            .Where(ur => ids.Contains(ur.UserId))
+            .Join(_db.Set<FcmsRole>(),
+                  ur => ur.RoleId,
+                  r => r.Id,
+                  (ur, r) => new { ur.UserId, RoleName = r.Name })
+            .ToListAsync(ct);
+
+        var rolesByUser = roleMap
+            .GroupBy(x => x.UserId)
+            .ToDictionary(g => g.Key, g => g.Select(x => x.RoleName ?? "").ToList());
+
+        var list = users.Select(u => new UserListItemViewModel
         {
-            var roles = await _userManager.GetRolesAsync(u);
-            list.Add(new UserListItemViewModel
-            {
-                Id = u.Id,
-                Email = u.Email ?? "",
-                DisplayName = u.UserName,
-                Status = u.Status,
-                ForcePasswordChange = u.ForcePasswordChange,
-                CreatedAt = u.CreatedAt,
-                Roles = [.. roles]
-            });
-        }
+            Id = u.Id,
+            Email = u.Email ?? "",
+            DisplayName = u.UserName,
+            Status = u.Status,
+            ForcePasswordChange = u.ForcePasswordChange,
+            CreatedAt = u.CreatedAt,
+            Roles = rolesByUser.TryGetValue(u.Id, out var rs) ? rs : []
+        }).ToList();
 
         return View(list);
     }

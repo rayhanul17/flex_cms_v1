@@ -39,5 +39,14 @@ public class FcmsPage : BaseEfEntity
     /// </summary>
     public byte[]? RowVersion { get; set; }
 
+    /// <summary>
+    /// One-time-use shareable preview token. Frontend renders an unpublished
+    /// page when <c>?preview={token}</c> matches AND the token has not expired.
+    /// Lets editors share drafts with reviewers without giving them admin
+    /// access — see <c>IPreviewTokenService.IssueAsync</c>.
+    /// </summary>
+    public string? PreviewToken { get; set; }
+    public DateTime? PreviewTokenExpiresAt { get; set; }
+
     public ICollection<FcmsPageTranslation> Translations { get; set; } = [];
 }

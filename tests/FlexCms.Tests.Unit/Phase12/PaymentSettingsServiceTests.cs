@@ -35,7 +35,7 @@ public class PaymentSettingsServiceTests
     [Fact]
     public async Task SaveGeneralAsync_round_trips_settings()
     {
-        var svc = new PaymentSettingsService(new StubSettings(), Provider());
+        var svc = new PaymentSettingsService(new StubSettings(), Provider(), Microsoft.Extensions.Logging.Abstractions.NullLogger<PaymentSettingsService>.Instance);
         await svc.SaveGeneralAsync(new PaymentSettings { Enabled = true, ActiveGateway = PaymentGateways.Sslcommerz });
         var stored = await svc.GetGeneralAsync();
         Assert.True(stored.Enabled);
@@ -47,7 +47,7 @@ public class PaymentSettingsServiceTests
     [Fact]
     public async Task SaveBkashAsync_encrypts_both_secrets()
     {
-        var svc = new PaymentSettingsService(new StubSettings(), Provider());
+        var svc = new PaymentSettingsService(new StubSettings(), Provider(), Microsoft.Extensions.Logging.Abstractions.NullLogger<PaymentSettingsService>.Instance);
         await svc.SaveBkashAsync(
             new BkashSettings { Enabled = true, AppKey = "akey", Username = "u" },
             newAppSecret: "Secret1!", newPassword: "Pwd1!");
@@ -66,7 +66,7 @@ public class PaymentSettingsServiceTests
     [Fact]
     public async Task SaveBkashAsync_with_null_secrets_preserves_existing_ciphertext()
     {
-        var svc = new PaymentSettingsService(new StubSettings(), Provider());
+        var svc = new PaymentSettingsService(new StubSettings(), Provider(), Microsoft.Extensions.Logging.Abstractions.NullLogger<PaymentSettingsService>.Instance);
         await svc.SaveBkashAsync(new BkashSettings { AppKey = "akey" }, "Secret1!", "Pwd1!");
         var firstSecret = (await svc.GetBkashAsync()).AppSecretEncrypted;
         var firstPwd = (await svc.GetBkashAsync()).PasswordEncrypted;
@@ -82,7 +82,7 @@ public class PaymentSettingsServiceTests
     [Fact]
     public async Task GetBkashWithSecretsAsync_returns_empty_when_no_ciphertext()
     {
-        var svc = new PaymentSettingsService(new StubSettings(), Provider());
+        var svc = new PaymentSettingsService(new StubSettings(), Provider(), Microsoft.Extensions.Logging.Abstractions.NullLogger<PaymentSettingsService>.Instance);
         var (_, secret, pwd) = await svc.GetBkashWithSecretsAsync();
         Assert.Equal("", secret);
         Assert.Equal("", pwd);
@@ -93,7 +93,7 @@ public class PaymentSettingsServiceTests
     [Fact]
     public async Task SaveSslcommerzAsync_encrypts_store_password()
     {
-        var svc = new PaymentSettingsService(new StubSettings(), Provider());
+        var svc = new PaymentSettingsService(new StubSettings(), Provider(), Microsoft.Extensions.Logging.Abstractions.NullLogger<PaymentSettingsService>.Instance);
         await svc.SaveSslcommerzAsync(new SslcommerzSettings { Enabled = true, StoreId = "sid" }, "StorePwd1!");
 
         var stored = await svc.GetSslcommerzAsync();
@@ -107,7 +107,7 @@ public class PaymentSettingsServiceTests
     [Fact]
     public async Task SaveSslcommerzAsync_with_null_secret_preserves_ciphertext()
     {
-        var svc = new PaymentSettingsService(new StubSettings(), Provider());
+        var svc = new PaymentSettingsService(new StubSettings(), Provider(), Microsoft.Extensions.Logging.Abstractions.NullLogger<PaymentSettingsService>.Instance);
         await svc.SaveSslcommerzAsync(new SslcommerzSettings { StoreId = "sid" }, "StorePwd1!");
         var firstPwd = (await svc.GetSslcommerzAsync()).StorePasswordEncrypted;
 
@@ -123,7 +123,7 @@ public class PaymentSettingsServiceTests
     [Fact]
     public async Task SaveNagadAsync_encrypts_merchant_private_key()
     {
-        var svc = new PaymentSettingsService(new StubSettings(), Provider());
+        var svc = new PaymentSettingsService(new StubSettings(), Provider(), Microsoft.Extensions.Logging.Abstractions.NullLogger<PaymentSettingsService>.Instance);
         await svc.SaveNagadAsync(
             new NagadSettings { Enabled = true, MerchantId = "mid" },
             "-----BEGIN PRIVATE KEY-----...");
@@ -139,7 +139,7 @@ public class PaymentSettingsServiceTests
     [Fact]
     public async Task SaveNagadAsync_with_null_secret_preserves_ciphertext()
     {
-        var svc = new PaymentSettingsService(new StubSettings(), Provider());
+        var svc = new PaymentSettingsService(new StubSettings(), Provider(), Microsoft.Extensions.Logging.Abstractions.NullLogger<PaymentSettingsService>.Instance);
         await svc.SaveNagadAsync(new NagadSettings { MerchantId = "mid" }, "-----BEGIN-----xxx");
         var firstPk = (await svc.GetNagadAsync()).MerchantPrivateKeyEncrypted;
 
@@ -157,7 +157,7 @@ public class PaymentSettingsServiceTests
     {
         // Same plaintext encrypted under one gateway's purpose must NOT decrypt
         // under another's — this guards the per-gateway IDataProtector isolation.
-        var svc = new PaymentSettingsService(new StubSettings(), Provider());
+        var svc = new PaymentSettingsService(new StubSettings(), Provider(), Microsoft.Extensions.Logging.Abstractions.NullLogger<PaymentSettingsService>.Instance);
 
         await svc.SaveBkashAsync(new BkashSettings(), newAppSecret: "shared", newPassword: null);
         var bkashCipher = (await svc.GetBkashAsync()).AppSecretEncrypted;

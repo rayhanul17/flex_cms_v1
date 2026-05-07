@@ -1,5 +1,6 @@
 using FlexCms.Framework.Services;
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.Extensions.Logging;
 
 namespace FlexCms.Framework.Messaging.Services;
 
@@ -10,11 +11,13 @@ public class SmtpSettingsService : ISmtpSettingsService
 
     private readonly ISettingsService _settings;
     private readonly IDataProtector _protector;
+    private readonly ILogger<SmtpSettingsService> _logger;
 
-    public SmtpSettingsService(ISettingsService settings, IDataProtectionProvider protectionProvider)
+    public SmtpSettingsService(ISettingsService settings, IDataProtectionProvider protectionProvider, ILogger<SmtpSettingsService> logger)
     {
         _settings = settings;
         _protector = protectionProvider.CreateProtector(ProtectorPurpose);
+        _logger = logger;
     }
 
     public Task<SmtpSettings> GetAsync(CancellationToken ct = default)
@@ -48,6 +51,16 @@ public class SmtpSettingsService : ISmtpSettingsService
     {
         if (string.IsNullOrEmpty(ciphertext)) return "";
         try { return _protector.Unprotect(ciphertext); }
-        catch { return ""; }   // key-rotation or corruption — caller treats as "not configured"
+        catch (Exception ex)
+        {
+            // Most likely cause: key-ring rotated or App_Data\keys deleted
+            // since the password was saved. Operator needs to re-enter the
+            // SMTP password before mail will work — log so they catch it
+            // at startup, not when the next "test email" silently fails.
+            _logger.LogWarning(ex,
+                "SMTP password ciphertext present but DataProtection could not decrypt it. " +
+                "Re-save the SMTP settings with the password to refresh the ciphertext.");
+            return "";
+        }
     }
 }

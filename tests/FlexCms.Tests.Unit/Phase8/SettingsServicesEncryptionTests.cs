@@ -40,7 +40,7 @@ public class SettingsServicesEncryptionTests
     [Fact]
     public async Task Smtp_SaveWithPassword_persists_ciphertext_and_decrypts_back_to_plaintext()
     {
-        var svc = new SmtpSettingsService(new StubSettings(), RealProtectionProvider());
+        var svc = new SmtpSettingsService(new StubSettings(), RealProtectionProvider(), Microsoft.Extensions.Logging.Abstractions.NullLogger<SmtpSettingsService>.Instance);
         await svc.SaveAsync(new SmtpSettings { Enabled = true, Host = "h" }, newPassword: "Secret!1", ct: default);
 
         var stored = await svc.GetAsync();
@@ -54,7 +54,7 @@ public class SettingsServicesEncryptionTests
     [Fact]
     public async Task Smtp_SaveWithNullPassword_preserves_existing_ciphertext()
     {
-        var svc = new SmtpSettingsService(new StubSettings(), RealProtectionProvider());
+        var svc = new SmtpSettingsService(new StubSettings(), RealProtectionProvider(), Microsoft.Extensions.Logging.Abstractions.NullLogger<SmtpSettingsService>.Instance);
         await svc.SaveAsync(new SmtpSettings { Host = "h" }, "OldSecret!1");
         var first = (await svc.GetAsync()).PasswordEncrypted;
 
@@ -68,7 +68,7 @@ public class SettingsServicesEncryptionTests
     [Fact]
     public async Task Sms_SaveWithApiKey_persists_ciphertext_and_decrypts_back()
     {
-        var svc = new SmsSettingsService(new StubSettings(), RealProtectionProvider());
+        var svc = new SmsSettingsService(new StubSettings(), RealProtectionProvider(), Microsoft.Extensions.Logging.Abstractions.NullLogger<SmsSettingsService>.Instance);
         await svc.SaveAsync(new SmsSettings { Enabled = true, Gateway = SmsGateways.Alpha }, newApiKey: "k1");
 
         var stored = await svc.GetAsync();
@@ -82,7 +82,7 @@ public class SettingsServicesEncryptionTests
     [Fact]
     public async Task Sms_SaveWithEmptyApiKey_preserves_existing_ciphertext()
     {
-        var svc = new SmsSettingsService(new StubSettings(), RealProtectionProvider());
+        var svc = new SmsSettingsService(new StubSettings(), RealProtectionProvider(), Microsoft.Extensions.Logging.Abstractions.NullLogger<SmsSettingsService>.Instance);
         await svc.SaveAsync(new SmsSettings { Gateway = SmsGateways.Alpha }, "k1");
         var first = (await svc.GetAsync()).ApiKeyEncrypted;
 

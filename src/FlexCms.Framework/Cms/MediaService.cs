@@ -1,5 +1,6 @@
 using FlexCms.Framework.Clock;
 using FlexCms.Framework.Db;
+using FlexCms.Framework.Services;
 using FlexCms.Framework.Storage;
 using Microsoft.AspNetCore.Http;
 using SkiaSharp;
@@ -35,21 +36,31 @@ public class MediaService : IMediaService
 
     private const int ThumbnailMaxSize = 300;
 
+    /// <summary>
+    /// Hard ceiling for any single upload, regardless of <c>SiteSettings.MaxUploadSizeMb</c>.
+    /// Keeps a misconfigured setting from blowing the heap. 256 MB matches
+    /// what most managed runtimes comfortably stream into a single MemoryStream.
+    /// </summary>
+    public const long AbsoluteMaxBytes = 256L * 1024 * 1024;
+
     private readonly IRepository<FcmsMedia> _mediaRepo;
     private readonly IFcmsUnitOfWork _uow;
     private readonly IFcmsFileStorage _storage;
     private readonly IFcmsLogService _audit;
+    private readonly ISettingsService _settings;
 
     public MediaService(
         IRepository<FcmsMedia> mediaRepo,
         IFcmsUnitOfWork uow,
         IFcmsFileStorage storage,
-        IFcmsLogService audit)
+        IFcmsLogService audit,
+        ISettingsService settings)
     {
         _mediaRepo = mediaRepo;
         _uow = uow;
         _storage = storage;
         _audit = audit;
+        _settings = settings;
     }
 
     public async Task<FcmsMedia> UploadAsync(IFormFile file, Guid? folderId, CancellationToken ct = default)
@@ -58,6 +69,21 @@ public class MediaService : IMediaService
 
         if (!AllowedExtensions.Contains(ext))
             throw new InvalidOperationException($"File type '{ext}' is not allowed.");
+
+        // Size cap enforced BEFORE streaming to MemoryStream — otherwise a
+        // 5 GB upload exhausts the heap before we ever get to validation.
+        // Two layers: admin-configurable SiteSettings.MaxUploadSizeMb +
+        // absolute floor in case settings is misconfigured/zero.
+        UploadLimitSnapshot? snap = null;
+        try { snap = await _settings.GetAsync<UploadLimitSnapshot>("site:general", ct); }
+        catch { /* settings unavailable → fall back to absolute cap */ }
+        var configuredMaxBytes = snap?.MaxUploadSizeMb > 0
+            ? (long)snap.MaxUploadSizeMb * 1024 * 1024
+            : AbsoluteMaxBytes;
+        var maxBytes = Math.Min(configuredMaxBytes, AbsoluteMaxBytes);
+        if (file.Length > maxBytes)
+            throw new InvalidOperationException(
+                $"File exceeds maximum upload size of {maxBytes / (1024 * 1024)} MB.");
 
         var safeOriginal = Path.GetFileNameWithoutExtension(SanitizeFileName(file.FileName));
         var uniqueName = $"{safeOriginal}_{Guid.NewGuid():N}{ext}";
@@ -186,5 +212,11 @@ public class MediaService : IMediaService
         ms.Position = 0;
 
         return await _storage.SaveAsync(thumbPath, ms, ct);
+    }
+
+    /// <summary>Local DTO matching the relevant subset of SiteSettings — Framework can't reference Core.</summary>
+    private sealed class UploadLimitSnapshot
+    {
+        public int MaxUploadSizeMb { get; set; }
     }
 }

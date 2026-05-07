@@ -38,7 +38,10 @@ body {
        so the header + footer stay pinned. */
     overflow: hidden;
     z-index: 1040; /* above backdrop (1035), below offcanvas-modal (1050) */
-    transition: transform .25s ease;
+    /* transform animates the mobile slide-in/out; width animates the
+       desktop collapse-to-rail. Same timing function on #main-content
+       below so the content slide stays in lock-step with the sidebar. */
+    transition: transform .25s ease, width .25s ease, min-width .25s ease;
 }
 
 #sidebar .sidebar-scroll {
@@ -232,6 +235,9 @@ body {
     min-height: 100vh;
     background: #f5f7fa;
     min-width: 0;
+    /* Slide in lock-step with #sidebar's width transition so the gutter
+       between sidebar and content never tears or jumps. */
+    transition: margin-left .25s ease;
 }
 
 #topbar {

@@ -1,0 +1,105 @@
+@using FlexCms.Framework.Auth.TwoFactor
+@{
+    ViewData["Title"] = "Two-factor authentication";
+    var enabled = (bool)(ViewData["Enabled"] ?? false);
+    var channel = (TwoFactorChannel)(ViewData["Channel"] ?? TwoFactorChannel.Disabled);
+    var recoveryCount = (int)(ViewData["RecoveryCount"] ?? 0);
+    var hasEmail = (bool)(ViewData["HasEmail"] ?? false);
+    var hasPhone = (bool)(ViewData["HasPhone"] ?? false);
+    var ok = TempData["Ok"] as string;
+    var err = TempData["Err"] as string;
+    var recoveryCodes = TempData["RecoveryCodes"] as string;
+}
+
+<h4 class="mb-3">Two-factor authentication</h4>
+
+@if (!string.IsNullOrEmpty(ok))
+{
+    <div class="alert alert-success">@ok</div>
+}
+@if (!string.IsNullOrEmpty(err))
+{
+    <div class="alert alert-danger">@err</div>
+}
+
+@if (!string.IsNullOrEmpty(recoveryCodes))
+{
+    <div class="card border-warning shadow-sm mb-3">
+        <div class="card-header bg-warning-subtle fw-semibold">
+            <i class="bi bi-exclamation-triangle"></i> Recovery codes — save these now
+        </div>
+        <div class="card-body">
+            <p class="text-muted small">
+                These codes are shown <strong>only once</strong>. Each code works ONE time and
+                lets you sign in if you can't receive a verification code. Print them or store
+                them in a password manager.
+            </p>
+            <pre class="bg-light p-3 border" style="font-size:1.1rem;letter-spacing:2px">@recoveryCodes</pre>
+            <button type="button" class="btn btn-sm btn-outline-primary"
+                    onclick="navigator.clipboard.writeText(document.querySelector('pre').textContent)">
+                <i class="bi bi-clipboard"></i> Copy to clipboard
+            </button>
+        </div>
+    </div>
+}
+
+<div class="card shadow-sm mb-3">
+    <div class="card-header fw-semibold">Status</div>
+    <div class="card-body">
+        @if (enabled)
+        {
+            <p>2FA is <span class="badge bg-success">enabled</span> — codes sent via <strong>@channel</strong>.</p>
+            <p class="small text-muted">@recoveryCount unused recovery code(s) remaining.</p>
+            <form asp-action="Disable" method="post" class="d-inline">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="btn btn-outline-danger btn-sm">
+                    <i class="bi bi-shield-slash"></i> Disable 2FA
+                </button>
+            </form>
+            <form asp-action="RegenerateRecoveryCodes" method="post" class="d-inline">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="btn btn-outline-secondary btn-sm">
+                    <i class="bi bi-arrow-clockwise"></i> Regenerate recovery codes
+                </button>
+            </form>
+        }
+        else
+        {
+            <p>2FA is <span class="badge bg-secondary">disabled</span>.</p>
+            <form asp-action="Enable" method="post" class="row g-2 align-items-end">
+                @Html.AntiForgeryToken()
+                <div class="col-auto">
+                    <label class="form-label">Channel</label>
+                    <select name="channel" class="form-select">
+                        @if (hasEmail)
+                        {
+                            <option value="@TwoFactorChannel.Email">Email — sent to your registered address</option>
+                        }
+                        @if (hasPhone)
+                        {
+                            <option value="@TwoFactorChannel.Sms">SMS — sent to your registered phone</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-auto">
+                    @if (hasEmail || hasPhone)
+                    {
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-shield-check"></i> Enable 2FA
+                        </button>
+                    }
+                    else
+                    {
+                        <span class="text-danger small">Add an email or phone number first.</span>
+                    }
+                </div>
+            </form>
+        }
+    </div>
+</div>
+
+<p class="small text-muted">
+    With 2FA enabled, after entering your password you'll be asked for a 6-digit
+    code we send via @(channel != TwoFactorChannel.Disabled ? channel.ToString() : "your chosen channel").
+    Codes expire in 5 minutes.
+</p>

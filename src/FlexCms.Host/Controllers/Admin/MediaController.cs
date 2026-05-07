@@ -189,4 +189,44 @@ public class MediaController : BaseAdminController
         }
         return RedirectToAction(nameof(Index));
     }
+
+    // ── Bulk alt-text editor ─────────────────────────────────────────────────
+    // Accessibility (WCAG 2.1 AA) + image-search SEO both depend on alt text.
+    // Editing one media item at a time is fine for new uploads but useless
+    // for bringing legacy libraries into compliance — typical sites import
+    // 50-500 images at a time, and per-image edit takes 30s each.
+
+    [HttpGet("alt-text")]
+    [FcmsAuthorize(FcmsPermissions.MediaEdit)]
+    public async Task<IActionResult> AltText(Guid? folderId, bool missingOnly = false)
+    {
+        var allFolders = await _folders.GetAllAsync();
+        var items = await _media.GetByFolderAsync(folderId);
+
+        // Default to images-only — alt text is only meaningful for visual
+        // media. Audio / PDF / video have their own accessibility metadata.
+        items = items
+            .Where(m => m.MimeType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        if (missingOnly)
+            items = items.Where(m => string.IsNullOrWhiteSpace(m.AltText)).ToList();
+
+        ViewBag.Folders = allFolders;
+        ViewBag.CurrentFolderId = folderId;
+        ViewBag.MissingOnly = missingOnly;
+        ViewBag.MissingCount = items.Count(m => string.IsNullOrWhiteSpace(m.AltText));
+        return View(items);
+    }
+
+    [HttpPost("alt-text/bulk-save")]
+    [ValidateAntiForgeryToken]
+    [FcmsAuthorize(FcmsPermissions.MediaEdit)]
+    public async Task<IActionResult> AltTextBulkSave([FromForm] Dictionary<Guid, string?> alt)
+    {
+        if (alt is null || alt.Count == 0)
+            return FcmsFail("Nothing to save.");
+        var n = await _media.BulkUpdateAltTextAsync(alt);
+        return FcmsOk($"Updated {n} item(s).", new { count = n });
+    }
 }

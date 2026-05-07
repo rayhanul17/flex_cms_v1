@@ -2,6 +2,7 @@ using FlexCms.Framework.Api;
 using FlexCms.Framework.Auth;
 using FlexCms.Framework.Auth.Ef;
 using FlexCms.Framework.Auth.History;
+using FlexCms.Framework.Auth.TwoFactor;
 using FlexCms.Framework.Captcha;
 using FlexCms.Framework.Cdn;
 using FlexCms.Framework.Chat;
@@ -178,6 +179,7 @@ public static class FcmsServiceExtensions
         services.AddScoped<ISessionService, SessionService>();
         services.AddScoped<ILoginHistoryService, LoginHistoryService>();
         services.AddScoped<ILoginRedirectService, LoginRedirectService>();
+        services.AddScoped<IOtpChallengeService, OtpChallengeService>();
 
         // Health checks — built-ins. Modules add more via AddSingleton<IFcmsHealthCheck, ...>().
         services.AddScoped<IFcmsHealthCheck, EfDatabaseHealthCheck>();

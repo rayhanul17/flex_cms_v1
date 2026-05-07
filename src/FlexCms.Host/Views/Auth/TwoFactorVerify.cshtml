@@ -1,0 +1,46 @@
+@model FlexCms.Host.Models.Auth.TwoFactorVerifyViewModel
+@{
+    ViewData["Title"] = "Verify sign-in";
+    var masked = ViewData["Masked"] as string ?? "";
+}
+
+<div class="row justify-content-center mt-5">
+    <div class="col-md-5 col-lg-4">
+        <div class="card shadow-sm">
+            <div class="card-body p-4">
+                <h4 class="card-title text-center mb-3">Verify sign-in</h4>
+                <p class="text-muted small text-center mb-4">
+                    @if (!string.IsNullOrEmpty(masked))
+                    {
+                        <text>We sent a 6-digit code to <strong>@masked</strong>. Enter it below.</text>
+                    }
+                    else
+                    {
+                        <text>Enter the 6-digit code we sent you, or one of your recovery codes.</text>
+                    }
+                </p>
+
+                <form asp-action="TwoFactorVerify" method="post" autocomplete="off">
+                    <div asp-validation-summary="ModelOnly" class="text-danger small mb-3"></div>
+
+                    <div class="mb-3">
+                        <label asp-for="Code" class="form-label">Code</label>
+                        <input asp-for="Code" class="form-control text-center"
+                               style="font-size:1.5rem;letter-spacing:0.4rem"
+                               inputmode="numeric" maxlength="20" autofocus />
+                        <span asp-validation-for="Code" class="text-danger small"></span>
+                        <div class="form-text">
+                            6-digit code or a recovery code formatted like <code>ABCDE-FGHJK</code>.
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary w-100">Verify</button>
+                </form>
+
+                <form asp-action="TwoFactorResend" method="post" class="mt-3">
+                    <button type="submit" class="btn btn-link btn-sm w-100 text-muted">Resend code</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>

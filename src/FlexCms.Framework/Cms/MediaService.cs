@@ -164,6 +164,33 @@ public class MediaService : IMediaService
     public async Task<IReadOnlyList<FcmsMedia>> GetByFolderAsync(Guid? folderId, CancellationToken ct = default)
         => await _mediaRepo.FindAsync(m => m.FolderId == folderId, ct);
 
+    public async Task<int> BulkUpdateAltTextAsync(IReadOnlyDictionary<Guid, string?> idToAlt, CancellationToken ct = default)
+    {
+        if (idToAlt is null || idToAlt.Count == 0) return 0;
+
+        // One round-trip to grab everything we need (instead of per-id GetById
+        // in a loop). The expression-based predicate translates to a single
+        // WHERE Id IN (...) on the relational side.
+        var ids = idToAlt.Keys.ToList();
+        var rows = await _mediaRepo.FindAsync(m => ids.Contains(m.Id), ct);
+        if (rows.Count == 0) return 0;
+
+        var updated = 0;
+        foreach (var row in rows)
+        {
+            if (!idToAlt.TryGetValue(row.Id, out var newAlt)) continue;
+            // Trim+coalesce to "" → null so the DB doesn't carry whitespace
+            // strings that the validator + screen-readers all treat as missing.
+            var normalized = string.IsNullOrWhiteSpace(newAlt) ? null : newAlt.Trim();
+            if (row.AltText == normalized) continue;
+            row.AltText = normalized;
+            await _mediaRepo.UpdateAsync(row, ct);
+            updated++;
+        }
+        if (updated > 0) await _uow.SaveChangesAsync(ct);
+        return updated;
+    }
+
     // -- helpers ----------------------------------------------------------------
 
     private static string SanitizeFileName(string fileName)

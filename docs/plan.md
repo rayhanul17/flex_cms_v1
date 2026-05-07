@@ -2865,10 +2865,9 @@ dotnet add package SkiaSharp                                # MIT — Thumbnail 
 
 # ── Phase 13-15 (Issues 67-103 — Production Critical) ──
 dotnet add package Microsoft.Extensions.Diagnostics.HealthChecks  # MIT — built-in (Issue 67)
-dotnet add package Microsoft.AspNetCore.Authentication.Google     # MIT — OAuth (Issue 72)
-dotnet add package Microsoft.AspNetCore.Authentication.Facebook   # MIT — OAuth (Issue 72)
-dotnet add package Microsoft.AspNetCore.Authentication.MicrosoftAccount  # MIT — OAuth (Issue 72)
-dotnet add package AspNet.Security.OAuth.GitHub                   # Apache 2.0 — GitHub OAuth (Issue 72)
+# OAuth provider packages (Issue 72) — DROPPED from core scope; install
+# in a community module if social-login is needed for your deployment.
+dotnet add package Otp.NET                                        # MIT — TOTP for 2FA codes (Issue 71)
 dotnet add package Microsoft.AspNetCore.OutputCaching             # MIT — built-in (Issue 86)
 dotnet add package DiffPlex                                       # Apache 2.0 — Revision diff (Issue 79)
 # Optional (centralized logging — Issue 88):
@@ -9598,10 +9597,9 @@ System.IO.Compression (built-in)              MIT         ← ZIP generation for
 
 # ── Issues 67-103 (PART 13) — Production Critical Enhancements ──
 Microsoft.Extensions.Diagnostics.HealthChecks  MIT         ← built-in, /health endpoints (Issue 67)
-Microsoft.AspNetCore.Authentication.Google     MIT         ← OAuth Google (Issue 72)
-Microsoft.AspNetCore.Authentication.Facebook   MIT         ← OAuth Facebook (Issue 72)
-Microsoft.AspNetCore.Authentication.MicrosoftAccount MIT   ← OAuth Microsoft (Issue 72)
-AspNet.Security.OAuth.GitHub                   Apache 2.0  ← OAuth GitHub (Issue 72)
+# OAuth provider packages (Issue 72) — DROPPED from core. Install in a
+# community module if social login is needed for your deployment.
+Otp.NET                                        MIT         ← TOTP code generation for 2FA (Issue 71)
 Microsoft.AspNetCore.OutputCaching             MIT         ← built-in (.NET 7+), full page cache (Issue 86)
 DiffPlex                                       Apache 2.0  ← Side-by-side text diff for revisions (Issue 79)
 
@@ -14375,15 +14373,16 @@ tests/FlexCms.Tests.Unit/Phase3/FcmsAuthorizeFilterTests.cs # +SuperAdmin upperc
 ### Phase 13 — Auth Hardening + Account Lifecycle (Issues 67-72, 91-92, 102-103)
 > **🔄 PARTIAL** (2026-05-06) — see [phase-13-test-cases.md](phase-13-test-cases.md)
 > ✅ Done in this pass: health checks (Issue 67) — `IFcmsHealthCheck` + EF DB / background-queue / disk-space built-ins + `/health` `/health/ready` `/health/live` endpoints; session tracking (Issue 68) — `FcmsUserSession` entity (EF + Mongo, `(UserId, IsRevoked)` + unique `SessionId` indexes) + `ISessionService` (RecordLogin / GetActive / Touch / IsValid / Revoke / RevokeAllForUser); login history (Issue 69) — `FcmsLoginHistory` + `ILoginHistoryService` + `AuthController` wires it on every login attempt (Success + InvalidCredentials + LockedOut + NotAllowed); env banner (Issue 91) — `<fcms-env-banner />` TagHelper rendered in `_AdminLayout` (red Dev / orange Staging / suppressed in Production); login redirect (Issue 102) — `ILoginRedirectService` + `LoginRedirectService` with priority chain returnUrl → user claim → role map (SuperAdmin > Admin > Editor > Author > Subscriber) → fallback; open-redirect blocked at every level. Database resilience (Issue 92) — `EnableRetryOnFailure(3)` already in earlier phase.
-> ⏸ Deferred (need external services / heavy UI design): 2FA TOTP (Issue 71), OAuth providers (Issue 72), full email-verification flow polish (Issue 70), `FcmsSessionValidationMiddleware` (the IsValid API exists; the middleware needs UI for "active sessions" first), custom 401/403/404/500 styled pages with admin overrides (Issue 103). The framework's existing error middleware covers the unstyled defaults.
+> ⏸ Deferred: 2FA TOTP (Issue 71) — replaced with email/SMS OTP (see hardening pass below; reuses Phase 8 Email/SMS infra; admin-friendly for the BD market vs requiring authenticator-app install); full email-verification flow polish (Issue 70); custom 401/403/404/500 styled pages with admin overrides (Issue 103) — framework's existing error middleware covers the unstyled defaults.
+> ❌ **Dropped (intentional, NOT deferred)**: OAuth providers (Issue 72) — Google/Facebook/Microsoft/GitHub. Reason: BD-market FlexCMS deployments are admin-heavy (small ops team) + email/phone-first; OAuth provider maintenance burden (deprecated scopes, callback-URL juggling, breaking provider API changes) outweighs onboarding benefit. M2Sv3 / NetCoreCMS — neither ships OAuth either. End-users wanting social login can install a community module instead of carrying it in core.
 > Tests: 15 unit (LoginRedirectService 10 + BuiltInHealthChecks 5) + 8 integration (SessionService 5 + LoginHistoryService 3). Project total 279 unit + 224 integration.
 **কাজ:**
 - `IFcmsHealthCheck` + built-in checks (DB, Audit, Queue, Disk) → `/health`, `/health/ready`, `/health/live` (Issue 67)
 - `FcmsUserSession` entity + `SessionService` + `FcmsSessionValidationMiddleware` — active sessions + force logout (Issue 68)
 - `FcmsLoginHistory` + admin Security Dashboard (Issue 69)
 - Email verification flow — `ConfirmEmailAsync`, resend link, SiteSettings.RequireEmailVerification (Issue 70)
-- 2FA TOTP + recovery codes + per-role enforce (Issue 71)
-- OAuth: Google, Facebook, Microsoft, GitHub — `AddGoogle()` etc., AutoRegister flag (Issue 72)
+- 2FA via email/SMS OTP (Issue 71 modified) — replaces TOTP plan; reuses Phase 8 infra
+- ~~OAuth: Google, Facebook, Microsoft, GitHub (Issue 72)~~ — **dropped from core scope** (see entry above for rationale)
 - Database connection resilience — `EnableRetryOnFailure(3)`, MongoDB RetryReads/Writes (Issue 92)
 - Environment banner tag helper (Issue 91)
 - **Login Redirect Service** — `ILoginRedirectService` + Settings JSON role map + per-user `CustomLandingPage` + per-role `DefaultLandingPage` override (Issue 102)

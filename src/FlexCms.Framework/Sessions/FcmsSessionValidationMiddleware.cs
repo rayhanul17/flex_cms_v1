@@ -16,8 +16,8 @@ namespace FlexCms.Framework.Sessions;
 /// <para>
 /// <b>Where to put it</b>: after <c>UseAuthentication()</c>, before
 /// <c>UseAuthorization()</c>. Skipped entirely for unauthenticated
-/// requests + for requests with no session-id claim (Bearer API token, OAuth
-/// callback in flight, etc.) so token-based auth keeps working.
+/// requests + for requests with no session-id claim (Bearer API token,
+/// etc.) so token-based auth keeps working.
 /// </para>
 /// </summary>
 public sealed class FcmsSessionValidationMiddleware

@@ -15,6 +15,21 @@ public class FcmsUser : IdentityUser<Guid>
     public DateTime UpdatedAt { get; set; } = FlexCms.Framework.Clock.FcmsTime.Now;
 
     /// <summary>
+    /// Selected 2FA channel — only honored when Identity's
+    /// <see cref="Microsoft.AspNetCore.Identity.IdentityUser.TwoFactorEnabled"/>
+    /// is also true. Lets users pick email vs SMS without changing the
+    /// Identity-managed boolean toggle.
+    /// </summary>
+    [BsonRepresentation(BsonType.Int32)]
+    public Auth.TwoFactor.TwoFactorChannel TwoFactorChannel { get; set; } = Auth.TwoFactor.TwoFactorChannel.Email;
+
+    /// <summary>BCrypt hash of the most-recent issued OTP. Cleared on consume.</summary>
+    public string? PendingOtpHash { get; set; }
+    public DateTime? PendingOtpExpiresAt { get; set; }
+    /// <summary>Per-user attempt counter on the current pending OTP. Reset on issue. Locks the OTP after 5 wrong tries.</summary>
+    public int PendingOtpAttempts { get; set; }
+
+    /// <summary>
     /// User lifecycle status. Source of truth for the admin UI active/deactive toggle.
     /// Auth-time blocking is enforced via Identity's <c>LockoutEnd</c>; the controller
     /// keeps the two in sync (Active ⇔ LockoutEnd null/past).

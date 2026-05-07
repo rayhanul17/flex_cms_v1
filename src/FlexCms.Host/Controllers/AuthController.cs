@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using FlexCms.Framework.Auth;
 using FlexCms.Framework.Auth.History;
+using FlexCms.Framework.Auth.TwoFactor;
 using FlexCms.Framework.Messaging;
 using FlexCms.Framework.Sessions;
 using FlexCms.Host.Models.Auth;
@@ -18,6 +19,7 @@ public class AuthController : Controller
     private readonly IFcmsBackgroundQueue _queue;
     private readonly ILoginHistoryService _history;
     private readonly ISessionService _sessions;
+    private readonly IOtpChallengeService _otp;
 
     public AuthController(
         UserManager<FcmsUser> userManager,
@@ -25,7 +27,8 @@ public class AuthController : Controller
         RoleManager<FcmsRole> roleManager,
         IFcmsBackgroundQueue queue,
         ILoginHistoryService history,
-        ISessionService sessions)
+        ISessionService sessions,
+        IOtpChallengeService otp)
     {
         _userManager = userManager;
         _signInManager = signInManager;
@@ -33,6 +36,7 @@ public class AuthController : Controller
         _queue = queue;
         _history = history;
         _sessions = sessions;
+        _otp = otp;
     }
 
     [HttpGet]
@@ -57,6 +61,28 @@ public class AuthController : Controller
         if (result.Succeeded)
         {
             var user = await _userManager.FindByNameAsync(model.UserName);
+
+            // 2FA gate: if user has a channel set, password alone is NOT
+            // enough — undo the cookie just issued and stash a pending-2FA
+            // marker so /auth/two-factor can complete the login.
+            if (user is not null && user.TwoFactorEnabled && user.TwoFactorChannel != TwoFactorChannel.Disabled)
+            {
+                await _signInManager.SignOutAsync();
+                StashPendingTwoFactor(user.Id, model.RememberMe, returnUrl);
+
+                var issue = await _otp.IssueAsync(user);
+                if (!issue.Success)
+                {
+                    // Failed to send — bail back to login with the error.
+                    // Bonus: don't record this as Success since the user
+                    // hasn't actually completed login.
+                    ModelState.AddModelError(string.Empty, issue.Error ?? "Could not deliver verification code.");
+                    return View(model);
+                }
+
+                return RedirectToAction(nameof(TwoFactorVerify), new { masked = issue.MaskedDestination });
+            }
+
             await _history.RecordAsync(model.UserName, user?.Id, LoginOutcome.Success, ip, ua);
 
             if (user is not null)
@@ -240,6 +266,139 @@ public class AuthController : Controller
 
     [HttpGet]
     public IActionResult AccessDenied() => View();
+
+    // ── 2FA verify (post-password challenge) ─────────────────────────────────
+
+    public const string PendingTwoFactorCookie = "fcms.pending2fa";
+
+    [HttpGet("auth/two-factor")]
+    public IActionResult TwoFactorVerify(string? masked = null)
+    {
+        var pending = ReadPendingTwoFactor();
+        if (pending is null) return RedirectToAction(nameof(Login));
+        ViewData["Masked"] = masked ?? "";
+        return View(new TwoFactorVerifyViewModel());
+    }
+
+    [HttpPost("auth/two-factor")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> TwoFactorVerify(TwoFactorVerifyViewModel model)
+    {
+        var pending = ReadPendingTwoFactor();
+        if (pending is null) return RedirectToAction(nameof(Login));
+        if (!ModelState.IsValid) return View(model);
+
+        var user = await _userManager.FindByIdAsync(pending.UserId.ToString());
+        if (user is null)
+        {
+            ClearPendingTwoFactor();
+            return RedirectToAction(nameof(Login));
+        }
+
+        var ip = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "";
+        var ua = Request.Headers.UserAgent.ToString();
+
+        // Recovery code path: any value with a dash is treated as a recovery
+        // code attempt (10-char alphanumeric formatted as XXXXX-XXXXX). Plain
+        // 6-digit input goes through the OTP path.
+        bool ok;
+        if (model.Code?.Contains('-') == true)
+        {
+            ok = await _otp.VerifyRecoveryCodeAsync(user, model.Code);
+            if (!ok)
+            {
+                ModelState.AddModelError(string.Empty, "Invalid recovery code.");
+                await _history.RecordAsync(user.UserName ?? "", user.Id, LoginOutcome.InvalidCredentials, ip, ua, failReason: "2FA recovery code invalid.");
+                return View(model);
+            }
+        }
+        else
+        {
+            var v = await _otp.VerifyAsync(user, model.Code ?? "");
+            if (v != OtpVerifyResult.Ok)
+            {
+                ModelState.AddModelError(string.Empty, v switch
+                {
+                    OtpVerifyResult.Expired => "Code expired — request a new one.",
+                    OtpVerifyResult.TooManyAttempts => "Too many wrong attempts — request a new code.",
+                    OtpVerifyResult.NoPending => "No active code — request a new one.",
+                    _ => "Invalid code.",
+                });
+                await _history.RecordAsync(user.UserName ?? "", user.Id, LoginOutcome.InvalidCredentials, ip, ua, failReason: $"2FA OTP {v}.");
+                return View(model);
+            }
+            ok = true;
+        }
+
+        if (!ok) return View(model);
+
+        // 2FA passed — complete the login that the password-only step held.
+        var sessionId = Guid.NewGuid().ToString("N");
+        var deviceLabel = ua.Length > 60 ? ua[..60] : ua;
+        await _sessions.RecordLoginAsync(user.Id, sessionId, ip, ua, deviceLabel);
+        await _signInManager.SignInWithClaimsAsync(user, pending.RememberMe,
+            [new Claim(FcmsSessionValidationMiddleware.SessionIdClaim, sessionId)]);
+        await _history.RecordAsync(user.UserName ?? "", user.Id, LoginOutcome.Success, ip, ua, failReason: "2FA verified.");
+        ClearPendingTwoFactor();
+
+        if (!string.IsNullOrEmpty(pending.ReturnUrl) && Url.IsLocalUrl(pending.ReturnUrl))
+            return Redirect(pending.ReturnUrl);
+        return LocalRedirect(await ResolveLoginRedirectAsync(user));
+    }
+
+    [HttpPost("auth/two-factor/resend")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> TwoFactorResend()
+    {
+        var pending = ReadPendingTwoFactor();
+        if (pending is null) return RedirectToAction(nameof(Login));
+        var user = await _userManager.FindByIdAsync(pending.UserId.ToString());
+        if (user is null) { ClearPendingTwoFactor(); return RedirectToAction(nameof(Login)); }
+
+        var issue = await _otp.IssueAsync(user);
+        return RedirectToAction(nameof(TwoFactorVerify), new { masked = issue.MaskedDestination });
+    }
+
+    private void StashPendingTwoFactor(Guid userId, bool rememberMe, string? returnUrl)
+    {
+        // Short-lived (10 min) HttpOnly + SameSite=Strict cookie carrying
+        // the bare facts we need to complete the login. We deliberately
+        // do NOT use Session for this — Session can outlive a browser
+        // restart in some configurations; this stash should not.
+        var payload = $"{userId:N}|{(rememberMe ? "1" : "0")}|{Uri.EscapeDataString(returnUrl ?? "")}";
+        var bytes = System.Text.Encoding.UTF8.GetBytes(payload);
+        Response.Cookies.Append(PendingTwoFactorCookie, Convert.ToBase64String(bytes), new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = Request.IsHttps,
+            SameSite = SameSiteMode.Strict,
+            Expires = DateTimeOffset.UtcNow.AddMinutes(10),
+            Path = "/auth/two-factor",
+        });
+    }
+
+    private PendingTwoFactor? ReadPendingTwoFactor()
+    {
+        if (!Request.Cookies.TryGetValue(PendingTwoFactorCookie, out var raw) || string.IsNullOrEmpty(raw))
+            return null;
+        try
+        {
+            var payload = System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(raw));
+            var parts = payload.Split('|', 3);
+            if (parts.Length < 2 || !Guid.TryParse(parts[0], out var uid)) return null;
+            return new PendingTwoFactor(uid, parts[1] == "1",
+                parts.Length >= 3 ? Uri.UnescapeDataString(parts[2]) : "");
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private void ClearPendingTwoFactor()
+        => Response.Cookies.Delete(PendingTwoFactorCookie, new CookieOptions { Path = "/auth/two-factor" });
+
+    private sealed record PendingTwoFactor(Guid UserId, bool RememberMe, string ReturnUrl);
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 

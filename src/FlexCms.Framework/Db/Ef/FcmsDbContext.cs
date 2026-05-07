@@ -1,6 +1,7 @@
 using FlexCms.Framework.Api;
 using FlexCms.Framework.Auth;
 using FlexCms.Framework.Auth.History;
+using FlexCms.Framework.Auth.TwoFactor;
 using FlexCms.Framework.Chat;
 using FlexCms.Framework.Cms;
 using FlexCms.Framework.Cms.Comments;
@@ -117,8 +118,9 @@ public class FcmsDbContext : IdentityDbContext<FcmsUser, FcmsRole, Guid>
     public DbSet<FcmsContentReview> ContentReviews => Set<FcmsContentReview>();
     public DbSet<FcmsContentAnnotation> ContentAnnotations => Set<FcmsContentAnnotation>();
 
-    // ── Post-phase hardening: draft autosave snapshots ────────────────────
+    // ── Post-phase hardening: draft autosave snapshots + 2FA recovery ─────
     public DbSet<FcmsContentDraftSnapshot> ContentDraftSnapshots => Set<FcmsContentDraftSnapshot>();
+    public DbSet<FcmsRecoveryCode> RecoveryCodes => Set<FcmsRecoveryCode>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -404,6 +406,11 @@ public class FcmsDbContext : IdentityDbContext<FcmsUser, FcmsRole, Guid>
         modelBuilder.Entity<FcmsContentDraftSnapshot>()
             .HasIndex(s => new { s.EntityType, s.EntityId, s.UserId })
             .IsUnique();
+
+        // 2FA recovery codes — VerifyRecoveryCodeAsync queries by
+        // (UserId, IsUsed) every 2FA recovery attempt; index keeps it cheap.
+        modelBuilder.Entity<FcmsRecoveryCode>()
+            .HasIndex(r => new { r.UserId, r.IsUsed });
 
         // Audit log entities are append-only — strip the inherited lifecycle
         // columns and skip the soft-delete query filter (no Status column means

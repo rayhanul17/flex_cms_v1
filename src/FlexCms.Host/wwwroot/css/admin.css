@@ -47,13 +47,11 @@ body {
     min-height: 0; /* without this, flex children with overflow ignore the cap */
 }
 
-/* Sidebar header — flex row containing brand link + toggle button. */
+/* Sidebar header — brand only now (toggle lives in the topbar). */
 #sidebar .sidebar-header {
     display: flex;
     align-items: center;
-    justify-content: space-between;
     border-bottom: 1px solid #2d3f53;
-    padding-right: .5rem;
 }
 
 #sidebar .sidebar-brand {
@@ -66,28 +64,6 @@ body {
     align-items: center;
     flex: 1;
     min-width: 0;
-}
-
-/* In-sidebar toggle button — inherits sidebar palette (no Bootstrap btn classes). */
-#sidebar .sidebar-toggle-btn {
-    background: transparent;
-    border: 1px solid transparent;
-    color: #adbccf;
-    padding: .35rem .55rem;
-    border-radius: .25rem;
-    cursor: pointer;
-    font-size: 1rem;
-    line-height: 1;
-    flex-shrink: 0;
-}
-#sidebar .sidebar-toggle-btn:hover {
-    background: #2d3f53;
-    color: #fff;
-    border-color: #3d556e;
-}
-#sidebar .sidebar-toggle-btn:focus-visible {
-    outline: 2px solid #0d6efd;
-    outline-offset: 2px;
 }
 
 #sidebar .nav { padding: .5rem 0; }
@@ -216,24 +192,27 @@ body {
     flex-shrink: 0;
 }
 
-/* Dropdown menu — Bootstrap's `.dropup` + Popper `data-bs-strategy="fixed"`
-   handle positioning (open upward, escape the sidebar's overflow:hidden
-   clipping rectangle). We only constrain width + max-height + scroll so
-   a long Language list doesn't push the menu off-screen. Light surface
-   regardless of the dark sidebar palette — the menu floats over the
-   page chrome, not over the sidebar.
-
-   z-index above the sidebar (1040) so the floating menu sits on top
-   of any sticky topbar / sidebar element when Popper places it. */
+/* Dropdown menu — the trigger lives inside `<nav id="sidebar">` which
+   has `overflow: hidden` so the brand row + scroll wrapper behave. Per
+   CSS spec, `position: fixed` is the ONE positioning scheme that escapes
+   an ancestor's `overflow: hidden` clipping rectangle. Bootstrap accepts
+   `data-bs-strategy="fixed"` but Popper sometimes still falls back to
+   `position: absolute` — so we force `position: fixed` here and let
+   Popper's `transform: translate3d(...)` continue to place the menu.
+   z-index above the sidebar (1040) and topbar (1030) so the menu sits
+   on top of every chrome layer. */
 .sidebar-user-menu {
-    min-width: 240px;
+    min-width: 260px;
     max-width: 320px;
     max-height: 70vh;
     overflow-y: auto;
-    z-index: 1060;
+    z-index: 1080;
     background: #fff;
     color: #212529;
     border: 1px solid rgba(0, 0, 0, .15);
+}
+.sidebar-user-menu.show {
+    position: fixed !important;
 }
 [data-bs-theme="dark"] .sidebar-user-menu {
     background: #212529;
@@ -258,20 +237,44 @@ body {
 #topbar {
     background: #fff;
     border-bottom: 1px solid #dee2e6;
-    /* Tighter vertical padding — user reported extra top space. The bell
-       button's own .btn padding gives the row enough click height. */
-    padding: .35rem 1rem;
+    /* Tight vertical padding — the hamburger + bell buttons supply their
+       own click height. Extra padding here was the white band the user
+       called out. */
+    padding: .35rem .75rem;
     display: flex;
     align-items: center;
-    justify-content: space-between;
     gap: .5rem;
     position: sticky;
     top: 0;
     z-index: 1030;
 }
 
+/* Hamburger / collapse toggle — used in the topbar. Plain button styles
+   (no Bootstrap .btn classes) so it doesn't import button padding +
+   borders that would re-introduce the vertical air. */
+.sidebar-toggle-btn {
+    background: transparent;
+    border: 1px solid transparent;
+    color: #495057;
+    padding: .3rem .5rem;
+    border-radius: .25rem;
+    cursor: pointer;
+    font-size: 1.15rem;
+    line-height: 1;
+    flex-shrink: 0;
+}
+.sidebar-toggle-btn:hover {
+    background: #e9ecef;
+    color: #212529;
+    border-color: #dee2e6;
+}
+.sidebar-toggle-btn:focus-visible {
+    outline: 2px solid #0d6efd;
+    outline-offset: 2px;
+}
+
 /* Top-right action cluster — currently hosts the notification bell.
-   Anchored to the right via flex-grow on the title sibling. */
+   Pushed to the right by the title's flex-grow:1 sibling. */
 #topbar .topbar-actions {
     display: flex;
     align-items: center;
@@ -317,9 +320,10 @@ body {
        so it doesn't take any horizontal space. */
     #main-content { margin-left: 0; }
 
-    /* Tighten paddings so 320–375px viewports keep usable canvas */
+    /* Tighten page-body padding so 320–375px viewports keep usable canvas.
+       Topbar padding stays at the base value (.35rem .75rem) — already
+       tight enough for mobile. */
     #page-body { padding: 1rem; }
-    #topbar { padding: .3rem .75rem; }
 }
 
 /* Extra-small (<576px): full-screen drawer rather than 240px panel */
@@ -356,14 +360,10 @@ body {
         padding-left: 0;
         padding-right: 0;
     }
-    /* In rail mode the sidebar header stacks brand + toggle vertically
-       so the toggle stays clickable in the 56px column. */
+    /* Tighten the brand row in rail mode so it doesn't tower over the
+       icon column. */
     body.sidebar-collapsed #sidebar .sidebar-header {
-        flex-direction: column;
         padding: .25rem 0;
-    }
-    body.sidebar-collapsed #sidebar .sidebar-toggle-btn {
-        margin-top: .25rem;
     }
     /* Sub-menus would push beyond the rail — collapse them entirely while
        in rail mode. (Hover-popout is a future enhancement.) */
@@ -381,9 +381,5 @@ body {
     }
     body.sidebar-collapsed #sidebar .sidebar-footer {
         padding: .25rem;
-    }
-    body.sidebar-collapsed #sidebar .sidebar-footer-actions {
-        justify-content: center;
-        padding: 0 0 .25rem;
     }
 }

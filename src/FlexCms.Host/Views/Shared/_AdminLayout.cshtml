@@ -46,15 +46,10 @@
         <a class="sidebar-brand" asp-controller="Dashboard" asp-action="Index">
             <i class="bi bi-grid-3x3-gap me-2"></i><span>FlexCMS</span>
         </a>
-        <!-- Hamburger inside the sidebar header — works on every viewport.
-             Clicking on desktop collapses to the icon-rail; on mobile it
-             closes the drawer (along with the backdrop). The topbar
-             hamburger (`#sidebar-toggle`) stays as the entry point when
-             the sidebar is HIDDEN on mobile. -->
-        <button type="button" class="sidebar-toggle-btn js-sidebar-toggle"
-                aria-label="Toggle navigation" title="Toggle sidebar">
-            <i class="bi bi-list"></i>
-        </button>
+        <!-- Toggle lives in the topbar (`#sidebar-toggle`) — single source
+             of truth for both desktop collapse + mobile drawer. Removing
+             the in-sidebar hamburger eliminates the duplicate-button
+             confusion and gives the topbar a real anchor on its left. -->
     </div>
 
     <!-- Scroll wrapper so long menus scroll while the user widget stays
@@ -113,10 +108,18 @@
 
 <!-- ── Main content ───────────────────────────────────────── -->
 <div id="main-content">
-    <!-- Topbar — page title on the left, notification bell on the right.
-         The sidebar header's own hamburger handles toggle on every viewport
-         (mobile drawer + desktop collapsed-rail). -->
+    <!-- Topbar — hamburger (left) + page title + notification bell (right).
+         The hamburger is the single toggle for both desktop collapse and
+         mobile drawer; removing it from the sidebar header avoided the
+         duplicate-button confusion and guarantees a click target stays
+         visible even when the sidebar is hidden off-screen on mobile. -->
     <div id="topbar">
+        <button type="button" id="sidebar-toggle"
+                class="sidebar-toggle-btn js-sidebar-toggle"
+                aria-label="Toggle navigation" aria-expanded="false" aria-controls="sidebar"
+                title="Toggle sidebar">
+            <i class="bi bi-list"></i>
+        </button>
         <span class="text-muted small text-truncate flex-grow-1">@ViewData["Title"]</span>
         <div class="topbar-actions">
             <partial name="_NotificationBell" />

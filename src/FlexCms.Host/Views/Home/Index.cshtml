@@ -21,17 +21,155 @@
     }
 }
 
+@section Styles {
+    <style>
+        /* Hero — soft gradient + radial glow accent. Self-contained so no
+           additional stylesheet edit needed for the public landing. */
+        .home-hero {
+            background:
+                radial-gradient(ellipse at 80% -10%, rgba(13, 110, 253, .18), transparent 50%),
+                radial-gradient(ellipse at 0% 100%, rgba(111, 66, 193, .12), transparent 55%),
+                linear-gradient(180deg, #f8f9fc 0%, #ffffff 100%);
+            border-bottom: 1px solid #e9ecef;
+        }
+        .home-hero h1 {
+            background: linear-gradient(135deg, #0d6efd, #6f42c1);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .home-hero .badge-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: .35rem;
+            background: rgba(13, 110, 253, .08);
+            color: #0d6efd;
+            border: 1px solid rgba(13, 110, 253, .2);
+            padding: .25rem .65rem;
+            border-radius: 999px;
+            font-size: .75rem;
+            font-weight: 600;
+            letter-spacing: .3px;
+            text-transform: uppercase;
+        }
+
+        /* Hero artwork — stacked module-tile mosaic. Pure CSS so the page
+           ships without an image dependency. */
+        .hero-mosaic {
+            position: relative;
+            width: 100%;
+            max-width: 380px;
+            aspect-ratio: 1;
+            margin-left: auto;
+        }
+        .hero-mosaic .tile {
+            position: absolute;
+            border-radius: 16px;
+            background: #fff;
+            box-shadow: 0 10px 30px rgba(15, 23, 42, .08), 0 1px 2px rgba(15, 23, 42, .04);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            transition: transform .3s ease;
+        }
+        .hero-mosaic .tile:hover { transform: translateY(-6px); }
+        .hero-mosaic .tile.t1 { top: 0; left: 22%; width: 38%; aspect-ratio: 1; color: #0d6efd; background: linear-gradient(135deg, #e7f1ff, #fff); }
+        .hero-mosaic .tile.t2 { top: 14%; right: 0; width: 32%; aspect-ratio: 1; color: #6f42c1; background: linear-gradient(135deg, #f3edff, #fff); }
+        .hero-mosaic .tile.t3 { top: 44%; left: 0; width: 32%; aspect-ratio: 1; color: #198754; background: linear-gradient(135deg, #e7f7ee, #fff); }
+        .hero-mosaic .tile.t4 { bottom: 0; left: 28%; width: 36%; aspect-ratio: 1; color: #fd7e14; background: linear-gradient(135deg, #fff1e3, #fff); }
+        .hero-mosaic .tile.t5 { bottom: 8%; right: 4%; width: 30%; aspect-ratio: 1; color: #d63384; background: linear-gradient(135deg, #ffe9f2, #fff); }
+
+        /* Highlight cards — subtle hover lift + colored top stripe per card. */
+        .highlight-card {
+            border: 1px solid #eef0f3;
+            border-radius: 14px;
+            transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        .highlight-card::before {
+            content: "";
+            position: absolute;
+            inset: 0 0 auto 0;
+            height: 3px;
+            background: var(--card-accent, #0d6efd);
+        }
+        .highlight-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 14px 30px rgba(15, 23, 42, .08);
+            border-color: var(--card-accent, #0d6efd);
+        }
+        .highlight-card .icon-circle {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            background: color-mix(in srgb, var(--card-accent, #0d6efd) 12%, transparent);
+            color: var(--card-accent, #0d6efd);
+        }
+
+        /* Stats strip — full-bleed dark bar between sections. */
+        .stats-strip {
+            background: linear-gradient(135deg, #1e2a3a, #0d1620);
+            color: #e7ecf1;
+        }
+        .stats-strip .stat-num {
+            font-size: 2.25rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #4dabf7, #b197fc);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .stats-strip .stat-label {
+            font-size: .8rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #8a9bb1;
+        }
+
+        /* Tech-stack chips */
+        .tech-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: .35rem;
+            padding: .35rem .75rem;
+            border-radius: 999px;
+            background: #f1f3f7;
+            color: #495057;
+            font-size: .8rem;
+            font-weight: 500;
+            border: 1px solid #e3e7ed;
+        }
+
+        /* Final CTA */
+        .final-cta {
+            background:
+                radial-gradient(ellipse at 50% 0%, rgba(13, 110, 253, .15), transparent 60%),
+                #f8f9fc;
+            border-top: 1px solid #e9ecef;
+        }
+    </style>
+}
+
 <!-- ── Hero ─────────────────────────────────────────────────────────── -->
-<section class="py-5 bg-light border-bottom">
+<section class="home-hero py-5">
     <div class="container py-4">
         <div class="row align-items-center g-5">
-            <div class="col-md-7">
-                <h1 class="display-5 fw-bold mb-3">@siteName</h1>
-                <p class="lead text-muted mb-4">@tagline</p>
-                <div class="d-flex flex-wrap gap-2">
+            <div class="col-lg-7">
+                <span class="badge-pill mb-3">
+                    <i class="bi bi-stars"></i> Built for Bangladesh
+                </span>
+                <h1 class="display-4 fw-bold mb-3">@siteName</h1>
+                <p class="lead text-muted mb-4" style="max-width:560px">@tagline</p>
+                <div class="d-flex flex-wrap gap-2 mb-4">
                     @if (FcmsContext.IsAuthenticated)
                     {
-                        <a href="/admin" class="btn btn-primary btn-lg">
+                        <a href="/admin" class="btn btn-primary btn-lg px-4">
                             <i class="bi bi-speedometer2 me-2"></i> Go to admin dashboard
                         </a>
                         <a href="/blog" class="btn btn-outline-secondary btn-lg">
@@ -40,7 +178,7 @@
                     }
                     else
                     {
-                        <a asp-controller="Auth" asp-action="Login" class="btn btn-primary btn-lg">
+                        <a asp-controller="Auth" asp-action="Login" class="btn btn-primary btn-lg px-4">
                             <i class="bi bi-box-arrow-in-right me-2"></i> Sign in to admin
                         </a>
                         <a href="/blog" class="btn btn-outline-secondary btn-lg">
@@ -48,23 +186,39 @@
                         </a>
                     }
                 </div>
+                <div class="d-flex flex-wrap gap-2">
+                    <span class="tech-chip"><i class="bi bi-check2-circle text-success"></i> .NET 10</span>
+                    <span class="tech-chip"><i class="bi bi-check2-circle text-success"></i> EF Core + MongoDB</span>
+                    <span class="tech-chip"><i class="bi bi-check2-circle text-success"></i> Bootstrap 5</span>
+                    <span class="tech-chip"><i class="bi bi-check2-circle text-success"></i> SignalR</span>
+                </div>
             </div>
-            <div class="col-md-5 text-center d-none d-md-block">
-                <i class="bi bi-grid-3x3-gap text-primary" style="font-size:10rem;opacity:.15"></i>
+            <div class="col-lg-5 d-none d-lg-block">
+                <div class="hero-mosaic">
+                    <div class="tile t1"><i class="bi bi-grid-3x3-gap"></i></div>
+                    <div class="tile t2"><i class="bi bi-shield-check"></i></div>
+                    <div class="tile t3"><i class="bi bi-translate"></i></div>
+                    <div class="tile t4"><i class="bi bi-lightning-charge"></i></div>
+                    <div class="tile t5"><i class="bi bi-puzzle"></i></div>
+                </div>
             </div>
         </div>
     </div>
 </section>
 
-<!-- ── Highlights ──────────────────────────────────────────────────── -->
+<!-- ── Highlights (3 cards) ────────────────────────────────────────── -->
 <section class="py-5">
     <div class="container">
+        <div class="text-center mb-5">
+            <h2 class="fw-bold">Everything a CMS framework should be</h2>
+            <p class="text-muted">Production-ready out of the box, with the BD-market essentials baked in.</p>
+        </div>
         <div class="row g-4">
             <div class="col-md-4">
-                <div class="card h-100 shadow-sm border-0">
-                    <div class="card-body">
-                        <i class="bi bi-puzzle text-primary fs-2"></i>
-                        <h5 class="card-title mt-2">Modular</h5>
+                <div class="card h-100 highlight-card shadow-sm" style="--card-accent:#0d6efd">
+                    <div class="card-body p-4">
+                        <span class="icon-circle mb-3"><i class="bi bi-puzzle"></i></span>
+                        <h5 class="card-title">Modular</h5>
                         <p class="text-muted small mb-0">
                             Drop-in modules with auto-registration, dependency
                             checks, sandbox manifest, and graceful update + rollback.
@@ -73,10 +227,10 @@
                 </div>
             </div>
             <div class="col-md-4">
-                <div class="card h-100 shadow-sm border-0">
-                    <div class="card-body">
-                        <i class="bi bi-shield-check text-primary fs-2"></i>
-                        <h5 class="card-title mt-2">Secure by default</h5>
+                <div class="card h-100 highlight-card shadow-sm" style="--card-accent:#198754">
+                    <div class="card-body p-4">
+                        <span class="icon-circle mb-3"><i class="bi bi-shield-check"></i></span>
+                        <h5 class="card-title">Secure by default</h5>
                         <p class="text-muted small mb-0">
                             DataProtection-encrypted secrets, CSRF, rate limiting,
                             session revocation, audit log, 2FA via email/SMS OTP,
@@ -86,19 +240,157 @@
                 </div>
             </div>
             <div class="col-md-4">
-                <div class="card h-100 shadow-sm border-0">
-                    <div class="card-body">
-                        <i class="bi bi-translate text-primary fs-2"></i>
-                        <h5 class="card-title mt-2">BD-friendly</h5>
+                <div class="card h-100 highlight-card shadow-sm" style="--card-accent:#d63384">
+                    <div class="card-body p-4">
+                        <span class="icon-circle mb-3"><i class="bi bi-translate"></i></span>
+                        <h5 class="card-title">BD-friendly</h5>
                         <p class="text-muted small mb-0">
                             English + Bengali UI, BD payment gateways
                             (bKash / SSLCommerz / Nagad), BD SMS gateways
-                            (Alpha / MRAM / Onnorokom), Asia/Dhaka timezone
-                            defaults.
+                            (Alpha / MRAM / Onnorokom), Asia/Dhaka timezone defaults.
                         </p>
                     </div>
                 </div>
             </div>
         </div>
+    </div>
+</section>
+
+<!-- ── Stats strip ─────────────────────────────────────────────────── -->
+<section class="stats-strip py-4">
+    <div class="container">
+        <div class="row g-4 text-center">
+            <div class="col-6 col-md-3">
+                <div class="stat-num">17</div>
+                <div class="stat-label">Phases delivered</div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="stat-num">700+</div>
+                <div class="stat-label">Tests passing</div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="stat-num">3</div>
+                <div class="stat-label">BD payment gateways</div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="stat-num">2</div>
+                <div class="stat-label">DB backends (EF + Mongo)</div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ── Feature grid (6 small) ──────────────────────────────────────── -->
+<section class="py-5 bg-white">
+    <div class="container">
+        <div class="text-center mb-5">
+            <h2 class="fw-bold">More inside</h2>
+            <p class="text-muted">Common admin tasks that are usually a separate package.</p>
+        </div>
+        <div class="row g-3">
+            <div class="col-sm-6 col-lg-4">
+                <div class="d-flex gap-3">
+                    <i class="bi bi-credit-card-2-front text-primary fs-4"></i>
+                    <div>
+                        <strong class="d-block">Payments</strong>
+                        <span class="text-muted small">Forward / Backward charge model + per-gateway VAT</span>
+                    </div>
+                </div>
+            </div>
+            <div class="col-sm-6 col-lg-4">
+                <div class="d-flex gap-3">
+                    <i class="bi bi-images text-primary fs-4"></i>
+                    <div>
+                        <strong class="d-block">Media + WebP</strong>
+                        <span class="text-muted small">Auto-resize, responsive srcset, bulk alt-text editor</span>
+                    </div>
+                </div>
+            </div>
+            <div class="col-sm-6 col-lg-4">
+                <div class="d-flex gap-3">
+                    <i class="bi bi-people text-primary fs-4"></i>
+                    <div>
+                        <strong class="d-block">Roles + Permissions</strong>
+                        <span class="text-muted small">Per-action filter, AND/OR expressions, audit-logged</span>
+                    </div>
+                </div>
+            </div>
+            <div class="col-sm-6 col-lg-4">
+                <div class="d-flex gap-3">
+                    <i class="bi bi-envelope text-primary fs-4"></i>
+                    <div>
+                        <strong class="d-block">Email + SMS</strong>
+                        <span class="text-muted small">SMTP + 3 BD SMS gateways, queued, restart-safe</span>
+                    </div>
+                </div>
+            </div>
+            <div class="col-sm-6 col-lg-4">
+                <div class="d-flex gap-3">
+                    <i class="bi bi-link-45deg text-primary fs-4"></i>
+                    <div>
+                        <strong class="d-block">Preview links</strong>
+                        <span class="text-muted small">Share unpublished drafts with reviewers, no login</span>
+                    </div>
+                </div>
+            </div>
+            <div class="col-sm-6 col-lg-4">
+                <div class="d-flex gap-3">
+                    <i class="bi bi-file-earmark-zip text-primary fs-4"></i>
+                    <div>
+                        <strong class="d-block">Backup + restore</strong>
+                        <span class="text-muted small">DB + media + config, EF and MongoDB</span>
+                    </div>
+                </div>
+            </div>
+            <div class="col-sm-6 col-lg-4">
+                <div class="d-flex gap-3">
+                    <i class="bi bi-tools text-primary fs-4"></i>
+                    <div>
+                        <strong class="d-block">Maintenance mode</strong>
+                        <span class="text-muted small">Bypass token + role allow-list during deploys</span>
+                    </div>
+                </div>
+            </div>
+            <div class="col-sm-6 col-lg-4">
+                <div class="d-flex gap-3">
+                    <i class="bi bi-toggles text-primary fs-4"></i>
+                    <div>
+                        <strong class="d-block">Feature flags</strong>
+                        <span class="text-muted small">Percent rollout + role bypass + stable bucketing</span>
+                    </div>
+                </div>
+            </div>
+            <div class="col-sm-6 col-lg-4">
+                <div class="d-flex gap-3">
+                    <i class="bi bi-bar-chart text-primary fs-4"></i>
+                    <div>
+                        <strong class="d-block">Health + diagnostics</strong>
+                        <span class="text-muted small">/health endpoints, slow-query log, output cache</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ── Final CTA ───────────────────────────────────────────────────── -->
+<section class="final-cta py-5">
+    <div class="container py-3 text-center">
+        @if (FcmsContext.IsAuthenticated)
+        {
+            <h3 class="fw-bold mb-2">You're signed in</h3>
+            <p class="text-muted mb-4">Jump straight into the admin to manage content, modules, and settings.</p>
+            <a href="/admin" class="btn btn-primary btn-lg px-4">
+                <i class="bi bi-speedometer2 me-2"></i> Open admin
+            </a>
+        }
+        else
+        {
+            <h3 class="fw-bold mb-2">Ready to start?</h3>
+            <p class="text-muted mb-4">Sign in with the admin credentials you set during the setup wizard.</p>
+            <a asp-controller="Auth" asp-action="Login" class="btn btn-primary btn-lg px-4">
+                <i class="bi bi-box-arrow-in-right me-2"></i> Sign in
+            </a>
+        }
     </div>
 </section>

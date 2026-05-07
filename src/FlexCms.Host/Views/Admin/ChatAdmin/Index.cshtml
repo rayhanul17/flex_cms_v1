@@ -69,7 +69,7 @@
 
     function renderMessage(m) {
         const cls = m.senderRole === 'admin' ? 'text-end' : '';
-        const bg  = m.senderRole === 'admin' ? 'bg-light' : 'bg-primary text-white';
+        const bg  = m.senderRole === 'admin' ? 'chat-bubble-admin' : 'bg-primary text-white';
         let body;
         if (m.attachmentKind === 'image') body = `<img src="${escapeHtml(m.attachmentUrl)}" style="max-width:200px;border-radius:6px"/>`;
         else if (m.attachmentKind === 'file') body = `<a href="${escapeHtml(m.attachmentUrl)}" target="_blank">📎 ${escapeHtml(m.attachmentName)}</a>`;

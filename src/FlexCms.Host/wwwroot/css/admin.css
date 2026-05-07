@@ -390,6 +390,12 @@ body {
     }
 }
 
+/* Chat admin bubble — light mode default (dark mode override below) */
+.chat-bubble-admin {
+    background-color: #e9ecef;
+    color: #212529;
+}
+
 /* ──────────────────────────────────────────────────────────────────────
    Dark mode — triggered by [data-bs-theme="dark"] on <html>.
    Overrides the hardcoded light colors in the layout above so the
@@ -583,6 +589,87 @@ body {
 [data-bs-theme="dark"] .modal-header,
 [data-bs-theme="dark"] .modal-footer {
     border-color: #374151;
+}
+
+/* Bootstrap bg-light / bg-white / table-light overrides */
+[data-bs-theme="dark"] .bg-light,
+[data-bs-theme="dark"] .bg-white {
+    background-color: #253041 !important;
+    color: #d1d5db !important;
+}
+
+[data-bs-theme="dark"] .text-bg-light {
+    background-color: #374151 !important;
+    color: #d1d5db !important;
+}
+
+[data-bs-theme="dark"] .table-light,
+[data-bs-theme="dark"] .table-light > th,
+[data-bs-theme="dark"] .table-light > td {
+    background-color: #253041 !important;
+    color: #d1d5db !important;
+    border-color: #374151 !important;
+}
+
+/* Tab content with bg-white (e.g. payments settings tabs) */
+[data-bs-theme="dark"] .tab-content {
+    background-color: #1f2937;
+    border-color: #374151 !important;
+}
+
+/* Nav tabs */
+[data-bs-theme="dark"] .nav-tabs {
+    border-bottom-color: #374151;
+}
+[data-bs-theme="dark"] .nav-tabs .nav-link {
+    color: #9ca3af;
+    border-color: transparent;
+}
+[data-bs-theme="dark"] .nav-tabs .nav-link:hover {
+    border-color: #374151;
+    color: #d1d5db;
+}
+[data-bs-theme="dark"] .nav-tabs .nav-link.active {
+    background-color: #1f2937;
+    border-color: #374151 #374151 #1f2937;
+    color: #f3f4f6;
+}
+
+/* Notification bell items */
+[data-bs-theme="dark"] .fcms-bell-item {
+    background-color: #1f2937 !important;
+    color: #d1d5db !important;
+    border-bottom-color: #374151 !important;
+}
+[data-bs-theme="dark"] .fcms-bell-item:hover {
+    background-color: #253041 !important;
+}
+
+/* Chat admin — admin message bubbles */
+[data-bs-theme="dark"] .chat-bubble-admin {
+    background-color: #374151 !important;
+    color: #d1d5db !important;
+}
+
+/* Media thumbnail placeholder */
+[data-bs-theme="dark"] .ratio.bg-light {
+    background-color: #253041 !important;
+}
+
+/* Card headers with bg-light */
+[data-bs-theme="dark"] .card-header.bg-light,
+[data-bs-theme="dark"] .card-header {
+    background-color: #253041 !important;
+    border-bottom-color: #374151 !important;
+    color: #d1d5db !important;
+}
+
+/* Pre blocks (e.g. recovery codes) */
+[data-bs-theme="dark"] pre.bg-light,
+[data-bs-theme="dark"] pre {
+    background-color: #111827 !important;
+    border-color: #374151 !important;
+    color: #d1d5db !important;
 }
 
 /* Table thead — Bootstrap defaults thead to white/light even with data-bs-theme="dark" */

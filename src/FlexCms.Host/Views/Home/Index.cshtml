@@ -1,8 +1,104 @@
-﻿@{
-    ViewData["Title"] = "Home Page";
+@using FlexCms.Framework.Services
+@inject IFcmsContextService FcmsContext
+@inject ISettingsService SettingsService
+@{
+    ViewData["Title"] = "Home";
+    string siteName = "FlexCMS";
+    string tagline = "A modular .NET 10 CMS framework";
+    try
+    {
+        var snap = await SettingsService.GetAsync<HomeSiteSnapshot>("site:general");
+        if (!string.IsNullOrWhiteSpace(snap.SiteName)) siteName = snap.SiteName;
+        if (!string.IsNullOrWhiteSpace(snap.Tagline)) tagline = snap.Tagline;
+    }
+    catch { /* fresh install — use defaults */ }
+}
+@functions {
+    sealed class HomeSiteSnapshot
+    {
+        public string SiteName { get; set; } = "";
+        public string Tagline { get; set; } = "";
+    }
 }
 
-<div class="text-center">
-    <h1 class="display-4">Welcome</h1>
-    <p>Learn about <a href="https://learn.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
-</div>
+<!-- ── Hero ─────────────────────────────────────────────────────────── -->
+<section class="py-5 bg-light border-bottom">
+    <div class="container py-4">
+        <div class="row align-items-center g-5">
+            <div class="col-md-7">
+                <h1 class="display-5 fw-bold mb-3">@siteName</h1>
+                <p class="lead text-muted mb-4">@tagline</p>
+                <div class="d-flex flex-wrap gap-2">
+                    @if (FcmsContext.IsAuthenticated)
+                    {
+                        <a href="/admin" class="btn btn-primary btn-lg">
+                            <i class="bi bi-speedometer2 me-2"></i> Go to admin dashboard
+                        </a>
+                        <a href="/blog" class="btn btn-outline-secondary btn-lg">
+                            <i class="bi bi-journal-richtext me-2"></i> View blog
+                        </a>
+                    }
+                    else
+                    {
+                        <a asp-controller="Auth" asp-action="Login" class="btn btn-primary btn-lg">
+                            <i class="bi bi-box-arrow-in-right me-2"></i> Sign in to admin
+                        </a>
+                        <a href="/blog" class="btn btn-outline-secondary btn-lg">
+                            <i class="bi bi-journal-richtext me-2"></i> View blog
+                        </a>
+                    }
+                </div>
+            </div>
+            <div class="col-md-5 text-center d-none d-md-block">
+                <i class="bi bi-grid-3x3-gap text-primary" style="font-size:10rem;opacity:.15"></i>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ── Highlights ──────────────────────────────────────────────────── -->
+<section class="py-5">
+    <div class="container">
+        <div class="row g-4">
+            <div class="col-md-4">
+                <div class="card h-100 shadow-sm border-0">
+                    <div class="card-body">
+                        <i class="bi bi-puzzle text-primary fs-2"></i>
+                        <h5 class="card-title mt-2">Modular</h5>
+                        <p class="text-muted small mb-0">
+                            Drop-in modules with auto-registration, dependency
+                            checks, sandbox manifest, and graceful update + rollback.
+                        </p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card h-100 shadow-sm border-0">
+                    <div class="card-body">
+                        <i class="bi bi-shield-check text-primary fs-2"></i>
+                        <h5 class="card-title mt-2">Secure by default</h5>
+                        <p class="text-muted small mb-0">
+                            DataProtection-encrypted secrets, CSRF, rate limiting,
+                            session revocation, audit log, 2FA via email/SMS OTP,
+                            and hotlink protection.
+                        </p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card h-100 shadow-sm border-0">
+                    <div class="card-body">
+                        <i class="bi bi-translate text-primary fs-2"></i>
+                        <h5 class="card-title mt-2">BD-friendly</h5>
+                        <p class="text-muted small mb-0">
+                            English + Bengali UI, BD payment gateways
+                            (bKash / SSLCommerz / Nagad), BD SMS gateways
+                            (Alpha / MRAM / Onnorokom), Asia/Dhaka timezone
+                            defaults.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>

@@ -7,6 +7,8 @@ using FlexCms.Framework.Cms.Comments;
 using FlexCms.Framework.Cms.CustomFields;
 using FlexCms.Framework.Cms.Revisions;
 using FlexCms.Framework.Clock;
+using FlexCms.Framework.FeatureFlags;
+using FlexCms.Framework.Seo;
 using FlexCms.Framework.Db;
 using FlexCms.Framework.Exports;
 using FlexCms.Framework.Helpers;
@@ -100,6 +102,10 @@ public class FcmsDbContext : IdentityDbContext<FcmsUser, FcmsRole, Guid>
     public DbSet<FcmsComment> Comments => Set<FcmsComment>();
     public DbSet<FcmsSubscriber> Subscribers => Set<FcmsSubscriber>();
     public DbSet<FcmsContentMeta> ContentMeta => Set<FcmsContentMeta>();
+
+    // ── Phase 15: SEO + Feature flags ─────────────────────────────────────
+    public DbSet<FcmsSeoMeta> SeoMeta => Set<FcmsSeoMeta>();
+    public DbSet<FcmsFeatureFlag> FeatureFlags => Set<FcmsFeatureFlag>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -345,6 +351,16 @@ public class FcmsDbContext : IdentityDbContext<FcmsUser, FcmsRole, Guid>
 
         modelBuilder.Entity<FcmsContentMeta>()
             .HasIndex(m => new { m.EntityType, m.EntityId, m.Key })
+            .IsUnique();
+
+        // ── Phase 15: SEO + Feature flags ─────────────────────────────────
+        // (EntityType, EntityId) is the natural key — at most one SEO row per entity.
+        modelBuilder.Entity<FcmsSeoMeta>()
+            .HasIndex(s => new { s.EntityType, s.EntityId })
+            .IsUnique();
+
+        modelBuilder.Entity<FcmsFeatureFlag>()
+            .HasIndex(f => f.Key)
             .IsUnique();
 
         // Audit log entities are append-only — strip the inherited lifecycle

@@ -22,6 +22,12 @@ public class FcmsPage : BaseEfEntity
     public int SortOrder { get; set; }
     public bool IsPublished { get; set; }
     public DateTime? PublishedAt { get; set; }
+    /// <summary>
+    /// Optional auto-unpublish timestamp. When set + reached, the
+    /// <c>ScheduledPublishService</c> flips <see cref="IsPublished"/> to false
+    /// (Phase 15). Independent from soft-delete.
+    /// </summary>
+    public DateTime? UnpublishAt { get; set; }
     public Guid? AuthorId { get; set; }
     public PageAccessControl AccessControl { get; set; } = PageAccessControl.Public;
     public string? PasswordHash { get; set; }

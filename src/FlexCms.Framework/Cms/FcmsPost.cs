@@ -15,6 +15,8 @@ public class FcmsPost : BaseEfEntity
     public FcmsCategory? Category { get; set; }
     public bool IsPublished { get; set; }
     public DateTime? PublishedAt { get; set; }
+    /// <summary>Auto-unpublish — see <see cref="FcmsPage.UnpublishAt"/>.</summary>
+    public DateTime? UnpublishAt { get; set; }
     public Guid? AuthorId { get; set; }
     public int ViewCount { get; set; }
     public ICollection<FcmsPostTag> PostTags { get; set; } = [];

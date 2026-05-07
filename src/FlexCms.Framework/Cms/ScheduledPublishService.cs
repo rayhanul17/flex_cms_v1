@@ -7,8 +7,11 @@ using Microsoft.Extensions.Logging;
 namespace FlexCms.Framework.Cms;
 
 /// <summary>
-/// Background service that runs every minute and publishes pages/posts whose
-/// PublishedAt timestamp has passed but IsPublished is still false.
+/// Background service that runs every minute and:
+/// <list type="number">
+///   <item>Publishes pages/posts whose <c>PublishedAt</c> has passed but <c>IsPublished</c> is still false.</item>
+///   <item>Unpublishes pages/posts whose <c>UnpublishAt</c> has passed but <c>IsPublished</c> is still true (Phase 15 — Issue 97).</item>
+/// </list>
 /// </summary>
 public class ScheduledPublishService : BackgroundService
 {
@@ -42,12 +45,24 @@ public class ScheduledPublishService : BackgroundService
         var pages = await pageRepo.FindAsync(p => !p.IsPublished && p.PublishedAt != null && p.PublishedAt <= now, ct);
         var posts = await postRepo.FindAsync(p => !p.IsPublished && p.PublishedAt != null && p.PublishedAt <= now, ct);
 
-        if (pages.Count == 0 && posts.Count == 0) return;
+        // Auto-unpublish (Phase 15 / Issue 97): catch already-published items
+        // whose UnpublishAt is in the past. Edge: if both PublishedAt and
+        // UnpublishAt are due in the same tick, the publish above sets
+        // IsPublished=true → the unpublish query then sees it and flips it
+        // back. End state matches what the operator scheduled.
+        var pagesToUnpublish = await pageRepo.FindAsync(p => p.IsPublished && p.UnpublishAt != null && p.UnpublishAt <= now, ct);
+        var postsToUnpublish = await postRepo.FindAsync(p => p.IsPublished && p.UnpublishAt != null && p.UnpublishAt <= now, ct);
+
+        if (pages.Count == 0 && posts.Count == 0 && pagesToUnpublish.Count == 0 && postsToUnpublish.Count == 0) return;
 
         foreach (var page in pages) { page.IsPublished = true; page.UpdatedAt = now; await pageRepo.UpdateAsync(page, ct); }
         foreach (var post in posts) { post.IsPublished = true; post.UpdatedAt = now; await postRepo.UpdateAsync(post, ct); }
 
+        foreach (var page in pagesToUnpublish) { page.IsPublished = false; page.UpdatedAt = now; await pageRepo.UpdateAsync(page, ct); }
+        foreach (var post in postsToUnpublish) { post.IsPublished = false; post.UpdatedAt = now; await postRepo.UpdateAsync(post, ct); }
+
         await uow.SaveChangesAsync(ct);
-        _logger.LogInformation("ScheduledPublish: published {Pages} page(s), {Posts} post(s).", pages.Count, posts.Count);
+        _logger.LogInformation("ScheduledPublish: published {Pages} page(s), {Posts} post(s); unpublished {UPages} page(s), {UPosts} post(s).",
+            pages.Count, posts.Count, pagesToUnpublish.Count, postsToUnpublish.Count);
     }
 }

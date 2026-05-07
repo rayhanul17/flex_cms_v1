@@ -156,6 +156,10 @@ app.UseAuthentication();
 // before [Authorize] checks fire). Bearer-token requests skip naturally —
 // they don't carry the fcms.session_id claim.
 app.UseMiddleware<FlexCms.Framework.Sessions.FcmsSessionValidationMiddleware>();
+// Maintenance mode: must run AFTER authentication (so role-based bypass
+// works) but BEFORE authorization (so the maintenance page renders for
+// non-bypassed users without going through [Authorize] checks).
+app.UseMiddleware<FlexCms.Framework.Maintenance.MaintenanceModeMiddleware>();
 app.UseAuthorization();
 app.UseMiddleware<ForcePasswordChangeMiddleware>();
 

@@ -9,6 +9,8 @@ using FlexCms.Framework.Cms;
 using FlexCms.Framework.Cms.Comments;
 using FlexCms.Framework.Cms.CustomFields;
 using FlexCms.Framework.Cms.Revisions;
+using FlexCms.Framework.Backup;
+using FlexCms.Framework.FeatureFlags;
 using FlexCms.Framework.Health;
 using FlexCms.Framework.Newsletters;
 using FlexCms.Framework.Sessions;
@@ -31,6 +33,7 @@ using FlexCms.Framework.Middleware;
 using FlexCms.Framework.Notifications;
 using FlexCms.Framework.Rendering;
 using FlexCms.Framework.Security;
+using FlexCms.Framework.Seo;
 using FlexCms.Framework.Themes;
 using FlexCms.Framework.Widgets;
 using FlexCms.Framework.Modules;
@@ -189,6 +192,11 @@ public static class FcmsServiceExtensions
         services.AddScoped<ICommentService, CommentService>();
         services.AddScoped<ISubscriberService, SubscriberService>();
         services.AddScoped<ICustomFieldService, CustomFieldService>();
+
+        // ── Phase 15: SEO + Backup + Feature Flags + Maintenance ─────────────
+        services.AddScoped<ISeoService, SeoService>();
+        services.AddScoped<IFcmsBackupService, FcmsBackupService>();
+        services.AddScoped<IFcmsFeatureService, FcmsFeatureService>();
 
         // Bearer scheme registered alongside the existing cookie scheme so
         // [Authorize]'d controllers accept BOTH session cookies and API tokens.

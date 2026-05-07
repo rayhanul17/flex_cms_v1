@@ -40,8 +40,24 @@ public class AuthController : Controller
     }
 
     [HttpGet]
-    public IActionResult Login(string? returnUrl = null)
+    public async Task<IActionResult> Login(string? returnUrl = null)
     {
+        // Sign out any lingering auth state on GET so the antiforgery token
+        // we issue for this page is bound to an anonymous identity. Without
+        // this, hitting /auth/login while already signed in (stale cookie,
+        // duplicate tab, or after an expired session not yet evicted) issues
+        // a token claim-bound to the OLD user, then the POST runs while the
+        // cookie has changed mid-flow → "antiforgery token meant for a
+        // different claims-based user" 400.
+        if (User?.Identity?.IsAuthenticated == true)
+        {
+            var sessionId = User.FindFirstValue(FcmsSessionValidationMiddleware.SessionIdClaim);
+            if (!string.IsNullOrEmpty(sessionId))
+            {
+                await _sessions.RevokeAsync(sessionId, revokedByUserId: null, reason: "login-page-revisit");
+            }
+            await _signInManager.SignOutAsync();
+        }
         ViewData["ReturnUrl"] = returnUrl;
         return View();
     }

@@ -745,6 +745,22 @@ Registered after `SecurityHeadersMiddleware`, before `IpFilterMiddleware`. Check
 
 ---
 
+## 5.x — Known Pending Features (Not Yet Implemented)
+
+These features are planned but not yet built. Do not look for them in the codebase — controllers, views, and menu entries do not exist yet.
+
+| Feature | Notes |
+|---|---|
+| **Module zip upload** | Admin UI to upload a `.zip` file and install a new module at runtime. Currently modules must be deployed manually (copy folder + restart). |
+| **Theme zip install** | Admin UI to upload a theme `.zip`. Currently themes are deployed manually to the `themes/` folder. |
+| **Comment moderation** | `/admin/comments` — approve/spam/trash. `CommentsModerate` permission is seeded but no controller or view exists. |
+| **Subscribers management** | `/admin/subscribers`. Permission seeded, no controller or view. |
+| **Data export / privacy requests** | `/admin/privacy/requests`. Permission seeded, no controller or view. |
+| **API tokens** | `/admin/api-tokens`. Permission seeded, no controller or view. |
+| **Webhooks** | `/admin/webhooks`. Permission seeded, no controller or view. |
+
+---
+
 ## 6. Creating a New Module
 
 Modules are how you add features without touching the CMS core.

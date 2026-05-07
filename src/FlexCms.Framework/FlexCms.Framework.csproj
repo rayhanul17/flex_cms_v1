@@ -15,6 +15,15 @@
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
 
+  <!-- Test projects need access to internal types (e.g. middleware
+       settings snapshot DTOs) for focused unit tests without exposing
+       them to public consumers. -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="FlexCms.Tests.Unit" />
+    <InternalsVisibleTo Include="FlexCms.Tests.Integration" />
+    <InternalsVisibleTo Include="DynamicProxyGenAssembly2" />
+  </ItemGroup>
+
   <!-- UAParser transitively references old .NET Standard compat shims (System.Net.Http 4.3.0,
        System.Text.RegularExpressions 4.3.0). On .NET 10 the framework supplies its own safe
        versions at runtime — these NuGet packages are never loaded. -->

@@ -206,6 +206,50 @@ public class PermissionServiceTests : IDisposable
         Assert.False(await _svc.HasPermissionAsync(user, "anything.read"));
     }
 
+    [Fact]
+    public async Task HasPermission_multi_role_user_unions_permissions_from_all_roles()
+    {
+        // Multi-role user covers the post-audit batch refactor: instead of
+        // looping per role, the service should resolve all role ids once,
+        // batch-fetch their permissions, union the keys, then evaluate.
+        var editorRole = await CreateRoleAsync("Editor");
+        await _svc.AssignAsync(editorRole.Id, "posts.edit");
+
+        var authorRole = await CreateRoleAsync("Author");
+        await _svc.AssignAsync(authorRole.Id, "posts.create");
+
+        var user = UserWithRoles(("Editor", editorRole.Id), ("Author", authorRole.Id));
+
+        // Each permission lives on a different role — only the union sees both.
+        Assert.True(await _svc.HasPermissionAsync(user, "posts.create"));
+        Assert.True(await _svc.HasPermissionAsync(user, "posts.edit"));
+        // AND across roles works because we union before evaluating.
+        Assert.True(await _svc.HasPermissionAsync(user, "posts.create&posts.edit"));
+    }
+
+    [Fact]
+    public async Task HasPermission_repeat_calls_share_per_role_cache()
+    {
+        // Hot-path semantics: after the first miss we should be cached for
+        // 15 minutes (TTL constant in the service). Two calls back-to-back
+        // should both succeed without the cache being a footgun (e.g. a
+        // missing-on-second-call regression after the recent batch refactor).
+        var role = await CreateRoleAsync("Cached");
+        await _svc.AssignAsync(role.Id, "media.view");
+        var user = UserWithRole("Cached", role.Id);
+
+        Assert.True(await _svc.HasPermissionAsync(user, "media.view"));
+        Assert.True(await _svc.HasPermissionAsync(user, "media.view"));   // cached
+        Assert.True(await _svc.HasPermissionAsync(user, "media.view"));   // cached
+    }
+
+    private static ClaimsPrincipal UserWithRoles(params (string Name, Guid Id)[] roles)
+    {
+        var claims = new List<Claim> { new(ClaimTypes.NameIdentifier, Guid.NewGuid().ToString()) };
+        claims.AddRange(roles.Select(r => new Claim(ClaimTypes.Role, r.Name)));
+        return new ClaimsPrincipal(new ClaimsIdentity(claims, "Test"));
+    }
+
     // ── SeedPermissions ───────────────────────────────────────────────────────
 
     [Fact]

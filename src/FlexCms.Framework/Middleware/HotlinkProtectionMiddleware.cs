@@ -78,7 +78,14 @@ public sealed class HotlinkProtectionMiddleware
         await ctx.Response.WriteAsync("Hotlinking not permitted.", ctx.RequestAborted);
     }
 
-    private sealed class HotlinkSnapshot
+    /// <summary>
+    /// Settings DTO matching the relevant subset of <c>SiteSettings</c>.
+    /// <c>internal</c> rather than private so tests can stub
+    /// <see cref="ISettingsService.GetAsync{T}(string,CancellationToken)"/>
+    /// against this exact type — Framework can't reference Core's
+    /// <c>SiteSettings</c>, and a private nested type would block NSubstitute.
+    /// </summary>
+    internal sealed class HotlinkSnapshot
     {
         public bool PreventHotlinking { get; set; }
         public string HotlinkWhitelist { get; set; } = "";

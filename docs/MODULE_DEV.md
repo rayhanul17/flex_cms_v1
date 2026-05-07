@@ -259,3 +259,123 @@ docker exec flexcms_flexcms_1 unzip /app/modules/MyCompany.Blog.zip -d /app/modu
 - [ ] No reference to other custom modules' DLLs
 - [ ] Cross-module needs go through `IFcmsHookManager` OR module API registry
 - [ ] Tested on both EF (MySQL) AND MongoDB providers (if module is provider-agnostic)
+
+---
+
+## Attribute Reference
+
+Quick reference for the attributes module authors are expected to use.
+All defined in `FlexCms.Framework`.
+
+### `[FcmsAuthorize(permission?)]`
+
+Source: `Auth/FcmsAuthorizeAttribute.cs` — applied on a controller or
+action. When omitted, just requires authentication. Permission
+expressions support `&` (AND) and `|` (OR), e.g.
+`[FcmsAuthorize("posts.create&posts.publish")]`. SuperAdmin bypasses
+every check.
+
+```csharp
+[FcmsAuthorize(FcmsPermissions.PostsEdit)]
+public async Task<IActionResult> Edit(Guid id) { ... }
+```
+
+### `[FcmsLog(action, entityType, entityIdParam = "id", module = "core")]`
+
+Source: `Auth/FcmsLogAttribute.cs` — automatic audit-log entry on
+successful 2xx redirect or JSON action result. Reads the entity id
+from the named route/query parameter (default `id`); use
+`FcmsLogContext.SetEntityId(id)` inside the action when the value
+isn't on the URL.
+
+```csharp
+[HttpPost("create")]
+[FcmsLog("post.create", "FcmsPost")]
+[FcmsAuthorize(FcmsPermissions.PostsCreate)]
+public async Task<IActionResult> Create(PostVm vm) { ... }
+```
+
+### `[FcmsLogIgnore]`
+
+Source: `Cms/FcmsLogIgnoreAttribute.cs` — applied on a property.
+Causes `FcmsLogJsonResolver` to strip the property from the audit
+JSON snapshot. Use for sensitive or noisy fields. The framework
+already strips Identity-managed fields (`PasswordHash`,
+`SecurityStamp`, `ConcurrencyStamp`, etc.) and navigation
+collections automatically — `[FcmsLogIgnore]` is for module-defined
+fields the framework can't infer.
+
+```csharp
+public class CustomerData : BaseEfEntity
+{
+    public string Name { get; set; } = "";
+    [FcmsLogIgnore] public string InternalNotes { get; set; } = "";
+}
+```
+
+### `[FcmsTable(name)]`
+
+Source: `Helpers/FcmsHelper.cs` — applied on an entity class.
+Overrides the auto-generated table name (`{prefix}_{snake_case_plural}`)
+when you need a specific table name (legacy compat, naming conflicts).
+Use sparingly — the convention is the path of least surprise.
+
+```csharp
+[FcmsTable("legacy_users")]
+public class FcmsUser : IdentityUser<Guid> { ... }
+```
+
+### `[FcmsScoped(serviceType?)]` / `[FcmsSingleton(serviceType?)]` / `[FcmsHostedService]`
+
+Source: `Modules/Attributes/FcmsLifetimeAttributes.cs` — applied on a
+service class. The module loader scans the assembly for these and
+registers them automatically with the right lifetime. Pass an
+explicit interface to register against if your class implements
+multiple interfaces.
+
+```csharp
+[FcmsScoped(typeof(IBlogService))]
+public class BlogService : IBlogService, IDisposable { ... }
+
+[FcmsHostedService]
+public class BlogIndexerService : BackgroundService { ... }
+```
+
+### `[FcmsModuleApi(version, DisplayName?)]`
+
+Source: `Modules/Api/FcmsModuleApiAttribute.cs` — applied on an
+interface that other modules will resolve through `IFcmsModuleApiRegistry`.
+Version follows SemVer; bump major on breaking changes. Consumers
+specify a constraint when calling `Get<T>(">=1.2.0")`.
+
+```csharp
+[FcmsModuleApi("1.2.0", DisplayName = "Blog Public API")]
+public interface IBlogPublicApi
+{
+    Task<List<Post>> GetRecentAsync(int n);
+}
+
+// Consumer side (in another module):
+var blog = registry.Get<IBlogPublicApi>(">=1.0.0");
+if (blog is not null)
+{
+    var posts = await blog.GetRecentAsync(5);
+}
+```
+
+---
+
+## Tag Helper Reference
+
+All tag helpers ship with `FlexCms.Framework`. Add
+`@addTagHelper *, FlexCms.Framework` to `_ViewImports.cshtml` (the
+host already does this).
+
+| Tag | Purpose | Example |
+|---|---|---|
+| `<button fcms-authorize="key">` | Hide element when user lacks permission | `<button fcms-authorize="users.delete">Delete</button>` |
+| `<fcms-honeypot />` | Renders an off-screen honeypot field pair to deter bots | `<form>... <fcms-honeypot /> </form>` |
+| `<fcms-env-banner />` | Colored "DEVELOPMENT" / "STAGING" banner; hidden in Production | Place once in `_AdminLayout.cshtml` |
+| `<fcms-picture src alt widths sizes>` | `<picture>` with WebP + responsive srcset + lazy fallback | `<fcms-picture src="/uploads/hero.jpg" alt="Hero" widths="640,1024,1920" />` |
+| `<fcms-data-table url page-length>` | Server-side jQuery DataTable with permission-filtered actions | See `MediaController.Index` |
+| `<fcms-row-actions entity-id base-url>` | Permission-filtered edit / delete / restore row buttons | Used inside DataTable templates |

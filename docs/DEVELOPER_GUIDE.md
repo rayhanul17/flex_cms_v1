@@ -1945,6 +1945,57 @@ The external developer **never clones your CMS source** — they only need the p
 
 ---
 
+## 📌 Framework Attribute & TagHelper Reference
+
+For module-author-facing details (constructor signatures, examples,
+when to reach for which attribute), see the **Attribute Reference**
+and **Tag Helper Reference** sections at the bottom of
+[MODULE_DEV.md](MODULE_DEV.md). Quick index of what's available:
+
+**Attributes** (all defined in `FlexCms.Framework`):
+
+- `[FcmsAuthorize(permission?)]` — controller/action permission gate
+  with `&` / `|` expressions. SuperAdmin bypass.
+- `[FcmsLog(action, entityType, entityIdParam?, module?)]` — automatic
+  audit-log entry on successful action result.
+- `[FcmsLogIgnore]` — strip a property from audit-log JSON snapshots.
+  Identity sensitive fields + nav collections are stripped automatically;
+  this is for module-defined fields.
+- `[FcmsTable(name)]` — override the auto-generated table name on an
+  entity class.
+- `[FcmsScoped]` / `[FcmsSingleton]` / `[FcmsHostedService]` — mark a
+  module service for auto-registration with the right lifetime.
+- `[FcmsModuleApi(version)]` — mark an interface as a versioned
+  cross-module API surface; consumers resolve via
+  `IFcmsModuleApiRegistry.Get<T>(constraint)`.
+
+**Tag Helpers** (auto-loaded via `_ViewImports.cshtml`):
+
+- `<button fcms-authorize="key">` — hide when permission missing
+- `<fcms-honeypot />` — bot-spam decoy field pair
+- `<fcms-env-banner />` — DEV / STAGING colored banner
+- `<fcms-picture src alt widths sizes>` — `<picture>` + WebP +
+  responsive `srcset` + lazy `<img>` fallback
+- `<fcms-data-table>` / `<fcms-row-actions>` — server-side DataTables
+  with permission-filtered action buttons
+
+**JSON serialization safety net** — `FcmsLogJsonResolver` strips:
+
+- Identity fields: `PasswordHash`, `SecurityStamp`, `ConcurrencyStamp`,
+  `NormalizedUserName`, `NormalizedEmail`, `EmailConfirmed`,
+  `PhoneNumberConfirmed`, `TwoFactorEnabled`, `AccessFailedCount`,
+  `LockoutEnabled`, `LockoutEnd`, `AuthenticationToken`
+- Embedded Identity collections: `Tokens`, `Claims`, `Logins`
+- Anonymous-type detection skips compiler-generated DTOs
+- Navigation collections (any `IEnumerable<TClass>`) and nav references
+  (class-typed properties except strings) are stripped automatically
+- Anything `[FcmsLogIgnore]`-marked
+
+You can pass full entities directly to `IFcmsLogService.LogAsync(...)`
+without anonymous-type projection — the resolver handles the rest.
+
+---
+
 ## ❓ Quick Reference Card
 
 | Task | Command |

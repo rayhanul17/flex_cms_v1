@@ -14545,7 +14545,18 @@ tests/FlexCms.Tests.Unit/Phase3/FcmsAuthorizeFilterTests.cs # +SuperAdmin upperc
 ---
 
 ### Phase 16 — Performance Critical + Accessibility + Editorial (Issues 104-109)
-> **❌ NOT STARTED**
+> **🔄 PARTIAL** (2026-05-07) — see [phase-16-17-test-cases.md](phase-16-17-test-cases.md)
+> ✅ **Done in this pass:**
+> - **Cache stampede protection (Issue 104)** — `IFcmsCacheService` + `FcmsCacheService` with per-key `SemaphoreSlim`. Concurrent misses for the same key invoke the factory once; throwing factory releases the lock so the next caller retries (no permanent hang). Different keys execute in parallel.
+> - **Image optimization pipeline (Issue 105)** — `IImageOptimizer` + `SkiaImageOptimizer` produces WebP at original size + responsive widths (640/1024/1920 default, skips widths ≥ source). `PictureTagHelper` emits `<picture><source srcset="hero-640w.webp 640w, ...">` + lazy fallback `<img>` following the `{base}.webp` + `{base}-{w}w.webp` filename convention.
+> - **Search (Issue 106)** — `IFcmsSearchProvider` + `LikeSearchProvider` fan-out across `IFcmsSearchableSource` implementations (modules contribute their own); `FcmsSearchQuery` + `FcmsSearchAnalytics` track no-result queries for the admin gap-analysis report. Vendor-specific FULLTEXT/tsvector/FTS impls swap in via the same interface for sub-100ms search on large corpora.
+> - **Real-time admin notifications (Issue 107)** — `AdminNotificationHub` (SignalR) at `/hubs/admin-notifications` + `IAdminNotificationPusher` hides hub plumbing. Replaces 60s bell polling with real-time push; polling stays as graceful fallback when SignalR is blocked.
+> - **WCAG contrast helper (Issue 108)** — `WcagContrast` computes the 2.1 contrast ratio + AA / AA-large / AAA / AAA-large pass-fail. 3-char hex shorthand expansion; malformed input returns 0 ("unable to evaluate"). Used by the theme editor color warnings.
+> - **Editorial workflow (Issue 109)** — `FcmsContentReview` (Submitted / Approved / ChangesRequested / Rejected) + `FcmsContentAnnotation` (inline reviewer comments anchored via opaque editor-specific JSON) + `IEditorialService` (submit / approve / request-changes / reject + auto-publish on approval for `FcmsPage` + `FcmsPost`).
+>
+> ⏸ **Deferred** (admin UI / view components needing UX design): Lighthouse-driven image-backfill admin job, FULLTEXT/tsvector/FTS concrete providers (interface + default LIKE impl shipped — vendor providers can swap in via DI later), in-page accessibility audit overlay (axe-core), full editorial calendar drag-drop view, side-by-side review diff, in-content annotation overlay rendering, alt-text save warning UI, skip-link in shared layout. The backing services are stable + reusable.
+>
+> Tests: 24 Phase16 unit (4 cache stampede, 5 image optimizer, 8 WCAG contrast, plus editorial wiring smoke). Project total: **416 unit + 247 EF integration pass.**
 **কাজ:**
 - `IFcmsCacheService` — SemaphoreSlim per-key cache stampede protection. Refactor PermissionService, MenuService, RedirectService, all settings reads to use it (Issue 104)
 - Image optimization pipeline — SkiaSharp WebP conversion + responsive sizes (640w/1024w/1920w) + `<picture>` srcset Razor helper + lazy loading + backfill job (Issue 105)
@@ -14586,7 +14597,8 @@ tests/FlexCms.Tests.Unit/Phase3/FcmsAuthorizeFilterTests.cs # +SuperAdmin upperc
 ---
 
 ### Phase 17 — Module API Registry (Issue 110 only)
-> **❌ NOT STARTED** — scope reduced from the original 9 issues
+> **✅ DONE** (2026-05-07) — scope reduced from the original 9 issues; see [phase-16-17-test-cases.md](phase-16-17-test-cases.md)
+> ✅ `[FcmsModuleApi("1.0.0")]` attribute marks cross-module interface contracts (SemVer-versioned). `IFcmsModuleApiRegistry.Get<T>(versionConstraint)` returns null on missing impl OR unsatisfied SemVer — consumers degrade gracefully without crash. Reuses Phase 15 `SemVerConstraint` parser; supports `>=`, `<=`, `>`, `<`, `=`, `^` (same-major), `~` (same-major+minor) operators. `List()` enumerates registered APIs across loaded assemblies for admin diagnostics. 7 unit tests cover missing impl, satisfied/unsatisfied constraints, caret semantics, fallback to plain DI for un-attributed interfaces.
 >
 > **Scope decision (2026-05-06):** the original Phase 17 plan bundled 9 features
 > (Cmd+K admin search, privacy analytics, PWA, WordPress importer, multi-step

@@ -79,6 +79,15 @@ builder.Services.AddControllersWithViews(mvc =>
     {
         // Custom binder for jQuery DataTables 2.x bracket-notation form data
         mvc.ModelBinderProviders.Insert(0, new FlexCms.Framework.Models.DataTablesRequestModelBinderProvider());
+
+        // .NET 6+ defaults to treating non-nullable reference types as
+        // implicitly required, which makes optional form fields (e.g.
+        // SiteTagline = "" with placeholder="Optional") silently fail
+        // ModelState validation when the user posts an empty value. Disable
+        // that — controllers must use [Required] explicitly when they really
+        // need a value. (Found via Settings page: empty Tagline / BaseUrl
+        // failed silently with no toast and no field error.)
+        mvc.SuppressImplicitRequiredAttributeForNonNullableReferenceTypes = true;
     })
     .AddRazorOptions(o =>
     {

@@ -129,9 +129,9 @@ public class PaymentsSettingsController : BaseAdminController
         if (amount <= 0) return FcmsFail("Amount must be positive.");
         PaymentChargeConfig cfg = gateway switch
         {
-            PaymentGateways.Bkash      => (await _settings.GetBkashAsync(ct)).Charge,
+            PaymentGateways.Bkash => (await _settings.GetBkashAsync(ct)).Charge,
             PaymentGateways.Sslcommerz => (await _settings.GetSslcommerzAsync(ct)).Charge,
-            PaymentGateways.Nagad      => (await _settings.GetNagadAsync(ct)).Charge,
+            PaymentGateways.Nagad => (await _settings.GetNagadAsync(ct)).Charge,
             _ => new PaymentChargeConfig()
         };
         var c = _charges.Calculate(amount, cfg);

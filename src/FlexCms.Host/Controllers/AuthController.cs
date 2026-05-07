@@ -42,21 +42,22 @@ public class AuthController : Controller
     [HttpGet]
     public async Task<IActionResult> Login(string? returnUrl = null)
     {
-        // Sign out any lingering auth state on GET so the antiforgery token
-        // we issue for this page is bound to an anonymous identity. Without
-        // this, hitting /auth/login while already signed in (stale cookie,
-        // duplicate tab, or after an expired session not yet evicted) issues
-        // a token claim-bound to the OLD user, then the POST runs while the
-        // cookie has changed mid-flow → "antiforgery token meant for a
-        // different claims-based user" 400.
+        // Already authenticated → bypass the login form entirely and send
+        // the user to their landing page (returnUrl wins, then SuperAdmin
+        // → /admin, then role-based map). Avoids the previous antiforgery
+        // 400 caused by rendering the form against a non-anonymous identity:
+        // by the time the POST landed, the user's cookie state could have
+        // shifted (revoked session, expired ticket) and the token's claim
+        // didn't match → "antiforgery token meant for a different
+        // claims-based user". With this redirect there's no stale token
+        // window in the first place.
         if (User?.Identity?.IsAuthenticated == true)
         {
-            var sessionId = User.FindFirstValue(FcmsSessionValidationMiddleware.SessionIdClaim);
-            if (!string.IsNullOrEmpty(sessionId))
-            {
-                await _sessions.RevokeAsync(sessionId, revokedByUserId: null, reason: "login-page-revisit");
-            }
-            await _signInManager.SignOutAsync();
+            if (!string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl))
+                return Redirect(returnUrl);
+            var user = await _userManager.GetUserAsync(User);
+            var landing = user is not null ? await ResolveLoginRedirectAsync(user) : "/";
+            return LocalRedirect(landing);
         }
         ViewData["ReturnUrl"] = returnUrl;
         return View();

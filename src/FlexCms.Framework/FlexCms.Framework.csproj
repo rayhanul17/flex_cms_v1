@@ -23,6 +23,26 @@
     <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-cmhx-cq75-c4mj" />
   </ItemGroup>
 
+  <!-- PdfSharpCore 1.3.65 transitively pulls SixLabors.ImageSharp 1.0.4. The
+       1.x line has no patched release for GHSA-2cmq-823j-5qj8 (a DoS via
+       crafted image input). ImageSharp 2.x/3.x switched to the Six Labors
+       Split License which requires a paid commercial license — not viable
+       for an open-source CMS framework.
+
+       Why this is safe for our use case:
+       - PdfSharpPdfService only renders text + tables built from server-side
+         strings (RenderTextAsync, RenderTableAsync). It never embeds user-
+         supplied images, so the vulnerable ImageSharp decode paths are not
+         reachable from the framework's own code.
+       - Modules that extend PdfSharp to embed user-uploaded images would
+         re-introduce the risk; that path needs its own input validation
+         and is the module author's responsibility.
+       - Re-evaluate when PdfSharpCore ships a maintained successor or when
+         a different MIT/Apache PDF lib gains feature parity. -->
+  <ItemGroup>
+    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-2cmq-823j-5qj8" />
+  </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="9.0.7" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.0.7" />

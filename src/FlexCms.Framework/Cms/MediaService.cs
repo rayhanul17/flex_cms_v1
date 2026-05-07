@@ -122,8 +122,6 @@ public class MediaService : IMediaService
 
         await _mediaRepo.AddAsync(media, ct);
         await _uow.SaveChangesAsync(ct);
-        await _audit.LogAsync(FcmsAuditActions.MediaUploaded, nameof(FcmsMedia), media.Id.ToString(),
-            value: media, ct: ct);
         return media;
     }
 

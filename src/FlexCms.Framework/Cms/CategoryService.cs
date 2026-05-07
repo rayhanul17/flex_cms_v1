@@ -7,18 +7,15 @@ public class CategoryService : ICategoryService
     private readonly IRepository<FcmsCategory> _repo;
     private readonly IRepository<FcmsPost> _postRepo;
     private readonly IFcmsUnitOfWork _uow;
-    private readonly IFcmsLogService _audit;
 
     public CategoryService(
         IRepository<FcmsCategory> repo,
         IRepository<FcmsPost> postRepo,
-        IFcmsUnitOfWork uow,
-        IFcmsLogService audit)
+        IFcmsUnitOfWork uow)
     {
         _repo = repo;
         _postRepo = postRepo;
         _uow = uow;
-        _audit = audit;
     }
 
     public Task<FcmsCategory?> GetByIdAsync(Guid id, CancellationToken ct = default)
@@ -40,8 +37,6 @@ public class CategoryService : ICategoryService
     {
         await _repo.AddAsync(category, ct);
         await _uow.SaveChangesAsync(ct);
-        await _audit.LogAsync(FcmsAuditActions.CategoryCreated, nameof(FcmsCategory), category.Id.ToString(),
-            value: category, ct: ct);
         return category;
     }
 
@@ -49,8 +44,6 @@ public class CategoryService : ICategoryService
     {
         await _repo.UpdateAsync(category, ct);
         await _uow.SaveChangesAsync(ct);
-        await _audit.LogAsync(FcmsAuditActions.CategoryUpdated, nameof(FcmsCategory), category.Id.ToString(),
-            value: category, ct: ct);
     }
 
     public async Task DeleteAsync(Guid id, CancellationToken ct = default)
@@ -59,7 +52,5 @@ public class CategoryService : ICategoryService
         if (category is null) return;
         await _repo.SoftDeleteAsync(category, ct);
         await _uow.SaveChangesAsync(ct);
-        await _audit.LogAsync(FcmsAuditActions.CategoryDeleted, nameof(FcmsCategory), id.ToString(),
-            value: category, ct: ct);
     }
 }

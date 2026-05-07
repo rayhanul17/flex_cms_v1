@@ -27,8 +27,7 @@ public class PageTranslationServiceTests : IDisposable
         _svc = new PageService(
             new EfRepository<FcmsPage>(_db),
             new EfRepository<FcmsPageTranslation>(_db),
-            new EfUnitOfWork(_db),
-            Substitute.For<IFcmsLogService>());
+            new EfUnitOfWork(_db));
 #pragma warning restore CA2000
     }
 

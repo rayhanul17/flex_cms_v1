@@ -26,8 +26,6 @@ public class MediaFolderService : IMediaFolderService
         var folder = new FcmsMediaFolder { Name = name.Trim(), ParentId = parentId };
         await _folderRepo.AddAsync(folder, ct);
         await _uow.SaveChangesAsync(ct);
-        await _audit.LogAsync(FcmsAuditActions.FolderCreated, nameof(FcmsMediaFolder), folder.Id.ToString(),
-            value: folder, ct: ct);
         return folder;
     }
 

@@ -26,8 +26,7 @@ public class PostServiceTrashTests : IDisposable
             new EfRepository<FcmsTag>(_db),
             new EfRepository<FcmsPostTag>(_db),
             new EfRepository<FcmsPostTranslation>(_db),
-            new EfUnitOfWork(_db),
-            Substitute.For<IFcmsLogService>());
+            new EfUnitOfWork(_db));
 #pragma warning restore CA2000
     }
 

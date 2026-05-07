@@ -7,18 +7,15 @@ public class PageService : IPageService
     private readonly IRepository<FcmsPage> _repo;
     private readonly IRepository<FcmsPageTranslation> _trRepo;
     private readonly IFcmsUnitOfWork _uow;
-    private readonly IFcmsLogService _audit;
 
     public PageService(
         IRepository<FcmsPage> repo,
         IRepository<FcmsPageTranslation> trRepo,
-        IFcmsUnitOfWork uow,
-        IFcmsLogService audit)
+        IFcmsUnitOfWork uow)
     {
         _repo = repo;
         _trRepo = trRepo;
         _uow = uow;
-        _audit = audit;
     }
 
     public Task<FcmsPage?> GetByIdAsync(Guid id, CancellationToken ct = default)
@@ -47,8 +44,6 @@ public class PageService : IPageService
         page.Content = HtmlSanitizer.Sanitize(page.Content);
         await _repo.AddAsync(page, ct);
         await _uow.SaveChangesAsync(ct);
-        await _audit.LogAsync(FcmsAuditActions.PageCreated, nameof(FcmsPage), page.Id.ToString(),
-            value: page, ct: ct);
         return page;
     }
 
@@ -57,8 +52,6 @@ public class PageService : IPageService
         page.Content = HtmlSanitizer.Sanitize(page.Content);
         await _repo.UpdateAsync(page, ct);
         await _uow.SaveChangesAsync(ct);
-        await _audit.LogAsync(FcmsAuditActions.PageUpdated, nameof(FcmsPage), page.Id.ToString(),
-            value: page, ct: ct);
     }
 
     public async Task RestoreAsync(Guid id, CancellationToken ct = default)
@@ -70,16 +63,12 @@ public class PageService : IPageService
         page.IsPublished = false; // always restore as draft
         await _repo.UpdateAsync(page, ct);
         await _uow.SaveChangesAsync(ct);
-        await _audit.LogAsync(FcmsAuditActions.PageRestored, nameof(FcmsPage), id.ToString(), ct: ct);
     }
 
     public async Task HardDeleteAsync(Guid id, CancellationToken ct = default)
     {
         var page = await _repo.FirstOrDefaultAsync(p => p.Id == id, ct, includeDeleted: true);
         if (page is null) return;
-        // Log before delete — entity must exist in DB when log is written
-        await _audit.LogAsync(FcmsAuditActions.PageHardDeleted, nameof(FcmsPage), id.ToString(),
-            value: page, severity: FcmsLogSeverity.Warning, ct: ct);
         await _repo.DeleteAsync(page, ct);
         await _uow.SaveChangesAsync(ct);
     }
@@ -91,8 +80,6 @@ public class PageService : IPageService
         page.DeletedAt = Clock.FcmsTime.Now;
         await _repo.SoftDeleteAsync(page, ct);
         await _uow.SaveChangesAsync(ct);
-        await _audit.LogAsync(FcmsAuditActions.PageDeleted, nameof(FcmsPage), id.ToString(),
-            value: page, ct: ct);
     }
 
     // ── Translations (Phase 7) ───────────────────────────────────────────────
@@ -103,9 +90,6 @@ public class PageService : IPageService
         if (string.IsNullOrWhiteSpace(slug)) return null;
         var langNorm = (lang ?? "").ToLowerInvariant();
 
-        // 1. Translation slug match — preferred path. Pull the translation, then
-        //    its base page (no auto-include — Mongo + EfRepository.Find don't share
-        //    Include semantics, so do two cheap lookups).
         if (!string.IsNullOrWhiteSpace(langNorm))
         {
             var tr = await _trRepo.FirstOrDefaultAsync(
@@ -117,12 +101,9 @@ public class PageService : IPageService
             }
         }
 
-        // 2. Base slug match — return base content (translator falls back to default lang).
         var basePage = await _repo.FirstOrDefaultAsync(p => p.Slug == slug, ct);
         if (basePage is null) return null;
 
-        // If a translation exists for the requested language, hand it back too —
-        // controller may swap fields without losing routing context.
         FcmsPageTranslation? maybeTr = null;
         if (!string.IsNullOrWhiteSpace(langNorm))
             maybeTr = await _trRepo.FirstOrDefaultAsync(
@@ -164,8 +145,6 @@ public class PageService : IPageService
         }
 
         await _uow.SaveChangesAsync(ct);
-        await _audit.LogAsync(FcmsAuditActions.PageUpdated, nameof(FcmsPageTranslation),
-            tr.Id.ToString(), value: tr, ct: ct);
         return tr;
     }
 
@@ -173,9 +152,7 @@ public class PageService : IPageService
     {
         var tr = await _trRepo.GetByIdAsync(translationId, ct);
         if (tr is null) return;
-        await _trRepo.DeleteAsync(tr, ct);   // hard delete — translations are not soft-deletable per UX (cheap to re-add)
+        await _trRepo.DeleteAsync(tr, ct);
         await _uow.SaveChangesAsync(ct);
-        await _audit.LogAsync(FcmsAuditActions.PageDeleted, nameof(FcmsPageTranslation),
-            translationId.ToString(), ct: ct);
     }
 }

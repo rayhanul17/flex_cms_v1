@@ -40,8 +40,7 @@ public class MongoTranslationTests : IAsyncLifetime
         => new(
             new MongoRepository<FcmsPage>(_db),
             new MongoRepository<FcmsPageTranslation>(_db),
-            new MongoUnitOfWork(new MongoClient(_mongo.GetConnectionString()), _db),
-            Substitute.For<IFcmsLogService>());
+            new MongoUnitOfWork(new MongoClient(_mongo.GetConnectionString()), _db));
 
     private PostService BuildPostService()
         => new(
@@ -49,8 +48,7 @@ public class MongoTranslationTests : IAsyncLifetime
             new MongoRepository<FcmsTag>(_db),
             new MongoRepository<FcmsPostTag>(_db),
             new MongoRepository<FcmsPostTranslation>(_db),
-            new MongoUnitOfWork(new MongoClient(_mongo.GetConnectionString()), _db),
-            Substitute.For<IFcmsLogService>());
+            new MongoUnitOfWork(new MongoClient(_mongo.GetConnectionString()), _db));
 #pragma warning restore CA2000
 
     [Fact]

@@ -14652,6 +14652,6 @@ tests/FlexCms.Tests.Unit/Phase3/FcmsAuthorizeFilterTests.cs # +SuperAdmin upperc
 | **12** | Payment + PDF + Excel | Gateway, PDF, Excel, async export |
 | **13** | Auth Hardening + Account | Health check, sessions, login history, email verify, 2FA, OAuth, DB resilience |
 | **14** | API + Integrations + Engagement | API tokens, webhooks, CORS, CAPTCHA, CDN, asset versioning, revisions, comments, forms, newsletter, custom fields |
-| **15** | SEO + Performance + Ops + Compliance | SEO pack, output cache, backup, maintenance mode, module update/sandbox/versioning, editor conflict, multi-language, admin widgets, GDPR, feature flags |
-| **16** | Performance Critical + A11y + Editorial | Cache stampede, image optimization, full-text search, real-time admin notify, WCAG 2.1 AA, editorial workflow |
-| **17** | Module API Registry (scope reduced) | Just Issue 110 — typed cross-module APIs with `[FcmsModuleApi]` versioning. Original 111-118 (Cmd+K, analytics, PWA, WP importer, multi-step forms, AI, Prometheus, marketplace) dropped — better as optional modules / external tooling. |
+| **15** | SEO + Performance + Ops + Compliance | ✅ All 15 backing services done. SEO pack, output cache, slow-query, backup, maintenance, module update/SemVer/sandbox, editor conflict, multi-language, admin widgets, GDPR, feature flags. Admin UI views deferred. |
+| **16** | Performance Critical + A11y + Editorial | ✅ Cache stampede, image opt + WebP picture helper, search abstraction, admin notify hub, WCAG contrast, editorial workflow. Admin UI views deferred. |
+| **17** | Module API Registry (scope reduced) | ✅ DONE — Issue 110: `[FcmsModuleApi]` + `IFcmsModuleApiRegistry.Get<T>(constraint)` with SemVer + graceful null-on-missing. Original 111-118 dropped (rationale documented in entry). |

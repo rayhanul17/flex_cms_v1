@@ -25,9 +25,14 @@
      with avatar header + theme + language + My Account + Logout.
      Mirrors the Plane / Linear / Huly admin-shell pattern.
 ─────────────────────────────────────────────────────────────────── -->
-<div class="dropdown sidebar-user" id="sidebarUser">
+<!-- dropup so Bootstrap Popper opens the menu upward from the trigger.
+     data-bs-strategy="fixed" puts the menu in position:fixed which
+     escapes the sidebar's overflow:hidden clipping rectangle. -->
+<div class="dropup sidebar-user" id="sidebarUser">
     <button class="sidebar-user-trigger" type="button"
-            data-bs-toggle="dropdown" data-bs-display="static"
+            data-bs-toggle="dropdown"
+            data-bs-strategy="fixed"
+            data-bs-auto-close="outside"
             aria-expanded="false" aria-label="Account menu">
         <span class="sidebar-user-avatar">@initials</span>
         <span class="sidebar-user-meta">

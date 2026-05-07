@@ -236,17 +236,29 @@ body {
     flex-shrink: 0;
 }
 
-/* Dropdown menu — explicitly position above the trigger via Popper static
-   placement (data-bs-display="static"); we constrain max-height + width. */
+/* Dropdown menu — Bootstrap's `.dropup` + Popper `data-bs-strategy="fixed"`
+   handle positioning (open upward, escape the sidebar's overflow:hidden
+   clipping rectangle). We only constrain width + max-height + scroll so
+   a long Language list doesn't push the menu off-screen. Light surface
+   regardless of the dark sidebar palette — the menu floats over the
+   page chrome, not over the sidebar.
+
+   z-index above the sidebar (1040) so the floating menu sits on top
+   of any sticky topbar / sidebar element when Popper places it. */
 .sidebar-user-menu {
     min-width: 240px;
-    max-width: 280px;
-    /* The user trigger sits at the very bottom — open the menu UPWARD. */
-    top: auto !important;
-    bottom: 100% !important;
-    left: 0 !important;
-    right: auto !important;
-    margin-bottom: .25rem !important;
+    max-width: 320px;
+    max-height: 70vh;
+    overflow-y: auto;
+    z-index: 1060;
+    background: #fff;
+    color: #212529;
+    border: 1px solid rgba(0, 0, 0, .15);
+}
+[data-bs-theme="dark"] .sidebar-user-menu {
+    background: #212529;
+    color: #dee2e6;
+    border-color: #495057;
 }
 
 /* ── Main content ────────────────────────────────────────────────────── */

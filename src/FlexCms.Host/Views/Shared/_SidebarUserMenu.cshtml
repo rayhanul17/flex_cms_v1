@@ -63,7 +63,7 @@
         {
             var active = string.Equals(m, currentTheme, StringComparison.OrdinalIgnoreCase);
             <li>
-                <form asp-controller="Theme" asp-action="SetMode" method="post" class="m-0">
+                <form action="/theme/mode" method="post" class="m-0">
                     <input type="hidden" name="__RequestVerificationToken" value="@token" />
                     <input type="hidden" name="mode" value="@m" />
                     <input type="hidden" name="returnUrl" value="@returnUrl" />

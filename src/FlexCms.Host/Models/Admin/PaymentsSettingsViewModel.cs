@@ -38,9 +38,12 @@ public class PaymentsSettingsViewModel
         [Range(0, 100)]
         public decimal VatPercent { get; set; }
 
-        [Display(Name = "Extra surcharge")]
+        [Display(Name = "Extra (service) charge")]
         [Range(0, double.MaxValue)]
         public decimal ExtraCharge { get; set; }
+
+        [Display(Name = "Apply gateway charge on extra")]
+        public bool ApplyChargeOnExtra { get; set; }
 
         public PaymentChargeConfig ToConfig() => new()
         {
@@ -48,7 +51,8 @@ public class PaymentsSettingsViewModel
             ChargePercent = ChargePercent,
             FixedCharge = FixedCharge,
             VatPercent = VatPercent,
-            ExtraCharge = ExtraCharge
+            ExtraCharge = ExtraCharge,
+            ApplyChargeOnExtra = ApplyChargeOnExtra
         };
 
         public static ChargeVm From(PaymentChargeConfig c) => new()
@@ -57,7 +61,8 @@ public class PaymentsSettingsViewModel
             ChargePercent = c.ChargePercent,
             FixedCharge = c.FixedCharge,
             VatPercent = c.VatPercent,
-            ExtraCharge = c.ExtraCharge
+            ExtraCharge = c.ExtraCharge,
+            ApplyChargeOnExtra = c.ApplyChargeOnExtra
         };
     }
 

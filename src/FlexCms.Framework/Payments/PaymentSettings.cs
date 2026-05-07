@@ -40,22 +40,42 @@ public enum ChargeBearer
 /// Per-gateway charge configuration shared between bKash / SSLCommerz / Nagad.
 /// Embedded into each per-gateway settings class so admins can set different
 /// rates per provider (typically 1.85% bKash, 2.5% SSLCommerz, 1.5% Nagad).
+///
+/// <para>
+/// Charge math mirrors NetCoreCMS — see <see cref="PaymentChargeCalculator"/>
+/// for the exact formulas. Forward = straight % on order amount; Backward
+/// = back-calculated so the merchant nets the full order amount after the
+/// gateway takes its cut.
+/// </para>
 /// </summary>
 public class PaymentChargeConfig
 {
     public ChargeBearer ChargeBearer { get; set; } = ChargeBearer.Forward;
 
-    /// <summary>Gateway commission as a percentage of the order amount. e.g. <c>1.85</c> for 1.85%.</summary>
+    /// <summary>Gateway commission as a percentage. Forward: applied directly. Backward: back-calculated. e.g. <c>1.85</c> for 1.85%.</summary>
     public decimal ChargePercent { get; set; }
 
-    /// <summary>Flat fee added on every transaction, in <see cref="PaymentSettings.Currency"/>. e.g. <c>2.00</c>.</summary>
+    /// <summary>Flat fee added on every transaction (in addition to the percent), in <see cref="PaymentSettings.Currency"/>. e.g. <c>2.00</c>.</summary>
     public decimal FixedCharge { get; set; }
 
     /// <summary>VAT applied on top of the gateway charge (NOT on the order amount). e.g. <c>15</c> = 15% of charge.</summary>
     public decimal VatPercent { get; set; }
 
-    /// <summary>Optional service surcharge merchant adds (e.g. processing fee). Forward: added to customer total. Backward: deducted from merchant payout.</summary>
+    /// <summary>
+    /// Merchant's own service surcharge (a flat fee, not a percent). ALWAYS
+    /// added to what the customer pays AND to what the merchant receives —
+    /// it's pass-through revenue, not a fee. The bearer toggle only governs
+    /// the gateway commission, never this.
+    /// </summary>
     public decimal ExtraCharge { get; set; }
+
+    /// <summary>
+    /// Whether the gateway charge percent is applied to (order + extra) or
+    /// just to (order). Default <c>false</c> matches the typical case where
+    /// the merchant doesn't want to pay gateway commission on their own
+    /// service fee. Mirrors NetCoreCMS's <c>IsServiceChargeApplyOnAdditionalFee</c>.
+    /// </summary>
+    public bool ApplyChargeOnExtra { get; set; }
 }
 
 /// <summary>

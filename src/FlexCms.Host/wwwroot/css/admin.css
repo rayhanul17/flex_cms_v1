@@ -149,26 +149,6 @@ body {
     flex-shrink: 0;
 }
 
-#sidebar .sidebar-footer-actions {
-    display: flex;
-    justify-content: flex-end;
-    padding: 0 .25rem .5rem;
-}
-
-/* Override the bell partial's btn-outline-secondary so it inherits the
-   sidebar palette (white-on-white was the bell-in-dark-sidebar problem). */
-#sidebar .sidebar-footer-actions #fcmsBell .btn {
-    color: #adbccf;
-    border-color: transparent;
-    background: transparent;
-}
-#sidebar .sidebar-footer-actions #fcmsBell .btn:hover,
-#sidebar .sidebar-footer-actions #fcmsBell .btn[aria-expanded="true"] {
-    background: #2d3f53;
-    color: #fff;
-    border-color: #3d556e;
-}
-
 /* User-menu trigger — full-width pill at the very bottom. */
 #sidebar .sidebar-user {
     width: 100%;
@@ -278,15 +258,25 @@ body {
 #topbar {
     background: #fff;
     border-bottom: 1px solid #dee2e6;
-    padding: .6rem 1rem;
+    /* Tighter vertical padding — user reported extra top space. The bell
+       button's own .btn padding gives the row enough click height. */
+    padding: .35rem 1rem;
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: .5rem;
-    /* Sticky on mobile so the hamburger stays reachable when scrolling. */
     position: sticky;
     top: 0;
     z-index: 1030;
+}
+
+/* Top-right action cluster — currently hosts the notification bell.
+   Anchored to the right via flex-grow on the title sibling. */
+#topbar .topbar-actions {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    flex-shrink: 0;
 }
 
 #page-body {
@@ -329,7 +319,7 @@ body {
 
     /* Tighten paddings so 320–375px viewports keep usable canvas */
     #page-body { padding: 1rem; }
-    #topbar { padding: .5rem .75rem; }
+    #topbar { padding: .3rem .75rem; }
 }
 
 /* Extra-small (<576px): full-screen drawer rather than 240px panel */

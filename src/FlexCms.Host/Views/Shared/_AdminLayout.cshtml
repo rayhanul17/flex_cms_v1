@@ -104,31 +104,22 @@
     </ul>
     </div>
 
-    <!-- Pinned bottom: notification bell + user menu (avatar + name + email).
-         Both live in the sidebar so the topbar can stay minimal. -->
+    <!-- Pinned bottom: user menu (avatar + name + email). The notification
+         bell now lives in the topbar (top-right) per UX request. -->
     <div class="sidebar-footer">
-        <div class="sidebar-footer-actions">
-            <partial name="_NotificationBell" />
-        </div>
         <partial name="_SidebarUserMenu" />
     </div>
 </nav>
 
 <!-- ── Main content ───────────────────────────────────────── -->
 <div id="main-content">
-    <!-- Topbar — minimal: hamburger entry-point + page title only. Bell,
-         theme, language, and user menu all live in the sidebar footer.
-         The topbar hamburger stays critical for mobile (when the drawer
-         is closed) + desktop collapsed-rail mode. -->
+    <!-- Topbar — page title on the left, notification bell on the right.
+         The sidebar header's own hamburger handles toggle on every viewport
+         (mobile drawer + desktop collapsed-rail). -->
     <div id="topbar">
-        <div class="d-flex align-items-center gap-2 flex-grow-1 min-w-0">
-            <button type="button" id="sidebar-toggle"
-                    class="btn btn-sm btn-outline-secondary js-sidebar-toggle"
-                    aria-label="Toggle navigation" aria-expanded="false" aria-controls="sidebar"
-                    title="Toggle sidebar">
-                <i class="bi bi-list"></i>
-            </button>
-            <span class="text-muted small text-truncate">@ViewData["Title"]</span>
+        <span class="text-muted small text-truncate flex-grow-1">@ViewData["Title"]</span>
+        <div class="topbar-actions">
+            <partial name="_NotificationBell" />
         </div>
     </div>
 

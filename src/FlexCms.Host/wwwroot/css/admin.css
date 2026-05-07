@@ -389,3 +389,228 @@ body {
         padding: .25rem;
     }
 }
+
+/* ──────────────────────────────────────────────────────────────────────
+   Dark mode — triggered by [data-bs-theme="dark"] on <html>.
+   Overrides the hardcoded light colors in the layout above so the
+   main content area, topbar, cards, and tables all switch correctly.
+   The sidebar already has its own dark palette and needs no changes.
+   ────────────────────────────────────────────────────────────────────── */
+[data-bs-theme="dark"] #main-content {
+    background: #111827;
+}
+
+[data-bs-theme="dark"] #topbar {
+    background: #1f2937;
+    border-bottom-color: #374151;
+    color: #d1d5db;
+}
+
+[data-bs-theme="dark"] #topbar .text-muted {
+    color: #9ca3af !important;
+}
+
+[data-bs-theme="dark"] .sidebar-toggle-btn {
+    color: #9ca3af;
+}
+[data-bs-theme="dark"] .sidebar-toggle-btn:hover {
+    background: #374151;
+    border-color: #4b5563;
+    color: #f3f4f6;
+}
+
+/* Cards, tables, page body panels */
+[data-bs-theme="dark"] .card,
+[data-bs-theme="dark"] .table,
+[data-bs-theme="dark"] .dataTables_wrapper {
+    color: #d1d5db;
+}
+
+[data-bs-theme="dark"] .card {
+    background: #1f2937;
+    border-color: #374151;
+}
+
+[data-bs-theme="dark"] .card-header {
+    background: #253041;
+    border-bottom-color: #374151;
+}
+
+/* DataTables wrapper panels */
+[data-bs-theme="dark"] .dataTables_wrapper .dataTables_length,
+[data-bs-theme="dark"] .dataTables_wrapper .dataTables_filter,
+[data-bs-theme="dark"] .dataTables_wrapper .dataTables_info,
+[data-bs-theme="dark"] .dataTables_wrapper .dataTables_paginate {
+    color: #9ca3af;
+}
+
+[data-bs-theme="dark"] .dataTables_wrapper .dataTables_filter input,
+[data-bs-theme="dark"] .dataTables_wrapper .dataTables_length select {
+    background: #1f2937;
+    border-color: #374151;
+    color: #d1d5db;
+}
+
+[data-bs-theme="dark"] .dataTables_wrapper .dataTables_paginate .paginate_button {
+    color: #9ca3af !important;
+}
+[data-bs-theme="dark"] .dataTables_wrapper .dataTables_paginate .paginate_button:hover {
+    background: #374151 !important;
+    border-color: #4b5563 !important;
+    color: #f3f4f6 !important;
+}
+[data-bs-theme="dark"] .dataTables_wrapper .dataTables_paginate .paginate_button.current {
+    background: #0d6efd !important;
+    border-color: #0d6efd !important;
+    color: #fff !important;
+}
+
+/* Stat cards on dashboard */
+[data-bs-theme="dark"] .stat-card,
+[data-bs-theme="dark"] [class*="bg-white"],
+[data-bs-theme="dark"] .bg-white {
+    background: #1f2937 !important;
+    color: #d1d5db;
+}
+
+/* Form controls */
+[data-bs-theme="dark"] .form-control,
+[data-bs-theme="dark"] .form-select {
+    background-color: #1f2937;
+    border-color: #374151;
+    color: #d1d5db;
+}
+[data-bs-theme="dark"] .form-control:focus,
+[data-bs-theme="dark"] .form-select:focus {
+    background-color: #253041;
+    border-color: #6b7280;
+    color: #f3f4f6;
+}
+[data-bs-theme="dark"] .form-control::placeholder {
+    color: #6b7280;
+}
+[data-bs-theme="dark"] .input-group-text {
+    background-color: #253041;
+    border-color: #374151;
+    color: #9ca3af;
+}
+
+/* Borders, dividers, muted text */
+[data-bs-theme="dark"] .border,
+[data-bs-theme="dark"] .border-bottom,
+[data-bs-theme="dark"] .border-top {
+    border-color: #374151 !important;
+}
+[data-bs-theme="dark"] .text-muted {
+    color: #9ca3af !important;
+}
+[data-bs-theme="dark"] hr {
+    border-color: #374151;
+}
+
+/* Alerts */
+[data-bs-theme="dark"] .alert-info {
+    background: #1e3a5f;
+    border-color: #1d4ed8;
+    color: #93c5fd;
+}
+[data-bs-theme="dark"] .alert-success {
+    background: #14532d;
+    border-color: #166534;
+    color: #86efac;
+}
+[data-bs-theme="dark"] .alert-danger {
+    background: #450a0a;
+    border-color: #991b1b;
+    color: #fca5a5;
+}
+[data-bs-theme="dark"] .alert-warning {
+    background: #451a03;
+    border-color: #92400e;
+    color: #fcd34d;
+}
+
+/* Breadcrumb */
+[data-bs-theme="dark"] .breadcrumb-item,
+[data-bs-theme="dark"] .breadcrumb-item a {
+    color: #9ca3af;
+}
+[data-bs-theme="dark"] .breadcrumb-item.active {
+    color: #d1d5db;
+}
+
+/* Badges */
+[data-bs-theme="dark"] .badge.bg-light {
+    background: #374151 !important;
+    color: #d1d5db !important;
+}
+[data-bs-theme="dark"] .badge.bg-secondary {
+    background: #4b5563 !important;
+}
+
+/* List groups */
+[data-bs-theme="dark"] .list-group-item {
+    background-color: #1f2937;
+    border-color: #374151;
+    color: #d1d5db;
+}
+[data-bs-theme="dark"] .list-group-item:hover {
+    background-color: #253041;
+}
+
+/* Dropdown menus (non-sidebar) */
+[data-bs-theme="dark"] .dropdown-menu:not(.sidebar-user-menu) {
+    background: #1f2937;
+    border-color: #374151;
+}
+[data-bs-theme="dark"] .dropdown-menu:not(.sidebar-user-menu) .dropdown-item {
+    color: #d1d5db;
+}
+[data-bs-theme="dark"] .dropdown-menu:not(.sidebar-user-menu) .dropdown-item:hover {
+    background: #374151;
+    color: #f3f4f6;
+}
+[data-bs-theme="dark"] .dropdown-divider {
+    border-color: #374151;
+}
+
+/* Modal */
+[data-bs-theme="dark"] .modal-content {
+    background: #1f2937;
+    border-color: #374151;
+    color: #d1d5db;
+}
+[data-bs-theme="dark"] .modal-header,
+[data-bs-theme="dark"] .modal-footer {
+    border-color: #374151;
+}
+
+/* Table thead — Bootstrap defaults thead to white/light even with data-bs-theme="dark" */
+[data-bs-theme="dark"] .table thead tr,
+[data-bs-theme="dark"] .table > thead {
+    background-color: #253041;
+    color: #d1d5db;
+    border-color: #374151;
+}
+[data-bs-theme="dark"] .table > :not(caption) > * > * {
+    background-color: inherit;
+    color: inherit;
+    border-bottom-color: #374151;
+}
+[data-bs-theme="dark"] .table-striped > tbody > tr:nth-of-type(odd) > * {
+    background-color: rgba(255,255,255,.03);
+}
+[data-bs-theme="dark"] .table-hover > tbody > tr:hover > * {
+    background-color: rgba(255,255,255,.06);
+}
+
+/* Code blocks */
+[data-bs-theme="dark"] code {
+    background: #111827;
+    color: #f472b6;
+}
+[data-bs-theme="dark"] pre {
+    background: #111827;
+    color: #d1d5db;
+    border-color: #374151;
+}

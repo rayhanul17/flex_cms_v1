@@ -1,62 +1,63 @@
-using PdfSharpCore.Drawing;
-using PdfSharpCore.Pdf;
+using QuestPDF.Fluent;
+using QuestPDF.Helpers;
+using QuestPDF.Infrastructure;
 
 namespace FlexCms.Framework.Documents;
 
 /// <summary>
-/// PdfSharpCore-based PDF generator. Now multi-page: when content overflows
-/// a page, a fresh A4 page is appended and rendering continues with a
-/// re-drawn header (table mode) or just the running body (text mode).
+/// QuestPDF-backed PDF generator. Class name kept as <c>PdfSharpPdfService</c>
+/// to avoid breaking callers / DI registration / module manifests, but the
+/// underlying engine is now QuestPDF (MIT-compatible Community licence). The
+/// switch dropped a 7-CVE-bearing transitive (SixLabors.ImageSharp 1.0.4 via
+/// PdfSharpCore) and gives us native multi-page + automatic header reflow.
+///
+/// <para>
+/// QuestPDF requires a one-time licence acknowledgement before any document
+/// is rendered. We set it lazily on first use so the framework doesn't need
+/// custom startup wiring; the static guard is idempotent.
+/// </para>
 /// </summary>
 public sealed class PdfSharpPdfService : IFcmsPdfService
 {
-    // PdfSharpCore measures everything in points (1/72 in). A4 = 595.28 × 841.89.
-    private const double Margin = 40;
-    private const double TitleFontSize = 16;
-    private const double BodyFontSize = 11;
-    private const double LineHeight = 16;
+    private static int _licenceConfigured;
+
+    static PdfSharpPdfService() => EnsureLicence();
+
+    private static void EnsureLicence()
+    {
+        if (Interlocked.Exchange(ref _licenceConfigured, 1) == 0)
+        {
+            // Community licence: free for individuals + companies under the
+            // QuestPDF revenue threshold + open-source projects. Downstream
+            // commercial users above the threshold must set their own licence
+            // via app startup before this class is touched.
+            QuestPDF.Settings.License = LicenseType.Community;
+        }
+    }
 
     public Task<byte[]> RenderTextAsync(string title, IEnumerable<string> lines, CancellationToken ct = default)
     {
         return Task.Run(() =>
         {
-            using var doc = new PdfDocument();
-            var titleFont = new XFont("Arial", TitleFontSize, XFontStyle.Bold);
-            var bodyFont = new XFont("Arial", BodyFontSize, XFontStyle.Regular);
-
-            var page = doc.AddPage();
-            var gfx = XGraphics.FromPdfPage(page);
-            try
+            var bodyLines = lines?.ToList() ?? [];
+            var doc = Document.Create(container =>
             {
-                double y = Margin;
-                gfx.DrawString(title ?? "", titleFont, XBrushes.Black,
-                    new XRect(Margin, y, page.Width - 2 * Margin, LineHeight),
-                    XStringFormats.TopLeft);
-                y += LineHeight + 8;
-
-                foreach (var line in lines ?? [])
+                container.Page(page =>
                 {
-                    if (y > page.Height - Margin)
-                    {
-                        // Roll over to a new page. Dispose the existing graphics
-                        // context first — PdfSharpCore needs the writer flushed
-                        // before another page can be added.
-                        gfx.Dispose();
-                        page = doc.AddPage();
-                        gfx = XGraphics.FromPdfPage(page);
-                        y = Margin;
-                    }
-                    gfx.DrawString(line ?? "", bodyFont, XBrushes.Black,
-                        new XRect(Margin, y, page.Width - 2 * Margin, LineHeight),
-                        XStringFormats.TopLeft);
-                    y += LineHeight;
-                }
-            }
-            finally { gfx.Dispose(); }
+                    page.Size(PageSizes.A4);
+                    page.Margin(40);
+                    page.PageColor(Colors.White);
+                    page.DefaultTextStyle(t => t.FontSize(11));
 
-            using var ms = new MemoryStream();
-            doc.Save(ms);
-            return ms.ToArray();
+                    page.Header().Text(title ?? "").FontSize(16).Bold();
+                    page.Content().PaddingVertical(8).Column(col =>
+                    {
+                        foreach (var line in bodyLines)
+                            col.Item().Text(line ?? "");
+                    });
+                });
+            });
+            return doc.GeneratePdf();
         }, ct);
     }
 
@@ -64,70 +65,51 @@ public sealed class PdfSharpPdfService : IFcmsPdfService
     {
         return Task.Run(() =>
         {
-            using var doc = new PdfDocument();
-            var titleFont = new XFont("Arial", TitleFontSize, XFontStyle.Bold);
-            var headerFont = new XFont("Arial", BodyFontSize, XFontStyle.Bold);
-            var bodyFont = new XFont("Arial", BodyFontSize, XFontStyle.Regular);
+            var headerList = headers ?? Array.Empty<string>();
+            var rowList = rows ?? Array.Empty<IReadOnlyList<string>>();
+            var columnCount = Math.Max(1, headerList.Count);
 
-            var columnCount = Math.Max(1, headers?.Count ?? 0);
-            var page = doc.AddPage();
-            var gfx = XGraphics.FromPdfPage(page);
-            double y;
-            double availableWidth;
-            double columnWidth;
-
-            void StartPage(bool first)
+            var doc = Document.Create(container =>
             {
-                y = Margin;
-                if (first)
+                container.Page(page =>
                 {
-                    gfx.DrawString(title ?? "", titleFont, XBrushes.Black,
-                        new XRect(Margin, y, page.Width - 2 * Margin, LineHeight),
-                        XStringFormats.TopLeft);
-                    y += LineHeight + 8;
-                }
-                availableWidth = page.Width - 2 * Margin;
-                columnWidth = availableWidth / columnCount;
-                // Re-draw the header row at the top of each new page so the
-                // reader doesn't lose context across page breaks.
-                for (int c = 0; c < columnCount; c++)
-                {
-                    gfx.DrawString(headers![c] ?? "", headerFont, XBrushes.Black,
-                        new XRect(Margin + c * columnWidth, y, columnWidth, LineHeight),
-                        XStringFormats.TopLeft);
-                }
-                y += LineHeight;
-                gfx.DrawLine(XPens.Black, Margin, y, Margin + availableWidth, y);
-                y += 2;
-            }
+                    page.Size(PageSizes.A4);
+                    page.Margin(40);
+                    page.PageColor(Colors.White);
+                    page.DefaultTextStyle(t => t.FontSize(11));
 
-            try
-            {
-                StartPage(first: true);
-
-                foreach (var row in rows ?? [])
-                {
-                    if (y > page.Height - Margin)
+                    page.Header().Text(title ?? "").FontSize(16).Bold();
+                    page.Content().PaddingVertical(8).Table(table =>
                     {
-                        gfx.Dispose();
-                        page = doc.AddPage();
-                        gfx = XGraphics.FromPdfPage(page);
-                        StartPage(first: false);
-                    }
-                    for (int c = 0; c < columnCount && c < row.Count; c++)
-                    {
-                        gfx.DrawString(row[c] ?? "", bodyFont, XBrushes.Black,
-                            new XRect(Margin + c * columnWidth, y, columnWidth, LineHeight),
-                            XStringFormats.TopLeft);
-                    }
-                    y += LineHeight;
-                }
-            }
-            finally { gfx.Dispose(); }
+                        // Equal-width columns (refinement = future work; matches the
+                        // PdfSharp version's behaviour).
+                        table.ColumnsDefinition(cols =>
+                        {
+                            for (int c = 0; c < columnCount; c++)
+                                cols.RelativeColumn();
+                        });
 
-            using var ms = new MemoryStream();
-            doc.Save(ms);
-            return ms.ToArray();
+                        // Header row repeats automatically on every page so readers
+                        // don't lose context across page breaks.
+                        table.Header(header =>
+                        {
+                            for (int c = 0; c < columnCount; c++)
+                                header.Cell().BorderBottom(1).PaddingVertical(4)
+                                    .Text(headerList[c] ?? "").Bold();
+                        });
+
+                        foreach (var row in rowList)
+                        {
+                            for (int c = 0; c < columnCount; c++)
+                            {
+                                var value = c < row.Count ? row[c] ?? "" : "";
+                                table.Cell().PaddingVertical(2).Text(value);
+                            }
+                        }
+                    });
+                });
+            });
+            return doc.GeneratePdf();
         }, ct);
     }
 }

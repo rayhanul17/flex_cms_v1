@@ -23,25 +23,14 @@
     <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-cmhx-cq75-c4mj" />
   </ItemGroup>
 
-  <!-- PdfSharpCore 1.3.65 transitively pulls SixLabors.ImageSharp 1.0.4. The
-       1.x line has no patched release for GHSA-2cmq-823j-5qj8 (a DoS via
-       crafted image input). ImageSharp 2.x/3.x switched to the Six Labors
-       Split License which requires a paid commercial license — not viable
-       for an open-source CMS framework.
-
-       Why this is safe for our use case:
-       - PdfSharpPdfService only renders text + tables built from server-side
-         strings (RenderTextAsync, RenderTableAsync). It never embeds user-
-         supplied images, so the vulnerable ImageSharp decode paths are not
-         reachable from the framework's own code.
-       - Modules that extend PdfSharp to embed user-uploaded images would
-         re-introduce the risk; that path needs its own input validation
-         and is the module author's responsibility.
-       - Re-evaluate when PdfSharpCore ships a maintained successor or when
-         a different MIT/Apache PDF lib gains feature parity. -->
+  <!-- MongoDB.Driver 3.8.0 (the latest stable) transitively pins Snappier 1.0.0
+       which was flagged with GHSA-pggp-6c3x-2xmx (decompression OOB). Snappier
+       handles Snappy decompression for the Mongo wire protocol — the inputs
+       come from our OWN MongoDB instance, not from end users, so an attacker
+       would need control of the DB to exploit. We don't control the version
+       (it's pinned by Driver). Re-evaluate when MongoDB.Driver bumps it. -->
   <ItemGroup>
-    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-2cmq-823j-5qj8" />
-    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-qxrv-gp6x-rc23" />
+    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-pggp-6c3x-2xmx" />
   </ItemGroup>
 
   <ItemGroup>
@@ -59,7 +48,7 @@
     <PackageReference Include="SkiaSharp" Version="3.119.2" />
     <PackageReference Include="UAParser" Version="3.1.47" />
     <PackageReference Include="MailKit" Version="4.16.0" />
-    <PackageReference Include="PdfSharpCore" Version="1.3.65" />
+    <PackageReference Include="QuestPDF" Version="2026.2.4" />
     <PackageReference Include="ClosedXML" Version="0.105.0" />
     <PackageReference Include="DiffPlex" Version="1.7.2" />
   </ItemGroup>

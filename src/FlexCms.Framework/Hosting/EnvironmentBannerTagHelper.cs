@@ -36,8 +36,14 @@ public sealed class EnvironmentBannerTagHelper : TagHelper
             _ => ("#6f42c1", $"{_env.EnvironmentName.ToUpperInvariant()} ENVIRONMENT")
         };
 
+        // position:fixed at the top so the banner overlays page chrome
+        // without participating in the parent's layout. Without this, when
+        // the host's body is a flex container the banner becomes a flex
+        // child and reserves a vertical strip of whitespace between
+        // siblings (the sidebar and the main-content margin).
+        // pointer-events:none lets clicks land on whatever is underneath.
         output.Content.SetHtmlContent(
-            $@"<div style=""background:{color};color:#fff;text-align:center;font-size:.75rem;font-weight:600;padding:2px 0;letter-spacing:.5px"">
+            $@"<div style=""position:fixed;top:0;left:0;right:0;z-index:1100;background:{color};color:#fff;text-align:center;font-size:.75rem;font-weight:600;padding:2px 0;letter-spacing:.5px;pointer-events:none"">
                 {label}
             </div>");
     }

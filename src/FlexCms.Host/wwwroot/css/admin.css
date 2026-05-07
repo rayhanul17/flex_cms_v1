@@ -165,3 +165,35 @@ body {
         max-width: 320px;
     }
 }
+
+/* ──────────────────────────────────────────────────────────────────────
+   Desktop collapsed-rail mode (≥992px). Toggled via #sidebar-toggle.
+   State persists in localStorage so navigation/refresh keeps it.
+   ────────────────────────────────────────────────────────────────────── */
+@media (min-width: 992px) {
+    body.sidebar-collapsed #sidebar {
+        width: 56px;
+        min-width: 56px;
+    }
+    body.sidebar-collapsed #main-content {
+        margin-left: 56px;
+    }
+    /* Hide labels + chevrons; keep only the icons. */
+    body.sidebar-collapsed #sidebar .sidebar-brand span,
+    body.sidebar-collapsed #sidebar .nav-link span,
+    body.sidebar-collapsed #sidebar .chevron {
+        display: none;
+    }
+    /* Center icons in the narrow rail. */
+    body.sidebar-collapsed #sidebar .sidebar-brand,
+    body.sidebar-collapsed #sidebar .nav-link {
+        justify-content: center;
+        padding-left: 0;
+        padding-right: 0;
+    }
+    /* Sub-menus would push beyond the rail — collapse them entirely while
+       in rail mode. (Hover-popout is a future enhancement.) */
+    body.sidebar-collapsed #sidebar .nav-children {
+        display: none;
+    }
+}

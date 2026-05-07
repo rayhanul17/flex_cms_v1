@@ -94,9 +94,13 @@
     <!-- Topbar -->
     <div id="topbar">
         <div class="d-flex align-items-center gap-2 flex-grow-1 min-w-0">
-            <!-- Hamburger — visible <992px (Bootstrap d-lg-none). Toggles sidebar via JS. -->
-            <button type="button" id="sidebar-toggle" class="btn btn-sm btn-outline-secondary d-lg-none"
-                    aria-label="Toggle navigation" aria-expanded="false" aria-controls="sidebar">
+            <!-- Sidebar toggle — works on every viewport.
+                 Mobile (<992px): toggles the slide-in drawer + backdrop.
+                 Desktop (≥992px): toggles a collapsed icon-only rail (56px wide).
+                 Desktop collapsed state persists across page loads via localStorage. -->
+            <button type="button" id="sidebar-toggle" class="btn btn-sm btn-outline-secondary"
+                    aria-label="Toggle navigation" aria-expanded="false" aria-controls="sidebar"
+                    title="Toggle sidebar">
                 <i class="bi bi-list"></i>
             </button>
             <span class="text-muted small text-truncate">@ViewData["Title"]</span>
@@ -142,46 +146,62 @@
         <text>document.addEventListener('DOMContentLoaded', () => fcms.toast.@(toastType)(@Html.Raw(System.Text.Json.JsonSerializer.Serialize(toastMsg))));</text>
     }
 
-    // ── Mobile sidebar toggle ─────────────────────────────────────────────
-    // The sidebar lives off-screen by default on <992px viewports (CSS
-    // transform). Hamburger click toggles `.show` on body which slides it in,
-    // shows the backdrop, and locks body scroll. Esc / backdrop tap closes it.
+    // ── Sidebar toggle (mobile drawer + desktop rail) ─────────────────────
+    // Two distinct behaviors driven by viewport width:
+    //  - <992px: button opens the slide-in drawer + backdrop, locks body scroll.
+    //  - ≥992px: button collapses the sidebar to a 56px icon-only rail; state
+    //    persists in localStorage so the next page load keeps it.
     (() => {
+        const LS_KEY  = 'fcms-sidebar-collapsed';
         const body     = document.body;
         const btn      = document.getElementById('sidebar-toggle');
         const sidebar  = document.getElementById('sidebar');
         const backdrop = document.getElementById('sidebar-backdrop');
         if (!btn || !sidebar || !backdrop) return;
 
-        function open() {
+        const mqlDesktop = window.matchMedia('(min-width: 992px)');
+
+        // Restore desktop collapsed state on first paint to avoid flicker.
+        if (mqlDesktop.matches && localStorage.getItem(LS_KEY) === '1') {
+            body.classList.add('sidebar-collapsed');
+        }
+
+        function openMobile() {
             body.classList.add('sidebar-open');
             backdrop.hidden = false;
             btn.setAttribute('aria-expanded', 'true');
         }
-        function close() {
+        function closeMobile() {
             body.classList.remove('sidebar-open');
             backdrop.hidden = true;
             btn.setAttribute('aria-expanded', 'false');
         }
-        function toggle() { body.classList.contains('sidebar-open') ? close() : open(); }
+        function toggleDesktop() {
+            const willCollapse = !body.classList.contains('sidebar-collapsed');
+            body.classList.toggle('sidebar-collapsed', willCollapse);
+            try { localStorage.setItem(LS_KEY, willCollapse ? '1' : '0'); } catch { /* SSR / private mode */ }
+            btn.setAttribute('aria-expanded', willCollapse ? 'false' : 'true');
+        }
 
-        btn.addEventListener('click', toggle);
-        backdrop.addEventListener('click', close);
-        document.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
+        btn.addEventListener('click', () => {
+            if (mqlDesktop.matches) toggleDesktop();
+            else (body.classList.contains('sidebar-open') ? closeMobile : openMobile)();
+        });
+        backdrop.addEventListener('click', closeMobile);
+        document.addEventListener('keydown', e => { if (e.key === 'Escape') closeMobile(); });
 
-        // Auto-close after navigating to a sidebar link on mobile so the
+        // Auto-close mobile drawer after navigating to a sidebar link so the
         // newly-loaded page isn't covered by the open drawer.
         sidebar.addEventListener('click', e => {
+            if (mqlDesktop.matches) return;   // desktop: clicks are normal navigation
             const a = e.target.closest('a.nav-link');
             // Skip group toggles (data-bs-toggle="collapse") — they expand sub-menus.
-            if (a && !a.hasAttribute('data-bs-toggle')) close();
+            if (a && !a.hasAttribute('data-bs-toggle')) closeMobile();
         });
 
-        // If the viewport grows past the lg breakpoint while the drawer is
-        // open (rotate to landscape, resize window) drop the open state so we
-        // don't leave the body locked.
-        const mql = window.matchMedia('(min-width: 992px)');
-        mql.addEventListener('change', e => { if (e.matches) close(); });
+        // Crossing the breakpoint: drop the mobile-only state so the body
+        // doesn't stay scroll-locked after rotating to landscape.
+        mqlDesktop.addEventListener('change', e => { if (e.matches) closeMobile(); });
     })();
 </script>
 @await RenderSectionAsync("Scripts", required: false)

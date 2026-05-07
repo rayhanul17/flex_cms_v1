@@ -35,10 +35,14 @@
                 <a class="navbar-brand fw-semibold" asp-controller="Home" asp-action="Index">
                     <i class="bi bi-grid-3x3-gap me-1"></i>@siteName
                 </a>
-                <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
+                <!-- Bootstrap's default navbar-toggler-icon is a background-
+                     image SVG that renders invisibly when the navbar isn't
+                     "navbar-dark" (white-on-white). Use a Bootstrap-Icons
+                     glyph instead so it's visible regardless of theme. -->
+                <button class="navbar-toggler border-0 px-2" type="button" data-bs-toggle="collapse"
                         data-bs-target="#publicNav" aria-controls="publicNav"
                         aria-expanded="false" aria-label="Toggle navigation">
-                    <span class="navbar-toggler-icon"></span>
+                    <i class="bi bi-list fs-3"></i>
                 </button>
                 <div class="navbar-collapse collapse" id="publicNav">
                     <ul class="navbar-nav me-auto">

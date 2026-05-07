@@ -159,82 +159,91 @@
     }
 
     // ── Sidebar toggle (mobile drawer + desktop rail) ─────────────────────
-    // IIFE runs immediately — this script lives at the END of body so the
-    // DOM above it is already parsed. (Wrapping in DOMContentLoaded would
-    // be a no-op AT BEST since the event has already fired by the time we
-    // get here, and a footgun in browsers that don't replay the event for
-    // late listeners.)
-    //
-    // Wired to ANY element with `.js-sidebar-toggle` (sidebar header
-    // hamburger AND topbar hamburger both qualify) so the user can
-    // toggle from either place.
-    (() => {
-        const LS_KEY   = 'fcms-sidebar-collapsed';
-        const body     = document.body;
-        const sidebar  = document.getElementById('sidebar');
-        const backdrop = document.getElementById('sidebar-backdrop');
-        const buttons  = document.querySelectorAll('.js-sidebar-toggle');
-        if (!sidebar || !backdrop || buttons.length === 0) {
-            console.warn('[fcms-admin] sidebar toggle: missing elements',
-                         { sidebar, backdrop, buttonCount: buttons.length });
-            return;
-        }
+    // Delegated click handler on document.body so it works regardless of
+    // when the toggle buttons enter the DOM (after view re-render, after
+    // a partial swap, etc.) AND survives any other script earlier in the
+    // page throwing. Diagnostic log fires on first toggle so the user
+    // can verify the wiring from the browser console.
+    (function () {
+        const LS_KEY = 'fcms-sidebar-collapsed';
 
-        const mqlDesktop = window.matchMedia('(min-width: 992px)');
+        function getSidebar()  { return document.getElementById('sidebar'); }
+        function getBackdrop() { return document.getElementById('sidebar-backdrop'); }
+        function isDesktop()   { return window.matchMedia('(min-width: 992px)').matches; }
 
         // Restore desktop collapsed state on first paint.
-        if (mqlDesktop.matches && localStorage.getItem(LS_KEY) === '1') {
-            body.classList.add('sidebar-collapsed');
-        }
+        try {
+            if (isDesktop() && localStorage.getItem(LS_KEY) === '1') {
+                document.body.classList.add('sidebar-collapsed');
+            }
+        } catch { /* private mode */ }
 
         function setExpanded(state) {
-            buttons.forEach(b => b.setAttribute('aria-expanded', String(state)));
+            document.querySelectorAll('.js-sidebar-toggle')
+                .forEach(b => b.setAttribute('aria-expanded', String(state)));
         }
         function openMobile() {
-            body.classList.add('sidebar-open');
-            backdrop.hidden = false;
+            document.body.classList.add('sidebar-open');
+            const bd = getBackdrop(); if (bd) bd.hidden = false;
             setExpanded(true);
         }
         function closeMobile() {
-            body.classList.remove('sidebar-open');
-            backdrop.hidden = true;
+            document.body.classList.remove('sidebar-open');
+            const bd = getBackdrop(); if (bd) bd.hidden = true;
             setExpanded(false);
         }
         function toggleDesktop() {
-            const willCollapse = !body.classList.contains('sidebar-collapsed');
-            body.classList.toggle('sidebar-collapsed', willCollapse);
-            try { localStorage.setItem(LS_KEY, willCollapse ? '1' : '0'); } catch { /* private mode */ }
+            const willCollapse = !document.body.classList.contains('sidebar-collapsed');
+            document.body.classList.toggle('sidebar-collapsed', willCollapse);
+            try { localStorage.setItem(LS_KEY, willCollapse ? '1' : '0'); } catch {}
             setExpanded(!willCollapse);
         }
-        function onToggleClick(e) {
+
+        // ONE delegated listener on body; survives DOM swaps + partial
+        // rendering. Matches any descendant of a `.js-sidebar-toggle`
+        // element (the icon inside the button counts).
+        document.body.addEventListener('click', function (e) {
+            const trigger = e.target.closest('.js-sidebar-toggle');
+            if (!trigger) return;
             e.preventDefault();
             e.stopPropagation();
-            if (mqlDesktop.matches) {
+            if (isDesktop()) {
                 toggleDesktop();
-            } else if (body.classList.contains('sidebar-open')) {
+            } else if (document.body.classList.contains('sidebar-open')) {
                 closeMobile();
             } else {
                 openMobile();
             }
-        }
+        }, true);   // capture phase so nothing else can swallow the click
 
-        buttons.forEach(b => b.addEventListener('click', onToggleClick));
-        backdrop.addEventListener('click', closeMobile);
-        document.addEventListener('keydown', e => { if (e.key === 'Escape') closeMobile(); });
+        // Backdrop tap closes the mobile drawer.
+        document.body.addEventListener('click', function (e) {
+            if (e.target.id === 'sidebar-backdrop') closeMobile();
+        });
+
+        // Esc closes the drawer.
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') closeMobile();
+        });
 
         // Auto-close mobile drawer after navigating to a sidebar link so
         // the newly-loaded page isn't covered by the open drawer.
-        sidebar.addEventListener('click', e => {
-            if (mqlDesktop.matches) return;   // desktop: clicks are normal navigation
-            // Skip the in-sidebar toggle button itself + sub-menu toggles.
+        document.body.addEventListener('click', function (e) {
+            if (isDesktop()) return;
+            const sb = getSidebar();
+            if (!sb || !sb.contains(e.target)) return;
             if (e.target.closest('.js-sidebar-toggle')) return;
             const a = e.target.closest('a.nav-link');
             if (a && !a.hasAttribute('data-bs-toggle')) closeMobile();
         });
 
-        // Crossing the breakpoint: drop the mobile-only state so the body
-        // doesn't stay scroll-locked after rotating to landscape.
-        mqlDesktop.addEventListener('change', e => { if (e.matches) closeMobile(); });
+        // Crossing the breakpoint: drop the mobile-only state.
+        window.matchMedia('(min-width: 992px)').addEventListener('change', function (e) {
+            if (e.matches) closeMobile();
+        });
+
+        console.log('[fcms-admin] sidebar toggle wired (delegated). Buttons present:',
+            document.querySelectorAll('.js-sidebar-toggle').length);
     })();
 </script>
 @await RenderSectionAsync("Scripts", required: false)

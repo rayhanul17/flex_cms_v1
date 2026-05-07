@@ -1,3 +1,4 @@
+using FlexCms.Framework.Cms;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using MongoDB.Driver;
@@ -15,6 +16,7 @@ public class MongoUnitOfWork : IFcmsUnitOfWork
     private readonly IMongoClient _client;
     private readonly IHttpContextAccessor? _httpContextAccessor;
     private readonly ILogger<MongoUnitOfWork>? _logger;
+    private readonly IFcmsLogService? _audit;
     private IClientSessionHandle? _session;
     /// <summary>
     /// Tracks whether the current Mongo deployment supports transactions.
@@ -27,12 +29,18 @@ public class MongoUnitOfWork : IFcmsUnitOfWork
     private static bool? _transactionsSupported;
     private readonly Dictionary<Type, object> _repositories = new();
 
-    public MongoUnitOfWork(IMongoClient client, IMongoDatabase database, IHttpContextAccessor? httpContextAccessor = null, ILogger<MongoUnitOfWork>? logger = null)
+    public MongoUnitOfWork(
+        IMongoClient client,
+        IMongoDatabase database,
+        IHttpContextAccessor? httpContextAccessor = null,
+        ILogger<MongoUnitOfWork>? logger = null,
+        IFcmsLogService? audit = null)
     {
         _client = client;
         _database = database;
         _httpContextAccessor = httpContextAccessor;
         _logger = logger;
+        _audit = audit;
     }
 
     public IRepository<T> Repository<T>() where T : class, IBaseEntity
@@ -40,12 +48,20 @@ public class MongoUnitOfWork : IFcmsUnitOfWork
         var type = typeof(T);
         if (!_repositories.TryGetValue(type, out var repo))
         {
+            // Create MongoRepository<T> via reflection — T is constrained to
+            // IBaseEntity here but MongoRepository<T> also requires new(), which
+            // can't be expressed at this call-site without duplicating constraints.
             var repoType = typeof(MongoRepository<>).MakeGenericType(type);
-            repo = Activator.CreateInstance(repoType, _database, _httpContextAccessor)!;
+            var inner = (IRepository<T>)Activator.CreateInstance(repoType, _database, _httpContextAccessor)!;
+
+            // Wrap with auditing decorator unless the entity opts out.
+            repo = ShouldAudit<T>() && _audit is not null
+                ? new AuditingRepository<T>(inner, _audit)
+                : inner;
             _repositories[type] = repo;
 
-            // If a transaction is already active, wire the session into the new repo
-            if (_session is not null && repo is IMongoSessionAware aware)
+            // Wire session into the inner Mongo repo if a transaction is active.
+            if (_session is not null && inner is IMongoSessionAware aware)
                 aware.SetSession(_session);
         }
         return (IRepository<T>)repo;
@@ -131,10 +147,28 @@ public class MongoUnitOfWork : IFcmsUnitOfWork
         return ValueTask.CompletedTask;
     }
 
+    private static bool ShouldAudit<T>() where T : class, IBaseEntity
+    {
+        var type = typeof(T);
+        if (typeof(IAppendOnlyEntity).IsAssignableFrom(type)) return false;
+        if (type.GetCustomAttributes(typeof(FcmsAuditIgnoreEntityAttribute), inherit: true).Length > 0) return false;
+        return true;
+    }
+
     private void PropagateSession(IClientSessionHandle? session)
     {
         foreach (var repo in _repositories.Values)
-            if (repo is IMongoSessionAware aware)
+        {
+            // Session must reach the inner MongoRepository, not the decorator.
+            var inner = repo is IAuditingRepositoryInner inner2 ? inner2.Inner : repo;
+            if (inner is IMongoSessionAware aware)
                 aware.SetSession(session);
+        }
     }
+}
+
+// Marker so PropagateSession can unwrap the decorator.
+internal interface IAuditingRepositoryInner
+{
+    object Inner { get; }
 }

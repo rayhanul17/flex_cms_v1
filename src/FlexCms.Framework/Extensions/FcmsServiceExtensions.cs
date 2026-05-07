@@ -503,14 +503,17 @@ public static class FcmsServiceExtensions
 
                 if (!options.UsesRelationalDb)
                 {
-                    // MongoDB-only mode: register Mongo repositories and identity stores
+                    // MongoDB-only mode: register Mongo repositories and identity stores.
+                    // AuditingRepository<T> decorator is applied inside MongoUnitOfWork.Repository<T>()
+                    // so we do NOT register a raw MongoRepository<T> here — all access goes via UoW.
                     services.AddScoped(typeof(IRepository<>), typeof(MongoRepository<>));
                     services.AddScoped<IFcmsUnitOfWork>(sp =>
                         new MongoUnitOfWork(
                             sp.GetRequiredService<IMongoClient>(),
                             sp.GetRequiredService<IMongoDatabase>(),
                             sp.GetService<Microsoft.AspNetCore.Http.IHttpContextAccessor>(),
-                            sp.GetService<Microsoft.Extensions.Logging.ILogger<MongoUnitOfWork>>()));
+                            sp.GetService<Microsoft.Extensions.Logging.ILogger<MongoUnitOfWork>>(),
+                            sp.GetService<IFcmsLogService>()));
 
                     identityBuilder.AddUserStore<MongoUserStore>();
                     identityBuilder.AddRoleStore<MongoRoleStore>();

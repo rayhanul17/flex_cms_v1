@@ -9,7 +9,6 @@ using Microsoft.Extensions.Logging;
 
 namespace FlexCms.Framework.Cms;
 
-
 /// <summary>
 /// EF Core save-changes interceptor that automatically writes one
 /// <see cref="FcmsLog"/> row for every Add/Modify/SoftDelete on any
@@ -26,21 +25,9 @@ namespace FlexCms.Framework.Cms;
 ///   <item><c>EntityState.Deleted</c> (hard delete) → <c>"Post.HardDeleted"</c></item>
 /// </list>
 /// </para>
-///
-/// <para>
-/// Service-layer code that calls <see cref="IFcmsLogService.LogAsync"/> directly
-/// (OTP events, auth events, etc.) continues to work as before — this interceptor
-/// only handles entity CRUD.  Manual log calls for the same entity+action in the
-/// same request are de-duplicated by the interceptor skipping entities whose type
-/// names match a well-known manual-log prefix (opt-out via
-/// <see cref="FcmsAuditIgnoreEntityAttribute"/>).
-/// </para>
 /// </summary>
 public sealed class FcmsAuditInterceptor : SaveChangesInterceptor
 {
-    // IAppendOnlyEntity types (FcmsLog, FcmsLogArchive) are always skipped —
-    // auto-logging them would recurse or produce meaningless noise.
-
     private static readonly JsonSerializerOptions JsonOpts = new()
     {
         PropertyNameCaseInsensitive = true,
@@ -53,15 +40,10 @@ public sealed class FcmsAuditInterceptor : SaveChangesInterceptor
     private readonly ISettingsService _settings;
     private readonly ILogger<FcmsAuditInterceptor> _logger;
 
-    // Captured inside SavingChangesAsync (before EF clears the tracker) and
-    // consumed in SavedChangesAsync (after the commit succeeds).
-    [ThreadStatic]
-    private static List<PendingEntry>? _pending;
-
-    // Guards the secondary SaveChangesAsync call (writing audit rows) so
-    // the interceptor doesn't re-enter and log its own FcmsLog inserts.
-    [ThreadStatic]
-    private static bool _writing;
+    // AsyncLocal is safe across async continuations (unlike [ThreadStatic] which
+    // is per-thread and loses its value after an await resumes on a different thread).
+    // Each logical call-chain (one SaveChangesAsync call stack) gets its own slot.
+    private static readonly AsyncLocal<CallState?> _state = new();
 
     public FcmsAuditInterceptor(
         IFcmsContextService ctx,
@@ -80,9 +62,12 @@ public sealed class FcmsAuditInterceptor : SaveChangesInterceptor
         InterceptionResult<int> result,
         CancellationToken ct = default)
     {
-        // Skip capturing when we ourselves are writing audit rows.
-        if (!_writing)
-            _pending = Capture(eventData.Context);
+        // When we are writing our own audit rows we set Writing=true in the state.
+        // Skip capture entirely to avoid infinite recursion.
+        if (_state.Value?.Writing == true)
+            return base.SavingChangesAsync(eventData, result, ct);
+
+        _state.Value = new CallState(Capture(eventData.Context));
         return base.SavingChangesAsync(eventData, result, ct);
     }
 
@@ -93,11 +78,15 @@ public sealed class FcmsAuditInterceptor : SaveChangesInterceptor
         int result,
         CancellationToken ct = default)
     {
-        var pending = _pending;
-        _pending = null;
-        if (pending is null || pending.Count == 0) return result;
+        var state = _state.Value;
+        if (state is null || state.Writing || state.Pending.Count == 0)
+            return result;
 
-        // Audit logging disabled in settings → skip entirely.
+        var ctx = eventData.Context;
+        if (ctx is null) return result;
+
+        // Check audit enabled — wrapped in try/catch so a settings read failure
+        // (e.g. during DB migration/setup) never breaks the main operation.
         try
         {
             var cfg = await _settings.GetAsync<AuditConfig>(AuditLogSettings.Key, ct: ct);
@@ -105,12 +94,8 @@ public sealed class FcmsAuditInterceptor : SaveChangesInterceptor
         }
         catch
         {
-            // Settings unavailable (e.g. during migration/setup) — skip silently.
             return result;
         }
-
-        var ctx = eventData.Context;
-        if (ctx is null) return result;
 
         var now = FcmsTime.Now;
         var userId = _ctx.UserId;
@@ -118,11 +103,11 @@ public sealed class FcmsAuditInterceptor : SaveChangesInterceptor
         var ip = _ctx.IpAddress;
         var ua = $"{_ctx.Browser} / {_ctx.Os}";
 
-        foreach (var entry in pending)
+        foreach (var entry in state.Pending)
         {
             try
             {
-                var log = new FcmsLog
+                ctx.Set<FcmsLog>().Add(new FcmsLog
                 {
                     CreatedAt = now,
                     UserId = userId,
@@ -135,12 +120,10 @@ public sealed class FcmsAuditInterceptor : SaveChangesInterceptor
                     Value = entry.Snapshot,
                     Module = "core",
                     Severity = entry.Severity,
-                };
-                ctx.Set<FcmsLog>().Add(log);
+                });
             }
             catch (Exception ex)
             {
-                // Audit failure must never break the main operation.
                 _logger.LogWarning(ex,
                     "FcmsAuditInterceptor: failed to queue log entry for {Action}/{EntityType}/{EntityId}",
                     entry.Action, entry.EntityType, entry.EntityId);
@@ -149,9 +132,8 @@ public sealed class FcmsAuditInterceptor : SaveChangesInterceptor
 
         try
         {
-            // _writing guard prevents the interceptor from re-entering when
-            // EF calls SavingChangesAsync again for this secondary save.
-            _writing = true;
+            // Mark Writing so SavingChangesAsync skips capture for this inner call.
+            state.Writing = true;
             await ctx.SaveChangesAsync(ct);
         }
         catch (Exception ex)
@@ -160,7 +142,8 @@ public sealed class FcmsAuditInterceptor : SaveChangesInterceptor
         }
         finally
         {
-            _writing = false;
+            state.Writing = false;
+            _state.Value = null;
         }
 
         return result;
@@ -178,27 +161,23 @@ public sealed class FcmsAuditInterceptor : SaveChangesInterceptor
         {
             var type = entry.Entity.GetType();
 
-            // Skip append-only infrastructure entities (FcmsLog, FcmsLogArchive, etc.)
+            // IAppendOnlyEntity types (FcmsLog, FcmsLogArchive) are always skipped.
             if (typeof(IAppendOnlyEntity).IsAssignableFrom(type)) continue;
             if (type.GetCustomAttributes(typeof(FcmsAuditIgnoreEntityAttribute), inherit: true).Length > 0) continue;
 
-            var (action, severity) = DeriveAction(entry);
-            if (action is null) continue;
+            var (verb, severity) = DeriveAction(entry);
+            if (verb is null) continue;
 
             var prefix = GetPrefix(type);
-            var entityId = entry.Entity.Id.ToString();
 
             string? snapshot = null;
-            try
-            {
-                snapshot = JsonSerializer.Serialize(entry.Entity, type, JsonOpts);
-            }
-            catch { /* snapshot best-effort */ }
+            try { snapshot = JsonSerializer.Serialize(entry.Entity, type, JsonOpts); }
+            catch { /* best-effort */ }
 
             list.Add(new PendingEntry(
-                Action: $"{prefix}.{action}",
+                Action: $"{prefix}.{verb}",
                 EntityType: type.Name,
-                EntityId: entityId,
+                EntityId: entry.Entity.Id.ToString(),
                 Snapshot: snapshot,
                 Severity: severity));
         }
@@ -206,33 +185,27 @@ public sealed class FcmsAuditInterceptor : SaveChangesInterceptor
         return list;
     }
 
-    private static (string? verb, FcmsLogSeverity severity) DeriveAction(
+    internal static (string? verb, FcmsLogSeverity severity) DeriveAction(
         Microsoft.EntityFrameworkCore.ChangeTracking.EntityEntry<BaseEfEntity> entry)
     {
         return entry.State switch
         {
-            EntityState.Added => ("Created", FcmsLogSeverity.Info),
-
+            EntityState.Added    => ("Created",     FcmsLogSeverity.Info),
             EntityState.Modified when entry.Entity.Status == EntityStatus.Deleted
-                => ("Deleted", FcmsLogSeverity.Info),
-
-            EntityState.Modified => ("Updated", FcmsLogSeverity.Info),
-
-            // Hard delete via repository.DeleteAsync / DeleteRangeAsync
-            EntityState.Deleted => ("HardDeleted", FcmsLogSeverity.Warning),
-
-            _ => (null, FcmsLogSeverity.Info),
+                                 => ("Deleted",     FcmsLogSeverity.Info),
+            EntityState.Modified => ("Updated",     FcmsLogSeverity.Info),
+            EntityState.Deleted  => ("HardDeleted", FcmsLogSeverity.Warning),
+            _                    => (null,           FcmsLogSeverity.Info),
         };
     }
 
-    private static string GetPrefix(Type type)
+    internal static string GetPrefix(Type type)
     {
         var attr = type.GetCustomAttributes(typeof(FcmsAuditEntityAttribute), inherit: true)
                        .OfType<FcmsAuditEntityAttribute>()
                        .FirstOrDefault();
         if (attr is not null) return attr.ActionPrefix;
 
-        // Strip common "Fcms" prefix for readability: FcmsPost → Post
         var name = type.Name;
         return name.StartsWith("Fcms", StringComparison.Ordinal) ? name[4..] : name;
     }
@@ -243,6 +216,12 @@ public sealed class FcmsAuditInterceptor : SaveChangesInterceptor
         string EntityId,
         string? Snapshot,
         FcmsLogSeverity Severity);
+
+    private sealed class CallState(List<PendingEntry> pending)
+    {
+        public List<PendingEntry> Pending { get; } = pending;
+        public bool Writing { get; set; }
+    }
 
     private sealed class AuditConfig
     {

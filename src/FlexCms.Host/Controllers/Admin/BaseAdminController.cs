@@ -5,6 +5,7 @@ using FlexCms.Framework.Models;
 using FlexCms.Framework.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Logging;
 using System.Linq.Expressions;
 using System.Text.Json;
 
@@ -23,6 +24,16 @@ public abstract class BaseAdminController : Controller
 
     protected IFcmsLogService OpLog =>
         HttpContext.RequestServices.GetRequiredService<IFcmsLogService>();
+
+    /// <summary>
+    /// Serilog logger scoped to the concrete controller type — so log entries
+    /// carry the correct source category (e.g. "FlexCms.Host.Controllers.Admin.SettingsController")
+    /// without each controller having to inject ILogger&lt;T&gt; in its constructor.
+    /// </summary>
+    protected ILogger Logger =>
+        HttpContext.RequestServices
+            .GetRequiredService<ILoggerFactory>()
+            .CreateLogger(GetType());
 
     // ── Cache ─────────────────────────────────────────────────────────────────
 

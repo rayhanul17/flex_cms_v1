@@ -8,11 +8,13 @@ public class SettingsViewModel
     [Display(Name = "Site Name")]
     public string SiteName { get; set; } = "";
 
+    // Optional — nullable so an empty form value isn't treated as a missing
+    // required field by the .NET 6+ implicit-required behavior.
     [Display(Name = "Site Tagline")]
-    public string SiteTagline { get; set; } = "";
+    public string? SiteTagline { get; set; }
 
     [Display(Name = "Site Base URL")]
-    public string SiteBaseUrl { get; set; } = "";
+    public string? SiteBaseUrl { get; set; }
 
     [Display(Name = "Default Language")]
     public string DefaultLanguage { get; set; } = "en";

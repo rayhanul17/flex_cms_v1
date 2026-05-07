@@ -1,8 +1,7 @@
 using System.Text.Json;
 using FlexCms.Framework.Clock;
-using FlexCms.Framework.Db.Ef;
+using FlexCms.Framework.Db;
 using FlexCms.Framework.Services;
-using Microsoft.EntityFrameworkCore;
 
 namespace FlexCms.Framework.Cms;
 
@@ -13,10 +12,20 @@ public static class AuditLogSettings
 
 public class FcmsLogService : IFcmsLogService
 {
-    // Logs use FcmsDbContext directly (not IRepository<T>) — they are
-    // append-only, have no Status / DeletedAt columns, and don't need the
-    // soft-delete query filter that IRepository injects on every call.
-    private readonly FcmsDbContext _db;
+    /// <summary>
+    /// Pages through old logs in fixed-size chunks rather than loading the
+    /// full result set into memory. Old impl hit OOM on large log tables —
+    /// a busy site accumulating ~10k log rows / hour would push hundreds
+    /// of thousands of rows through one ToListAsync per archive tick.
+    /// </summary>
+    public const int ArchiveBatchSize = 1000;
+
+    // Logs (and their archive) are append-only — IAppendOnlyEntity opts
+    // both backends out of the soft-delete query filter, so direct
+    // IRepository<T> usage is safe and runs identically on EF + Mongo.
+    private readonly IRepository<FcmsLog> _logs;
+    private readonly IRepository<FcmsLogArchive> _archives;
+    private readonly IFcmsUnitOfWork _uow;
     private readonly IFcmsContextService _context;
     private readonly ISettingsService _settings;
 
@@ -32,11 +41,15 @@ public class FcmsLogService : IFcmsLogService
     };
 
     public FcmsLogService(
-        FcmsDbContext db,
+        IRepository<FcmsLog> logs,
+        IRepository<FcmsLogArchive> archives,
+        IFcmsUnitOfWork uow,
         IFcmsContextService context,
         ISettingsService settings)
     {
-        _db = db;
+        _logs = logs;
+        _archives = archives;
+        _uow = uow;
         _context = context;
         _settings = settings;
     }
@@ -68,17 +81,9 @@ public class FcmsLogService : IFcmsLogService
             Severity = severity
         };
 
-        _db.Logs.Add(log);
-        await _db.SaveChangesAsync(ct);
+        await _logs.AddAsync(log, ct);
+        await _uow.SaveChangesAsync(ct);
     }
-
-    /// <summary>
-    /// Pages through old logs in fixed-size chunks rather than loading the
-    /// full result set into memory. Old impl hit OOM on large log tables —
-    /// a busy site accumulating ~10k log rows / hour would push hundreds
-    /// of thousands of rows through one ToListAsync per archive tick.
-    /// </summary>
-    public const int ArchiveBatchSize = 1000;
 
     public async Task ArchiveOlderThanAsync(TimeSpan age, CancellationToken ct = default)
     {
@@ -86,13 +91,14 @@ public class FcmsLogService : IFcmsLogService
 
         while (!ct.IsCancellationRequested)
         {
-            // Fetch one batch ordered by oldest-first so we never re-scan
-            // newly-arriving logs into the same window.
-            var batch = await _db.Logs
-                .Where(l => l.CreatedAt < cutoff)
+            // Page-and-move: oldest-first so newly-arriving logs don't get
+            // dragged into the same window. We rely on FindAsync returning
+            // a snapshot list (both EF + Mongo do); for huge log tables the
+            // ArchiveBatchSize cap (1000) keeps each iteration cheap.
+            var batch = (await _logs.FindAsync(l => l.CreatedAt < cutoff, ct))
                 .OrderBy(l => l.CreatedAt)
                 .Take(ArchiveBatchSize)
-                .ToListAsync(ct);
+                .ToList();
             if (batch.Count == 0) break;
 
             var archiveEntries = batch.Select(log => new FcmsLogArchive
@@ -110,15 +116,11 @@ public class FcmsLogService : IFcmsLogService
                 Severity = log.Severity
             }).ToList();
 
-            _db.LogArchives.AddRange(archiveEntries);
-            _db.Logs.RemoveRange(batch);
-            await _db.SaveChangesAsync(ct);
-
-            // Detach so the next iteration's tracker stays small. Without
-            // this the change tracker would grow to N entries by the end
-            // of a multi-batch archive pass.
-            foreach (var e in batch) _db.Entry(e).State = EntityState.Detached;
-            foreach (var a in archiveEntries) _db.Entry(a).State = EntityState.Detached;
+            await _archives.AddRangeAsync(archiveEntries, ct);
+            // Hard delete (DeleteRangeAsync) — append-only logs use real
+            // delete, not soft-delete; both backends honor that here.
+            await _logs.DeleteRangeAsync(batch, ct);
+            await _uow.SaveChangesAsync(ct);
 
             // Last partial batch — nothing more to archive.
             if (batch.Count < ArchiveBatchSize) break;
@@ -127,39 +129,25 @@ public class FcmsLogService : IFcmsLogService
 
     public async Task ClearArchiveAsync(CancellationToken ct = default)
     {
-        // Prefer ExecuteDeleteAsync (single server-side DELETE, no tracker
-        // rows) on relational providers. EF InMemory throws
-        // InvalidOperationException for it, so fall back to a tracked
-        // delete — fine for tests, never hit in production.
-        try
-        {
-            await _db.LogArchives.ExecuteDeleteAsync(ct);
-        }
-        catch (InvalidOperationException)
-        {
-            var all = await _db.LogArchives.ToListAsync(ct);
-            if (all.Count > 0)
-            {
-                _db.LogArchives.RemoveRange(all);
-                await _db.SaveChangesAsync(ct);
-            }
-        }
+        // IRepository abstracts the bulk delete: EF impl uses
+        // ExecuteDeleteAsync where supported; Mongo uses DeleteManyAsync.
+        // Same call site, no backend-specific branches.
+        var all = await _archives.GetAllAsync(ct);
+        if (all.Count == 0) return;
+        await _archives.DeleteRangeAsync(all, ct);
+        await _uow.SaveChangesAsync(ct);
     }
 
     public async Task<IReadOnlyList<FcmsLog>> GetRecentAsync(int count = 100, CancellationToken ct = default)
     {
-        return await _db.Logs
-            .OrderByDescending(l => l.CreatedAt)
-            .Take(count)
-            .ToListAsync(ct);
+        var rows = await _logs.GetAllAsync(ct);
+        return rows.OrderByDescending(l => l.CreatedAt).Take(count).ToList();
     }
 
     public async Task<IReadOnlyList<FcmsLogArchive>> GetArchiveAsync(int count = 100, CancellationToken ct = default)
     {
-        return await _db.LogArchives
-            .OrderByDescending(l => l.CreatedAt)
-            .Take(count)
-            .ToListAsync(ct);
+        var rows = await _archives.GetAllAsync(ct);
+        return rows.OrderByDescending(l => l.CreatedAt).Take(count).ToList();
     }
 
     private sealed class AuditConfig

@@ -35,7 +35,15 @@ public class FcmsLogServiceTests : IDisposable
         context.Browser.Returns("Chrome");
         context.Os.Returns("Windows");
 
-        _svc = new FcmsLogService(_db, context, _settings);
+        // FcmsLogService now goes through IRepository<T> for backend-portability.
+        // Wrap the in-memory DbContext in EfRepository instances; same DbSet
+        // semantics, just exposed via the framework-portable interface.
+#pragma warning disable CA2000
+        var logRepo = new EfRepository<FcmsLog>(_db);
+        var archiveRepo = new EfRepository<FcmsLogArchive>(_db);
+        var uow = new EfUnitOfWork(_db);
+#pragma warning restore CA2000
+        _svc = new FcmsLogService(logRepo, archiveRepo, uow, context, _settings);
     }
 
     public void Dispose() => _db.Dispose();

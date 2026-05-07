@@ -40,8 +40,37 @@ public class MongoUserStore :
 
     public async Task<IdentityResult> UpdateAsync(FcmsUser user, CancellationToken ct)
     {
+        // Optimistic concurrency on the Identity-managed ConcurrencyStamp
+        // (same field EF Identity stores in IsConcurrencyToken). Two admins
+        // both calling AddToRoleAsync on the same user used to silently lose
+        // one of the writes; now the second write fails with a conflict and
+        // UserManager surfaces the standard Identity "ConcurrencyFailure"
+        // result. Caller can refetch + retry.
+        var oldStamp = user.ConcurrencyStamp;
+        user.ConcurrencyStamp = Guid.NewGuid().ToString("N");
         user.UpdatedAt = FlexCms.Framework.Clock.FcmsTime.Now;
-        await _users.ReplaceOneAsync(ById(user.Id.ToString()), user, new ReplaceOptions(), ct);
+
+        var filter = Builders<FcmsUser>.Filter.And(
+            ById(user.Id.ToString()),
+            string.IsNullOrEmpty(oldStamp)
+                ? Builders<FcmsUser>.Filter.Or(
+                    Builders<FcmsUser>.Filter.Exists(u => u.ConcurrencyStamp, false),
+                    Builders<FcmsUser>.Filter.Eq(u => u.ConcurrencyStamp, (string?)null),
+                    Builders<FcmsUser>.Filter.Eq(u => u.ConcurrencyStamp, ""))
+                : Builders<FcmsUser>.Filter.Eq(u => u.ConcurrencyStamp, oldStamp));
+
+        var result = await _users.ReplaceOneAsync(filter, user, new ReplaceOptions(), ct);
+        if (result.MatchedCount == 0)
+        {
+            // Restore the stamp so the caller's user object reflects what
+            // was attempted (and can be diff'd against the latest fetch).
+            user.ConcurrencyStamp = oldStamp;
+            return IdentityResult.Failed(new IdentityError
+            {
+                Code = "ConcurrencyFailure",
+                Description = "Optimistic concurrency failure, object has been modified.",
+            });
+        }
         return IdentityResult.Success;
     }
 

@@ -29,14 +29,33 @@ public class MongoRepository<T> : IRepository<T>, IMongoSessionAware where T : c
 
     void IMongoSessionAware.SetSession(IClientSessionHandle? session) => _session = session;
 
+    /// <summary>
+    /// True if <typeparamref name="T"/> declares a <c>RowVersion</c> property
+    /// (byte[]). Mirrors EF's <c>IsRowVersion()</c> opt-in: presence of the
+    /// property turns on optimistic concurrency on Mongo too. Cached via
+    /// static reflection so we don't hit Type.GetProperty per UpdateAsync.
+    /// </summary>
+    private static readonly PropertyInfo? RowVersionProp =
+        typeof(T).GetProperty("RowVersion", BindingFlags.Public | BindingFlags.Instance);
+
+    /// <summary>
+    /// Audit-log entities (FcmsLog, FcmsLogArchive) opt out of soft-delete
+    /// filtering — EF strips the inherited Status column entirely; Mongo
+    /// matches by short-circuiting to "match all" so the two stay symmetric.
+    /// </summary>
+    private static readonly bool IsAppendOnly =
+        typeof(IAppendOnlyEntity).IsAssignableFrom(typeof(T));
+
     private Guid? CurrentUserId()
     {
         var claim = _httpContextAccessor?.HttpContext?.User?.FindFirstValue(ClaimTypes.NameIdentifier);
         return Guid.TryParse(claim, out var id) ? id : null;
     }
 
-    // All queries auto-exclude soft-deleted entities (Status != Deleted)
-    private FilterDefinition<T> NotDeleted => Filter.Ne(e => e.Status, EntityStatus.Deleted);
+    // All queries auto-exclude soft-deleted entities (Status != Deleted),
+    // EXCEPT append-only entities (audit logs) — see IAppendOnlyEntity comment.
+    private FilterDefinition<T> NotDeleted =>
+        IsAppendOnly ? Filter.Empty : Filter.Ne(e => e.Status, EntityStatus.Deleted);
 
     public async Task<T?> GetByIdAsync(Guid id, CancellationToken ct = default)
     {
@@ -120,11 +139,47 @@ public class MongoRepository<T> : IRepository<T>, IMongoSessionAware where T : c
     {
         entity.UpdatedAt = FcmsTime.Now;
         entity.UpdatedBy = CurrentUserId();
+
+        // Optimistic concurrency: if T has a RowVersion byte[] (EF Phase 15
+        // Issue 96 — FcmsPage / FcmsPost), require it match the stored value
+        // OR be null/empty (first save). Then bump it to a fresh value so the
+        // NEXT writer of the same row will see a mismatch.
         var f = Filter.Eq(e => e.Id, entity.Id);
-        if (_session is not null)
-            await _collection.ReplaceOneAsync(_session, f, entity, cancellationToken: ct);
-        else
-            await _collection.ReplaceOneAsync(f, entity, cancellationToken: ct);
+        if (RowVersionProp is not null)
+        {
+            var current = (byte[]?)RowVersionProp.GetValue(entity);
+            // Mongo's strict "field equals X bytes" filter — compares element-wise.
+            f = current is null || current.Length == 0
+                ? Filter.And(f, Filter.Or(
+                    Filter.Exists("RowVersion", false),
+                    Filter.Eq<byte[]?>("RowVersion", null),
+                    Filter.Size("RowVersion", 0)))
+                : Filter.And(f, Filter.Eq<byte[]?>("RowVersion", current));
+            RowVersionProp.SetValue(entity, NewRowVersion());
+        }
+
+        var result = _session is not null
+            ? await _collection.ReplaceOneAsync(_session, f, entity, cancellationToken: ct)
+            : await _collection.ReplaceOneAsync(f, entity, cancellationToken: ct);
+
+        if (RowVersionProp is not null && result.MatchedCount == 0)
+        {
+            // Mirrors EF's DbUpdateConcurrencyException — caller is expected
+            // to surface "Another editor saved first; refresh" UX. Custom
+            // exception type keeps the EF/Mongo signal symmetric without
+            // pulling EF Core into the Mongo path.
+            throw new FcmsConcurrencyException(
+                $"Concurrency conflict: {typeof(T).Name} {entity.Id} was modified by another writer (RowVersion mismatch).");
+        }
+    }
+
+    private static byte[] NewRowVersion()
+    {
+        // 8 bytes is what SQL Server's ROWVERSION uses; mirror it for
+        // consistency between backends.
+        var b = new byte[8];
+        System.Security.Cryptography.RandomNumberGenerator.Fill(b);
+        return b;
     }
 
     public async Task DeleteAsync(T entity, CancellationToken ct = default)

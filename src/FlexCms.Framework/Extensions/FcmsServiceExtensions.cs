@@ -211,7 +211,13 @@ public static class FcmsServiceExtensions
 
         // ── Phase 15: SEO + Backup + Feature Flags + Maintenance ─────────────
         services.AddScoped<ISeoService, SeoService>();
-        services.AddScoped<IFcmsBackupService, FcmsBackupService>();
+        // Backup impl is backend-specific. EF dumps DbSets via reflection;
+        // Mongo dumps every collection as canonical-extended-JSON. Both
+        // produce the same ZIP layout so the admin UI doesn't care.
+        if (options.UseMongoDB && !options.UsesRelationalDb)
+            services.AddScoped<IFcmsBackupService, MongoBackupService>();
+        else
+            services.AddScoped<IFcmsBackupService, FcmsBackupService>();
         services.AddScoped<IFcmsFeatureService, FcmsFeatureService>();
         services.AddSingleton<IFcmsOutputCache, FcmsMemoryOutputCache>();
         services.AddSingleton<SlowQueryInterceptor>();
@@ -225,12 +231,21 @@ public static class FcmsServiceExtensions
         services.AddSingleton<IImageOptimizer, SkiaImageOptimizer>();
         services.AddScoped<IFcmsSearchAnalytics, FcmsSearchAnalytics>();
         services.AddScoped<IFcmsSearchProvider, LikeSearchProvider>();
-        // Default LIKE-based sources for the framework's own entities. Admins
-        // swap in vendor providers (MySqlFullTextSearchSource /
-        // PostgresFullTextSearchSource) by registering them additionally —
-        // the dispatcher fan-outs to all registered sources.
-        services.AddScoped<IFcmsSearchableSource, FlexCms.Framework.Search.Providers.PageSearchSource>();
-        services.AddScoped<IFcmsSearchableSource, FlexCms.Framework.Search.Providers.PostSearchSource>();
+        // Search sources fan out into the provider; pick by backend.
+        // - Mongo deployments: native regex source (uses IMongoDatabase).
+        // - Relational deployments: per-entity LIKE sources via IRepository<T>.
+        // Admins running large corpora can additionally register MySqlFullText
+        // SearchSource / PostgresFullTextSearchSource (require the per-DB
+        // FULLTEXT/GIN indexes — see those classes' XML doc).
+        if (options.UseMongoDB && !options.UsesRelationalDb)
+        {
+            services.AddScoped<IFcmsSearchableSource, FlexCms.Framework.Search.Providers.MongoSearchSource>();
+        }
+        else
+        {
+            services.AddScoped<IFcmsSearchableSource, FlexCms.Framework.Search.Providers.PageSearchSource>();
+            services.AddScoped<IFcmsSearchableSource, FlexCms.Framework.Search.Providers.PostSearchSource>();
+        }
         services.AddScoped<IEditorialService, EditorialService>();
         services.AddSingleton<IAdminNotificationPusher, AdminNotificationPusher>();
 
@@ -483,7 +498,9 @@ public static class FcmsServiceExtensions
                     services.AddScoped<IFcmsUnitOfWork>(sp =>
                         new MongoUnitOfWork(
                             sp.GetRequiredService<IMongoClient>(),
-                            sp.GetRequiredService<IMongoDatabase>()));
+                            sp.GetRequiredService<IMongoDatabase>(),
+                            sp.GetService<Microsoft.AspNetCore.Http.IHttpContextAccessor>(),
+                            sp.GetService<Microsoft.Extensions.Logging.ILogger<MongoUnitOfWork>>()));
 
                     identityBuilder.AddUserStore<MongoUserStore>();
                     identityBuilder.AddRoleStore<MongoRoleStore>();

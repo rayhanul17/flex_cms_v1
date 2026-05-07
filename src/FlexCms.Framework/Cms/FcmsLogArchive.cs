@@ -10,7 +10,7 @@ namespace FlexCms.Framework.Cms;
 /// from <see cref="BaseEfEntity"/> are ignored in <c>FcmsDbContext.OnModelCreating</c>
 /// because archive entries are append-only or hard-deleted in bulk.
 /// </summary>
-public class FcmsLogArchive : BaseEfEntity
+public class FcmsLogArchive : BaseEfEntity, Db.IAppendOnlyEntity
 {
     public Guid? UserId { get; set; }
     public string UserName { get; set; } = string.Empty;

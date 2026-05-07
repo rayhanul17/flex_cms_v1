@@ -1,17 +1,24 @@
 using FlexCms.Framework.Api;
 using FlexCms.Framework.Auth;
 using FlexCms.Framework.Auth.History;
+using FlexCms.Framework.Auth.TwoFactor;
 using FlexCms.Framework.Chat;
 using FlexCms.Framework.Cms;
 using FlexCms.Framework.Cms.Comments;
 using FlexCms.Framework.Cms.CustomFields;
+using FlexCms.Framework.Cms.Drafts;
 using FlexCms.Framework.Cms.Revisions;
+using FlexCms.Framework.Editorial;
 using FlexCms.Framework.Exports;
+using FlexCms.Framework.FeatureFlags;
 using FlexCms.Framework.Helpers;
+using FlexCms.Framework.I18n;
 using FlexCms.Framework.Messaging;
 using FlexCms.Framework.Modules;
 using FlexCms.Framework.Newsletters;
 using FlexCms.Framework.Notifications;
+using FlexCms.Framework.Search;
+using FlexCms.Framework.Seo;
 using FlexCms.Framework.Sessions;
 using FlexCms.Framework.Webhooks;
 using FlexCms.Framework.Widgets;
@@ -275,6 +282,71 @@ public class MongoIndexService : IHostedService
         await UniqueAsync<Db.FcmsSettings>(
             Builders<Db.FcmsSettings>.IndexKeys.Ascending(s => s.Key),
             "ux_settings_key", ct);
+
+        // ── Phase 14 (additional engagement indexes that EF has) ─────────────
+        await IndexAsync<FcmsSubscriber>(
+            Builders<FcmsSubscriber>.IndexKeys.Ascending(s => s.SubscriberStatus),
+            "ix_subscribers_status", ct);
+        await IndexAsync<FcmsComment>(
+            Builders<FcmsComment>.IndexKeys.Ascending(c => c.ParentId),
+            "ix_comments_parent", ct);
+        await IndexAsync<FcmsWebhookEndpoint>(
+            Builders<FcmsWebhookEndpoint>.IndexKeys.Ascending(e => e.IsActive),
+            "ix_webhook_endpoints_active", ct);
+
+        // ── Phase 15: SEO + FeatureFlags + Languages + Editorial + Search ────
+        // (EntityType, EntityId) is the natural key for SEO meta — at most one row per entity.
+        await UniqueAsync<FcmsSeoMeta>(
+            Builders<FcmsSeoMeta>.IndexKeys
+                .Ascending(s => s.EntityType)
+                .Ascending(s => s.EntityId),
+            "ux_seo_meta_entity", ct);
+
+        await UniqueAsync<FcmsFeatureFlag>(
+            Builders<FcmsFeatureFlag>.IndexKeys.Ascending(f => f.Key),
+            "ux_feature_flags_key", ct);
+
+        await UniqueAsync<FcmsLanguage>(
+            Builders<FcmsLanguage>.IndexKeys.Ascending(l => l.Code),
+            "ux_languages_code", ct);
+
+        // No-result-queries report: WHERE result_count = 0 AND created_at >= cutoff.
+        await IndexAsync<FcmsSearchQuery>(
+            Builders<FcmsSearchQuery>.IndexKeys
+                .Ascending(s => s.ResultCount)
+                .Descending(s => s.CreatedAt),
+            "ix_search_queries_result_created", ct);
+
+        // Editorial: GetLatestAsync queries by (EntityType, EntityId, CreatedAt desc).
+        await IndexAsync<FcmsContentReview>(
+            Builders<FcmsContentReview>.IndexKeys
+                .Ascending(r => r.EntityType)
+                .Ascending(r => r.EntityId)
+                .Descending(r => r.CreatedAt),
+            "ix_content_reviews_entity_created", ct);
+        await IndexAsync<FcmsContentAnnotation>(
+            Builders<FcmsContentAnnotation>.IndexKeys
+                .Ascending(a => a.EntityType)
+                .Ascending(a => a.EntityId)
+                .Ascending(a => a.IsResolved),
+            "ix_content_annotations_entity_resolved", ct);
+
+        // ── Hardening: draft autosave + 2FA recovery ─────────────────────────
+        // Draft autosave is an upsert — one row per (entityType, entityId, user)
+        // — needs a unique compound index so concurrent autosaves don't dupe.
+        await UniqueAsync<FcmsContentDraftSnapshot>(
+            Builders<FcmsContentDraftSnapshot>.IndexKeys
+                .Ascending(s => s.EntityType)
+                .Ascending(s => s.EntityId)
+                .Ascending(s => s.UserId),
+            "ux_draft_snapshots_entity_user", ct);
+
+        // 2FA recovery code verification: WHERE user_id = ? AND is_used = false.
+        await IndexAsync<FcmsRecoveryCode>(
+            Builders<FcmsRecoveryCode>.IndexKeys
+                .Ascending(r => r.UserId)
+                .Ascending(r => r.IsUsed),
+            "ix_recovery_codes_user_used", ct);
 
         _logger.LogInformation("MongoIndexService: indexes ensured.");
     }

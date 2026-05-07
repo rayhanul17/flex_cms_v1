@@ -318,29 +318,34 @@ public class SeedService : IHostedService
             ex.Message.Contains("does not exist", StringComparison.OrdinalIgnoreCase) ||
             ex.Message.Contains("Invalid object name", StringComparison.OrdinalIgnoreCase))
         {
-            // fcms_menu_items table missing on an existing pre-menu install.
-            // Try to create it via the relational creator (EF Core idempotent).
+            // RELATIONAL ONLY — fcms_menu_items table missing on an existing
+            // pre-menu install. Try the EF-only auto-create path.
+            // Mongo deployments never hit this branch because collections are
+            // created on first insert; the original SeedAsync would have just
+            // succeeded. If we DO land here without an EF DbContext (Mongo-
+            // only setup mis-throwing a "not found" error), there's nothing
+            // useful to recover so we log + return cleanly.
+            var ctx = scope.ServiceProvider.GetService<Db.Ef.FcmsDbContext>();
+            if (ctx is null)
+            {
+                _logger.LogError(ex,
+                    "SeedService: menu seed failed and no EF DbContext available — " +
+                    "if running on Mongo this is unexpected (collections auto-create on insert).");
+                return;
+            }
             try
             {
-                var ctx = scope.ServiceProvider.GetService<Db.Ef.FcmsDbContext>();
-                if (ctx is not null)
-                {
-                    var creator = ctx.GetService<Microsoft.EntityFrameworkCore.Storage.IRelationalDatabaseCreator>();
-                    await creator.CreateTablesAsync(ct);
-                    await menuService.SeedAsync("core", CoreMenuItems, ct);
-                    _logger.LogInformation("SeedService: created fcms_menu_items table and seeded core items.");
-                    return;
-                }
+                var creator = ctx.GetService<Microsoft.EntityFrameworkCore.Storage.IRelationalDatabaseCreator>();
+                await creator.CreateTablesAsync(ct);
+                await menuService.SeedAsync("core", CoreMenuItems, ct);
+                _logger.LogInformation("SeedService: created fcms_menu_items table and seeded core items.");
             }
             catch (Exception innerEx)
             {
                 _logger.LogError(innerEx,
                     "SeedService: fcms_menu_items table missing and auto-create failed. " +
                     "Drop+recreate the DB or add the table manually.");
-                return;
             }
-
-            _logger.LogError(ex, "SeedService: menu seed failed (table missing, no DbContext available).");
         }
     }
 }

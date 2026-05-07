@@ -8,6 +8,7 @@ using FlexCms.Framework.Cms.CustomFields;
 using FlexCms.Framework.Cms.Revisions;
 using FlexCms.Framework.Clock;
 using FlexCms.Framework.FeatureFlags;
+using FlexCms.Framework.I18n;
 using FlexCms.Framework.Seo;
 using FlexCms.Framework.Db;
 using FlexCms.Framework.Exports;
@@ -103,9 +104,10 @@ public class FcmsDbContext : IdentityDbContext<FcmsUser, FcmsRole, Guid>
     public DbSet<FcmsSubscriber> Subscribers => Set<FcmsSubscriber>();
     public DbSet<FcmsContentMeta> ContentMeta => Set<FcmsContentMeta>();
 
-    // ── Phase 15: SEO + Feature flags ─────────────────────────────────────
+    // ── Phase 15: SEO + Feature flags + Languages ─────────────────────────
     public DbSet<FcmsSeoMeta> SeoMeta => Set<FcmsSeoMeta>();
     public DbSet<FcmsFeatureFlag> FeatureFlags => Set<FcmsFeatureFlag>();
+    public DbSet<FcmsLanguage> Languages => Set<FcmsLanguage>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -186,6 +188,13 @@ public class FcmsDbContext : IdentityDbContext<FcmsUser, FcmsRole, Guid>
         modelBuilder.Entity<FcmsPost>()
             .HasIndex(p => p.Slug)
             .IsUnique();
+
+        // Phase 15 — Issue 96: optimistic concurrency on the two main editable
+        // entities. EF translates this to ROWVERSION (SqlServer), TIMESTAMP
+        // (MySQL — auto-set on update), or xmin (Postgres). The .NET property
+        // stays a byte[] across all three.
+        modelBuilder.Entity<FcmsPage>().Property(p => p.RowVersion).IsRowVersion();
+        modelBuilder.Entity<FcmsPost>().Property(p => p.RowVersion).IsRowVersion();
 
         // Tags
         modelBuilder.Entity<FcmsTag>()
@@ -361,6 +370,10 @@ public class FcmsDbContext : IdentityDbContext<FcmsUser, FcmsRole, Guid>
 
         modelBuilder.Entity<FcmsFeatureFlag>()
             .HasIndex(f => f.Key)
+            .IsUnique();
+
+        modelBuilder.Entity<FcmsLanguage>()
+            .HasIndex(l => l.Code)
             .IsUnique();
 
         // Audit log entities are append-only — strip the inherited lifecycle

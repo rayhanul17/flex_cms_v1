@@ -16,6 +16,9 @@
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Razor.RuntimeCompilation" Version="9.0.15" />
     <PackageReference Include="Serilog.AspNetCore" Version="10.0.0" />
     <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
+    <!-- Phase 15 / Issue 88: lets operators add Seq / Elasticsearch /
+         AppInsights sinks via appsettings.json + the matching sink package. -->
+    <PackageReference Include="Serilog.Settings.Configuration" Version="10.0.0" />
   </ItemGroup>
 
   <PropertyGroup>

@@ -9,6 +9,11 @@ var builder = WebApplication.CreateBuilder(args);
 var appDataPath = Path.Combine(builder.Environment.ContentRootPath, "App_Data");
 
 // ── Logging (Serilog) ─────────────────────────────────────────────────────────
+// Defaults: rolling File sink (30-day retention) + Console in Dev. Operators
+// who want centralized logging (Seq / Elasticsearch / Application Insights /
+// Datadog) drop a "Serilog" section into appsettings.{Environment}.json plus
+// the matching `Serilog.Sinks.<Name>` NuGet package — Phase 15 / Issue 88.
+// Sinks declared in config layer ON TOP of the file sink, not replacing it.
 var logPath = Path.Combine(appDataPath, "logs", "flexcms-.log");
 var logConfig = new LoggerConfiguration()
     .MinimumLevel.Information()
@@ -20,6 +25,19 @@ var logConfig = new LoggerConfiguration()
 
 if (builder.Environment.IsDevelopment())
     logConfig.WriteTo.Console();
+
+// ReadFrom.Configuration only attaches sinks if a "Serilog" section exists.
+// Catches the case where the config references a sink NuGet that isn't
+// installed — log to the file sink + carry on rather than crash startup.
+try
+{
+    if (builder.Configuration.GetSection("Serilog").Exists())
+        logConfig.ReadFrom.Configuration(builder.Configuration);
+}
+catch (Exception ex)
+{
+    Console.Error.WriteLine($"[Serilog] Failed to apply Serilog config from appsettings — falling back to file sink only. {ex.Message}");
+}
 
 Log.Logger = logConfig.CreateLogger();
 builder.Host.UseSerilog();

@@ -10,8 +10,10 @@ using FlexCms.Framework.Cms.Comments;
 using FlexCms.Framework.Cms.CustomFields;
 using FlexCms.Framework.Cms.Revisions;
 using FlexCms.Framework.Backup;
+using FlexCms.Framework.Cms.Editing;
 using FlexCms.Framework.Diagnostics;
 using FlexCms.Framework.FeatureFlags;
+using FlexCms.Framework.Gdpr;
 using FlexCms.Framework.Health;
 using FlexCms.Framework.OutputCache;
 using FlexCms.Framework.Newsletters;
@@ -201,6 +203,9 @@ public static class FcmsServiceExtensions
         services.AddScoped<IFcmsFeatureService, FcmsFeatureService>();
         services.AddSingleton<IFcmsOutputCache, FcmsMemoryOutputCache>();
         services.AddSingleton<SlowQueryInterceptor>();
+        services.AddSingleton<IEditorPresenceService, EditorPresenceService>();
+        services.AddScoped<ILanguageService, LanguageService>();
+        services.AddScoped<IFcmsGdprService, FcmsGdprService>();
 
         // Bearer scheme registered alongside the existing cookie scheme so
         // [Authorize]'d controllers accept BOTH session cookies and API tokens.

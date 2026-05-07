@@ -19,6 +19,10 @@ public class FcmsPost : BaseEfEntity
     public DateTime? UnpublishAt { get; set; }
     public Guid? AuthorId { get; set; }
     public int ViewCount { get; set; }
+
+    /// <summary>Optimistic-concurrency token — see <see cref="FcmsPage.RowVersion"/>.</summary>
+    public byte[]? RowVersion { get; set; }
+
     public ICollection<FcmsPostTag> PostTags { get; set; } = [];
 
     public ICollection<FcmsPostTranslation> Translations { get; set; } = [];

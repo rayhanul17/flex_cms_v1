@@ -32,5 +32,12 @@ public class FcmsPage : BaseEfEntity
     public PageAccessControl AccessControl { get; set; } = PageAccessControl.Public;
     public string? PasswordHash { get; set; }
 
+    /// <summary>
+    /// Optimistic-concurrency token (Phase 15 — Issue 96). EF will increment
+    /// this on every update; the editor sends back the value it loaded with,
+    /// and a mismatch on save is treated as "another editor saved first".
+    /// </summary>
+    public byte[]? RowVersion { get; set; }
+
     public ICollection<FcmsPageTranslation> Translations { get; set; } = [];
 }

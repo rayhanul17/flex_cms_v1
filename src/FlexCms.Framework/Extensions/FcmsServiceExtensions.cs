@@ -10,8 +10,10 @@ using FlexCms.Framework.Cms.Comments;
 using FlexCms.Framework.Cms.CustomFields;
 using FlexCms.Framework.Cms.Revisions;
 using FlexCms.Framework.Backup;
+using FlexCms.Framework.Diagnostics;
 using FlexCms.Framework.FeatureFlags;
 using FlexCms.Framework.Health;
+using FlexCms.Framework.OutputCache;
 using FlexCms.Framework.Newsletters;
 using FlexCms.Framework.Sessions;
 using FlexCms.Framework.Webhooks;
@@ -197,6 +199,8 @@ public static class FcmsServiceExtensions
         services.AddScoped<ISeoService, SeoService>();
         services.AddScoped<IFcmsBackupService, FcmsBackupService>();
         services.AddScoped<IFcmsFeatureService, FcmsFeatureService>();
+        services.AddSingleton<IFcmsOutputCache, FcmsMemoryOutputCache>();
+        services.AddSingleton<SlowQueryInterceptor>();
 
         // Bearer scheme registered alongside the existing cookie scheme so
         // [Authorize]'d controllers accept BOTH session cookies and API tokens.
@@ -347,7 +351,8 @@ public static class FcmsServiceExtensions
                     o.UseMySql(
                         options.MySqlConnectionString,
                         Microsoft.EntityFrameworkCore.ServerVersion.AutoDetect(options.MySqlConnectionString),
-                        m => { m.EnableRetryOnFailure(3); m.CommandTimeout(30); }));
+                        m => { m.EnableRetryOnFailure(3); m.CommandTimeout(30); })
+                     .AddInterceptors(sp.GetRequiredService<SlowQueryInterceptor>()));
 
                 RegisterEfServices(services, identityBuilder);
             }
@@ -356,7 +361,8 @@ public static class FcmsServiceExtensions
                 services.AddDbContext<FcmsDbContext>((sp, o) =>
                     o.UseSqlServer(
                         options.MsSqlConnectionString,
-                        m => { m.EnableRetryOnFailure(3); m.CommandTimeout(30); }));
+                        m => { m.EnableRetryOnFailure(3); m.CommandTimeout(30); })
+                     .AddInterceptors(sp.GetRequiredService<SlowQueryInterceptor>()));
 
                 RegisterEfServices(services, identityBuilder);
             }
@@ -365,7 +371,8 @@ public static class FcmsServiceExtensions
                 services.AddDbContext<FcmsDbContext>((sp, o) =>
                     o.UseNpgsql(
                         options.PostgreSqlConnectionString,
-                        m => { m.EnableRetryOnFailure(3); m.CommandTimeout(30); }));
+                        m => { m.EnableRetryOnFailure(3); m.CommandTimeout(30); })
+                     .AddInterceptors(sp.GetRequiredService<SlowQueryInterceptor>()));
 
                 RegisterEfServices(services, identityBuilder);
             }

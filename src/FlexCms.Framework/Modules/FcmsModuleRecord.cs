@@ -20,4 +20,16 @@ public class FcmsModuleRecord : BaseEfEntity
     public bool SeedCompleted { get; set; }
 
     public DateTime? ActivatedAt { get; set; }
+
+    /// <summary>
+    /// Phase 15 / Issue 95: snapshot of capabilities the operator approved
+    /// at install time. Stored as comma-separated for portability across
+    /// EF + Mongo. Empty = no capabilities approved yet (must be set before
+    /// activation if the manifest declares any).
+    /// </summary>
+    public string ApprovedCapabilities { get; set; } = "";
+
+    /// <summary>Phase 15 / Issue 95: who approved + when, for audit.</summary>
+    public Guid? ApprovedByUserId { get; set; }
+    public DateTime? ApprovedAt { get; set; }
 }

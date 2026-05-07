@@ -23,4 +23,13 @@ public class ModuleManifest
 
     /// <summary>Permission keys this module needs declared up-front.</summary>
     public string[] RequestedPermissions { get; set; } = [];
+
+    /// <summary>
+    /// Sandbox manifest (Phase 15 — Issue 95): coarse-grained capability
+    /// declarations the operator approves before activation. Keep these
+    /// simple intent strings rather than mirroring OS/AppDomain permissions
+    /// — this is admin-readable consent, not enforcement.
+    /// </summary>
+    /// <example>["filesystem.read", "outbound.http", "send.email"]</example>
+    public string[] RequestedCapabilities { get; set; } = [];
 }

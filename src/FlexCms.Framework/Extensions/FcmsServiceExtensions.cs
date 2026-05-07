@@ -41,6 +41,7 @@ using FlexCms.Framework.Seo;
 using FlexCms.Framework.Themes;
 using FlexCms.Framework.Widgets;
 using FlexCms.Framework.Modules;
+using FlexCms.Framework.Modules.Updates;
 using FlexCms.Framework.Services;
 using FlexCms.Framework.Setup;
 using FlexCms.Framework.Validators;
@@ -206,6 +207,7 @@ public static class FcmsServiceExtensions
         services.AddSingleton<IEditorPresenceService, EditorPresenceService>();
         services.AddScoped<ILanguageService, LanguageService>();
         services.AddScoped<IFcmsGdprService, FcmsGdprService>();
+        services.AddScoped<IModuleUpdateService, ModuleUpdateService>();
 
         // Bearer scheme registered alongside the existing cookie scheme so
         // [Authorize]'d controllers accept BOTH session cookies and API tokens.

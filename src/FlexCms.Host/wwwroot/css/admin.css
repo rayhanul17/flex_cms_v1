@@ -3,12 +3,22 @@
    ≥992px → fixed 240px sidebar, content margin-left: 240px (desktop default)
    <992px → sidebar hidden off-screen, hamburger toggles a slide-in drawer
             with a tap-to-close backdrop and locked body scroll.
+
+   Layout note: body is intentionally a BLOCK container, not flex. The
+   sidebar uses position:fixed (out of flow) and the content reserves
+   space via margin-left. Earlier versions used display:flex on body
+   which caused the env-banner div (a flex child of body) to claim
+   intrinsic horizontal space between siblings — visible as a vertical
+   strip of whitespace between the sidebar and content.
 */
 
+html, body {
+    height: 100%;
+}
+
 body {
-    display: flex;
-    min-height: 100vh;
     margin: 0;
+    min-height: 100vh;
 }
 
 /* ── Sidebar ─────────────────────────────────────────────────────────── */
@@ -94,12 +104,14 @@ body {
 
 #main-content {
     margin-left: 240px;
-    flex: 1;
+    /* Block-level: takes the full remaining viewport width to the right
+       of the fixed sidebar. Flex column inside so #topbar + #page-body
+       stack vertically and #page-body grows to fill. */
     display: flex;
     flex-direction: column;
     min-height: 100vh;
     background: #f5f7fa;
-    min-width: 0; /* allow flex children to shrink below their content */
+    min-width: 0;
 }
 
 #topbar {
@@ -149,7 +161,9 @@ body {
     /* Lock background scroll while drawer is open */
     body.sidebar-open { overflow: hidden; }
 
-    /* Main content takes full viewport width — no left margin reserved */
+    /* Main content takes full viewport width — no left margin reserved.
+       Sidebar at this breakpoint is position:fixed + translateX(-100%)
+       so it doesn't take any horizontal space. */
     #main-content { margin-left: 0; }
 
     /* Tighten paddings so 320–375px viewports keep usable canvas */

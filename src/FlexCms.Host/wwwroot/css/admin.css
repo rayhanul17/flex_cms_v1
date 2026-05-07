@@ -701,3 +701,97 @@ body {
     color: #d1d5db;
     border-color: #374151;
 }
+
+/* ── Topbar fetch/AJAX loader bar ────────────────────────────────────────
+   Thin 3px stripe pinned to the very top of the viewport. Appears on any
+   fetch() call (patched in fcms-loader.js). Three states:
+     .fcms-loader-active  — animating progress shimmer
+     .fcms-loader-done    — filled to 100% (brief pause before fade)
+     .fcms-loader-hidden  — invisible (default / after fade)
+*/
+#fcms-loader-bar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 3px;
+    width: 0;
+    z-index: 9999;
+    pointer-events: none;
+    background: linear-gradient(90deg, #0d6efd, #6ea8fe, #0d6efd);
+    background-size: 200% 100%;
+    transition: opacity .3s ease, width .3s ease;
+    opacity: 0;
+}
+
+#fcms-loader-bar.fcms-loader-active {
+    opacity: 1;
+    width: 85%;
+    animation: fcms-loader-shimmer 1.2s linear infinite;
+}
+
+#fcms-loader-bar.fcms-loader-done {
+    opacity: 1;
+    width: 100%;
+    animation: none;
+    transition: width .15s ease, opacity .3s ease;
+}
+
+#fcms-loader-bar.fcms-loader-hidden {
+    opacity: 0;
+    width: 0;
+    animation: none;
+    transition: opacity .3s ease;
+}
+
+@keyframes fcms-loader-shimmer {
+    0%   { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+/* ── DataTables responsive / scroll fixes ────────────────────────────────
+   .fcms-dt-wrap   — outer overflow-x:auto scroll container (small screens)
+   scrollX: true   — DataTables adds its own wrapper; we keep ours for the
+                     ColVis toolbar to stay properly aligned outside the scroll.
+*/
+.fcms-dt-wrap {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+/* DataTables Buttons (ColVis) — match Bootstrap btn-sm style */
+.dt-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .25rem;
+}
+
+.dt-buttons .btn {
+    font-size: .8125rem;
+}
+
+/* Prevent DataTables' scrollX inner wrapper from fighting our responsive wrap */
+.dataTables_scrollBody {
+    overflow-x: auto !important;
+}
+
+/* Dark mode: DataTables Buttons dropdown */
+[data-bs-theme="dark"] .dt-button-collection {
+    background: #1f2937;
+    border-color: #374151;
+}
+[data-bs-theme="dark"] .dt-button-collection .dt-button {
+    color: #d1d5db;
+}
+[data-bs-theme="dark"] .dt-button-collection .dt-button:hover,
+[data-bs-theme="dark"] .dt-button-collection .dt-button.active {
+    background: #374151;
+    color: #fff;
+}
+
+/* Dark mode: DataTables processing overlay */
+[data-bs-theme="dark"] .dataTables_processing {
+    background: rgba(31,41,55,.85);
+    color: #d1d5db;
+    border-color: #374151;
+}

@@ -1,0 +1,41 @@
+@*
+    Flat language switcher items, designed to render INSIDE another
+    dropdown (the sidebar user menu). Same shape as _LangSwitcher.cshtml
+    but without the outer dropdown wrapper / its own toggle button.
+*@
+@using FlexCms.Framework.I18n
+@inject IFcmsTranslator Translator
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
+@{
+    var current = Translator.CurrentLanguage;
+    var supported = Translator.SupportedLanguages;
+    var returnUrl = Context.Request.Path + Context.Request.QueryString;
+    var token = Antiforgery.GetAndStoreTokens(Context).RequestToken;
+    var labels = new Dictionary<string, string>
+    {
+        ["en"] = "English",
+        ["bn"] = "বাংলা"
+    };
+}
+
+@if (supported.Count > 1)
+{
+    @foreach (var code in supported)
+    {
+        var label = labels.TryGetValue(code, out var l) ? l : code.ToUpperInvariant();
+        var active = string.Equals(code, current, StringComparison.OrdinalIgnoreCase);
+        <form asp-controller="Language" asp-action="Set" method="post" class="m-0">
+            <input type="hidden" name="__RequestVerificationToken" value="@token" />
+            <input type="hidden" name="lang" value="@code" />
+            <input type="hidden" name="returnUrl" value="@returnUrl" />
+            <button type="submit" class="dropdown-item d-flex align-items-center @(active ? "active" : "")">
+                <span class="text-uppercase fw-semibold me-2">@code</span>
+                @label
+                @if (active)
+                {
+                    <i class="bi bi-check2 ms-auto"></i>
+                }
+            </button>
+        </form>
+    }
+}

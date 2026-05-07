@@ -34,9 +34,17 @@ body {
     top: 0;
     bottom: 0;
     left: 0;
-    overflow-y: auto;
+    /* Scroll lives on the inner .sidebar-scroll, not the sidebar itself,
+       so the header + footer stay pinned. */
+    overflow: hidden;
     z-index: 1040; /* above backdrop (1035), below offcanvas-modal (1050) */
     transition: transform .25s ease;
+}
+
+#sidebar .sidebar-scroll {
+    flex: 1;
+    overflow-y: auto;
+    min-height: 0; /* without this, flex children with overflow ignore the cap */
 }
 
 /* Sidebar header — flex row containing brand link + toggle button. */
@@ -131,6 +139,115 @@ body {
 
 #sidebar .nav-children .nav-link:hover { background: #243443; }
 #sidebar .nav-children .nav-link.active { background: #0d6efd; color: #fff; }
+
+/* ── Sidebar footer (notifications + user menu) ──────────────────────── */
+
+#sidebar .sidebar-footer {
+    border-top: 1px solid #2d3f53;
+    padding: .5rem;
+    background: #18222e;
+    flex-shrink: 0;
+}
+
+#sidebar .sidebar-footer-actions {
+    display: flex;
+    justify-content: flex-end;
+    padding: 0 .25rem .5rem;
+}
+
+/* Override the bell partial's btn-outline-secondary so it inherits the
+   sidebar palette (white-on-white was the bell-in-dark-sidebar problem). */
+#sidebar .sidebar-footer-actions #fcmsBell .btn {
+    color: #adbccf;
+    border-color: transparent;
+    background: transparent;
+}
+#sidebar .sidebar-footer-actions #fcmsBell .btn:hover,
+#sidebar .sidebar-footer-actions #fcmsBell .btn[aria-expanded="true"] {
+    background: #2d3f53;
+    color: #fff;
+    border-color: #3d556e;
+}
+
+/* User-menu trigger — full-width pill at the very bottom. */
+#sidebar .sidebar-user {
+    width: 100%;
+}
+#sidebar .sidebar-user-trigger {
+    display: flex;
+    align-items: center;
+    gap: .65rem;
+    width: 100%;
+    background: transparent;
+    border: 1px solid transparent;
+    color: #cdd6e0;
+    padding: .5rem .65rem;
+    border-radius: .35rem;
+    cursor: pointer;
+    text-align: left;
+}
+#sidebar .sidebar-user-trigger:hover {
+    background: #2d3f53;
+    border-color: #3d556e;
+}
+#sidebar .sidebar-user-avatar {
+    flex-shrink: 0;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #0d6efd, #6f42c1);
+    color: #fff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: .85rem;
+    letter-spacing: .5px;
+}
+#sidebar .sidebar-user-avatar-sm {
+    width: 32px;
+    height: 32px;
+    font-size: .75rem;
+}
+#sidebar .sidebar-user-meta {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+#sidebar .sidebar-user-name {
+    font-size: .85rem;
+    font-weight: 600;
+    color: #fff;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+#sidebar .sidebar-user-email {
+    font-size: .7rem;
+    color: #8a9bb1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+#sidebar .sidebar-user-chevron {
+    font-size: .75rem;
+    color: #8a9bb1;
+    flex-shrink: 0;
+}
+
+/* Dropdown menu — explicitly position above the trigger via Popper static
+   placement (data-bs-display="static"); we constrain max-height + width. */
+.sidebar-user-menu {
+    min-width: 240px;
+    max-width: 280px;
+    /* The user trigger sits at the very bottom — open the menu UPWARD. */
+    top: auto !important;
+    bottom: 100% !important;
+    left: 0 !important;
+    right: auto !important;
+    margin-bottom: .25rem !important;
+}
 
 /* ── Main content ────────────────────────────────────────────────────── */
 
@@ -250,5 +367,21 @@ body {
        in rail mode. (Hover-popout is a future enhancement.) */
     body.sidebar-collapsed #sidebar .nav-children {
         display: none;
+    }
+    /* User-menu in rail mode: avatar only, dropdown still works. */
+    body.sidebar-collapsed #sidebar .sidebar-user-meta,
+    body.sidebar-collapsed #sidebar .sidebar-user-chevron {
+        display: none;
+    }
+    body.sidebar-collapsed #sidebar .sidebar-user-trigger {
+        justify-content: center;
+        padding: .5rem 0;
+    }
+    body.sidebar-collapsed #sidebar .sidebar-footer {
+        padding: .25rem;
+    }
+    body.sidebar-collapsed #sidebar .sidebar-footer-actions {
+        justify-content: center;
+        padding: 0 0 .25rem;
     }
 }

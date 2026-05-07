@@ -56,6 +56,10 @@
             <i class="bi bi-list"></i>
         </button>
     </div>
+
+    <!-- Scroll wrapper so long menus scroll while the user widget stays
+         pinned at the sidebar bottom. -->
+    <div class="sidebar-scroll">
     <ul class="nav flex-column py-2">
         @foreach (var item in topLevel)
         {
@@ -98,17 +102,26 @@
             }
         }
     </ul>
+    </div>
+
+    <!-- Pinned bottom: notification bell + user menu (avatar + name + email).
+         Both live in the sidebar so the topbar can stay minimal. -->
+    <div class="sidebar-footer">
+        <div class="sidebar-footer-actions">
+            <partial name="_NotificationBell" />
+        </div>
+        <partial name="_SidebarUserMenu" />
+    </div>
 </nav>
 
 <!-- ── Main content ───────────────────────────────────────── -->
 <div id="main-content">
-    <!-- Topbar -->
+    <!-- Topbar — minimal: hamburger entry-point + page title only. Bell,
+         theme, language, and user menu all live in the sidebar footer.
+         The topbar hamburger stays critical for mobile (when the drawer
+         is closed) + desktop collapsed-rail mode. -->
     <div id="topbar">
         <div class="d-flex align-items-center gap-2 flex-grow-1 min-w-0">
-            <!-- Topbar hamburger — primarily an entry point when the
-                 sidebar is hidden (mobile drawer closed, or desktop
-                 collapsed-rail mode where the in-sidebar button isn't
-                 prominent). Clicking matches the in-sidebar button. -->
             <button type="button" id="sidebar-toggle"
                     class="btn btn-sm btn-outline-secondary js-sidebar-toggle"
                     aria-label="Toggle navigation" aria-expanded="false" aria-controls="sidebar"
@@ -116,19 +129,6 @@
                 <i class="bi bi-list"></i>
             </button>
             <span class="text-muted small text-truncate">@ViewData["Title"]</span>
-        </div>
-        <div class="d-flex align-items-center gap-2 gap-md-3 flex-shrink-0">
-            <partial name="_NotificationBell" />
-            <partial name="_ThemeModeToggle" />
-            <partial name="_LangSwitcher" />
-            <a href="/" target="_blank" class="text-muted small d-none d-md-inline">
-                <i class="bi bi-box-arrow-up-right"></i> View site
-            </a>
-            <form asp-controller="Auth" asp-action="Logout" method="post" class="d-inline">
-                <button type="submit" class="btn btn-sm btn-outline-secondary" title="Logout">
-                    <i class="bi bi-box-arrow-right"></i><span class="d-none d-md-inline ms-1">Logout</span>
-                </button>
-            </form>
         </div>
     </div>
 
@@ -159,20 +159,24 @@
     }
 
     // ── Sidebar toggle (mobile drawer + desktop rail) ─────────────────────
+    // IIFE runs immediately — this script lives at the END of body so the
+    // DOM above it is already parsed. (Wrapping in DOMContentLoaded would
+    // be a no-op AT BEST since the event has already fired by the time we
+    // get here, and a footgun in browsers that don't replay the event for
+    // late listeners.)
+    //
     // Wired to ANY element with `.js-sidebar-toggle` (sidebar header
     // hamburger AND topbar hamburger both qualify) so the user can
     // toggle from either place.
-    //  - <992px: drawer slide-in + backdrop, locks body scroll.
-    //  - ≥992px: collapses the sidebar to a 56px icon-only rail; state
-    //    persists in localStorage so the next page load keeps it.
-    document.addEventListener('DOMContentLoaded', () => {
+    (() => {
         const LS_KEY   = 'fcms-sidebar-collapsed';
         const body     = document.body;
         const sidebar  = document.getElementById('sidebar');
         const backdrop = document.getElementById('sidebar-backdrop');
         const buttons  = document.querySelectorAll('.js-sidebar-toggle');
         if (!sidebar || !backdrop || buttons.length === 0) {
-            console.warn('[fcms-admin] sidebar toggle: missing elements', { sidebar, backdrop, buttons });
+            console.warn('[fcms-admin] sidebar toggle: missing elements',
+                         { sidebar, backdrop, buttonCount: buttons.length });
             return;
         }
 
@@ -204,6 +208,7 @@
         }
         function onToggleClick(e) {
             e.preventDefault();
+            e.stopPropagation();
             if (mqlDesktop.matches) {
                 toggleDesktop();
             } else if (body.classList.contains('sidebar-open')) {
@@ -230,7 +235,7 @@
         // Crossing the breakpoint: drop the mobile-only state so the body
         // doesn't stay scroll-locked after rotating to landscape.
         mqlDesktop.addEventListener('change', e => { if (e.matches) closeMobile(); });
-    });
+    })();
 </script>
 @await RenderSectionAsync("Scripts", required: false)
 </body>

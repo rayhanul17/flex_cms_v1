@@ -1,0 +1,107 @@
+@using FlexCms.Framework.Services
+@using FlexCms.Framework.Themes
+@inject IFcmsContextService FcmsContext
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
+@{
+    // Initials = first character of each whitespace-separated chunk in the
+    // username (cap at 2). Falls back to email-local part if no name. Lets
+    // the avatar look human even before a real photo upload feature ships.
+    var name = FcmsContext.Username ?? FcmsContext.Email ?? "User";
+    var displayName = FcmsContext.Username ?? FcmsContext.Email ?? "User";
+    var email = FcmsContext.Email ?? "";
+    var initials = string.Join("", name
+        .Split(new[] { ' ', '.', '_', '-', '@' }, StringSplitOptions.RemoveEmptyEntries)
+        .Take(2)
+        .Select(p => char.ToUpperInvariant(p[0])));
+    if (string.IsNullOrEmpty(initials)) initials = "?";
+
+    var token = Antiforgery.GetAndStoreTokens(Context).RequestToken;
+    var returnUrl = Context.Request.Path + Context.Request.QueryString;
+    var currentTheme = ThemeMode.Resolve(Context);
+}
+
+<!-- ── Sidebar user menu ──────────────────────────────────────────────
+     Pinned at the bottom of the sidebar. Click → dropdown opens UPWARD
+     with avatar header + theme + language + My Account + Logout.
+     Mirrors the Plane / Linear / Huly admin-shell pattern.
+─────────────────────────────────────────────────────────────────── -->
+<div class="dropdown sidebar-user" id="sidebarUser">
+    <button class="sidebar-user-trigger" type="button"
+            data-bs-toggle="dropdown" data-bs-display="static"
+            aria-expanded="false" aria-label="Account menu">
+        <span class="sidebar-user-avatar">@initials</span>
+        <span class="sidebar-user-meta">
+            <span class="sidebar-user-name">@displayName</span>
+            <span class="sidebar-user-email">@email</span>
+        </span>
+        <i class="bi bi-chevron-up sidebar-user-chevron"></i>
+    </button>
+
+    <ul class="dropdown-menu sidebar-user-menu shadow-lg">
+        <li class="px-3 py-2 border-bottom">
+            <div class="d-flex align-items-center gap-2">
+                <span class="sidebar-user-avatar sidebar-user-avatar-sm">@initials</span>
+                <div class="min-w-0">
+                    <div class="fw-semibold text-truncate">@displayName</div>
+                    <div class="small text-muted text-truncate">@email</div>
+                </div>
+            </div>
+        </li>
+
+        <li><a class="dropdown-item" href="/profile/security/two-factor">
+            <i class="bi bi-shield-lock me-2"></i> My Account
+        </a></li>
+
+        <!-- Theme submenu — opens to the right on desktop, inline on mobile. -->
+        <li class="dropdown-header pt-2"><small class="text-muted">Appearance</small></li>
+        @foreach (var m in ThemeMode.All)
+        {
+            var active = string.Equals(m, currentTheme, StringComparison.OrdinalIgnoreCase);
+            <li>
+                <form asp-controller="Theme" asp-action="SetMode" method="post" class="m-0">
+                    <input type="hidden" name="__RequestVerificationToken" value="@token" />
+                    <input type="hidden" name="mode" value="@m" />
+                    <input type="hidden" name="returnUrl" value="@returnUrl" />
+                    <button type="submit" class="dropdown-item d-flex align-items-center @(active ? "active" : "")">
+                        @switch (m)
+                        {
+                            case ThemeMode.Light:
+                                <i class="bi bi-sun me-2"></i><text>Light</text>
+                                break;
+                            case ThemeMode.Dark:
+                                <i class="bi bi-moon-stars me-2"></i><text>Dark</text>
+                                break;
+                            default:
+                                <i class="bi bi-circle-half me-2"></i><text>Auto</text>
+                                break;
+                        }
+                        @if (active)
+                        {
+                            <i class="bi bi-check2 ms-auto"></i>
+                        }
+                    </button>
+                </form>
+            </li>
+        }
+
+        <li class="dropdown-header pt-2"><small class="text-muted">Language</small></li>
+        <li>
+            <partial name="_LangSwitcherDropdownItems" />
+        </li>
+
+        <li><hr class="dropdown-divider" /></li>
+        <li>
+            <a class="dropdown-item" href="/" target="_blank">
+                <i class="bi bi-box-arrow-up-right me-2"></i> View site
+            </a>
+        </li>
+        <li>
+            <form asp-controller="Auth" asp-action="Logout" method="post" class="m-0">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="dropdown-item text-danger">
+                    <i class="bi bi-box-arrow-right me-2"></i> Log out
+                </button>
+            </form>
+        </li>
+    </ul>
+</div>

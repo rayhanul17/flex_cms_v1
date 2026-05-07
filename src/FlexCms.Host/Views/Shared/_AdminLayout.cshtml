@@ -42,9 +42,20 @@
 
 <!-- ── Sidebar ─────────────────────────────────────────────── -->
 <nav id="sidebar">
-    <a class="sidebar-brand" asp-controller="Dashboard" asp-action="Index">
-        <i class="bi bi-grid-3x3-gap me-2"></i>FlexCMS
-    </a>
+    <div class="sidebar-header">
+        <a class="sidebar-brand" asp-controller="Dashboard" asp-action="Index">
+            <i class="bi bi-grid-3x3-gap me-2"></i><span>FlexCMS</span>
+        </a>
+        <!-- Hamburger inside the sidebar header — works on every viewport.
+             Clicking on desktop collapses to the icon-rail; on mobile it
+             closes the drawer (along with the backdrop). The topbar
+             hamburger (`#sidebar-toggle`) stays as the entry point when
+             the sidebar is HIDDEN on mobile. -->
+        <button type="button" class="sidebar-toggle-btn js-sidebar-toggle"
+                aria-label="Toggle navigation" title="Toggle sidebar">
+            <i class="bi bi-list"></i>
+        </button>
+    </div>
     <ul class="nav flex-column py-2">
         @foreach (var item in topLevel)
         {
@@ -94,11 +105,12 @@
     <!-- Topbar -->
     <div id="topbar">
         <div class="d-flex align-items-center gap-2 flex-grow-1 min-w-0">
-            <!-- Sidebar toggle — works on every viewport.
-                 Mobile (<992px): toggles the slide-in drawer + backdrop.
-                 Desktop (≥992px): toggles a collapsed icon-only rail (56px wide).
-                 Desktop collapsed state persists across page loads via localStorage. -->
-            <button type="button" id="sidebar-toggle" class="btn btn-sm btn-outline-secondary"
+            <!-- Topbar hamburger — primarily an entry point when the
+                 sidebar is hidden (mobile drawer closed, or desktop
+                 collapsed-rail mode where the in-sidebar button isn't
+                 prominent). Clicking matches the in-sidebar button. -->
+            <button type="button" id="sidebar-toggle"
+                    class="btn btn-sm btn-outline-secondary js-sidebar-toggle"
                     aria-label="Toggle navigation" aria-expanded="false" aria-controls="sidebar"
                     title="Toggle sidebar">
                 <i class="bi bi-list"></i>
@@ -147,62 +159,78 @@
     }
 
     // ── Sidebar toggle (mobile drawer + desktop rail) ─────────────────────
-    // Two distinct behaviors driven by viewport width:
-    //  - <992px: button opens the slide-in drawer + backdrop, locks body scroll.
-    //  - ≥992px: button collapses the sidebar to a 56px icon-only rail; state
+    // Wired to ANY element with `.js-sidebar-toggle` (sidebar header
+    // hamburger AND topbar hamburger both qualify) so the user can
+    // toggle from either place.
+    //  - <992px: drawer slide-in + backdrop, locks body scroll.
+    //  - ≥992px: collapses the sidebar to a 56px icon-only rail; state
     //    persists in localStorage so the next page load keeps it.
-    (() => {
-        const LS_KEY  = 'fcms-sidebar-collapsed';
+    document.addEventListener('DOMContentLoaded', () => {
+        const LS_KEY   = 'fcms-sidebar-collapsed';
         const body     = document.body;
-        const btn      = document.getElementById('sidebar-toggle');
         const sidebar  = document.getElementById('sidebar');
         const backdrop = document.getElementById('sidebar-backdrop');
-        if (!btn || !sidebar || !backdrop) return;
+        const buttons  = document.querySelectorAll('.js-sidebar-toggle');
+        if (!sidebar || !backdrop || buttons.length === 0) {
+            console.warn('[fcms-admin] sidebar toggle: missing elements', { sidebar, backdrop, buttons });
+            return;
+        }
 
         const mqlDesktop = window.matchMedia('(min-width: 992px)');
 
-        // Restore desktop collapsed state on first paint to avoid flicker.
+        // Restore desktop collapsed state on first paint.
         if (mqlDesktop.matches && localStorage.getItem(LS_KEY) === '1') {
             body.classList.add('sidebar-collapsed');
         }
 
+        function setExpanded(state) {
+            buttons.forEach(b => b.setAttribute('aria-expanded', String(state)));
+        }
         function openMobile() {
             body.classList.add('sidebar-open');
             backdrop.hidden = false;
-            btn.setAttribute('aria-expanded', 'true');
+            setExpanded(true);
         }
         function closeMobile() {
             body.classList.remove('sidebar-open');
             backdrop.hidden = true;
-            btn.setAttribute('aria-expanded', 'false');
+            setExpanded(false);
         }
         function toggleDesktop() {
             const willCollapse = !body.classList.contains('sidebar-collapsed');
             body.classList.toggle('sidebar-collapsed', willCollapse);
-            try { localStorage.setItem(LS_KEY, willCollapse ? '1' : '0'); } catch { /* SSR / private mode */ }
-            btn.setAttribute('aria-expanded', willCollapse ? 'false' : 'true');
+            try { localStorage.setItem(LS_KEY, willCollapse ? '1' : '0'); } catch { /* private mode */ }
+            setExpanded(!willCollapse);
+        }
+        function onToggleClick(e) {
+            e.preventDefault();
+            if (mqlDesktop.matches) {
+                toggleDesktop();
+            } else if (body.classList.contains('sidebar-open')) {
+                closeMobile();
+            } else {
+                openMobile();
+            }
         }
 
-        btn.addEventListener('click', () => {
-            if (mqlDesktop.matches) toggleDesktop();
-            else (body.classList.contains('sidebar-open') ? closeMobile : openMobile)();
-        });
+        buttons.forEach(b => b.addEventListener('click', onToggleClick));
         backdrop.addEventListener('click', closeMobile);
         document.addEventListener('keydown', e => { if (e.key === 'Escape') closeMobile(); });
 
-        // Auto-close mobile drawer after navigating to a sidebar link so the
-        // newly-loaded page isn't covered by the open drawer.
+        // Auto-close mobile drawer after navigating to a sidebar link so
+        // the newly-loaded page isn't covered by the open drawer.
         sidebar.addEventListener('click', e => {
             if (mqlDesktop.matches) return;   // desktop: clicks are normal navigation
+            // Skip the in-sidebar toggle button itself + sub-menu toggles.
+            if (e.target.closest('.js-sidebar-toggle')) return;
             const a = e.target.closest('a.nav-link');
-            // Skip group toggles (data-bs-toggle="collapse") — they expand sub-menus.
             if (a && !a.hasAttribute('data-bs-toggle')) closeMobile();
         });
 
         // Crossing the breakpoint: drop the mobile-only state so the body
         // doesn't stay scroll-locked after rotating to landscape.
         mqlDesktop.addEventListener('change', e => { if (e.matches) closeMobile(); });
-    })();
+    });
 </script>
 @await RenderSectionAsync("Scripts", required: false)
 </body>

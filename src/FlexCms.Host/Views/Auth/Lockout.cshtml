@@ -1,0 +1,22 @@
+@{
+    ViewData["Title"] = "Account locked";
+}
+
+<div class="row justify-content-center mt-5">
+    <div class="col-md-5 col-lg-4">
+        <div class="card shadow-sm border-danger">
+            <div class="card-body p-4 text-center">
+                <i class="bi bi-lock-fill fs-1 text-danger mb-3 d-block"></i>
+                <h4 class="mb-2">Account temporarily locked</h4>
+                <p class="text-muted small mb-4">
+                    Too many failed sign-in attempts. Your account has been locked for a short period.
+                    Please wait a few minutes and try again — or reset your password.
+                </p>
+                <div class="d-flex gap-2 justify-content-center">
+                    <a asp-action="ForgotPassword" class="btn btn-outline-primary btn-sm">Reset password</a>
+                    <a asp-action="Login" class="btn btn-outline-secondary btn-sm">Back to sign in</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

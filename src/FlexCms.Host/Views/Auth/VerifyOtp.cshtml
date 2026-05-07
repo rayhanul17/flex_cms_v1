@@ -1,0 +1,39 @@
+@model FlexCms.Host.Models.Auth.VerifyOtpViewModel
+@{
+    ViewData["Title"] = "Enter verification code";
+}
+
+<div class="row justify-content-center mt-5">
+    <div class="col-md-5 col-lg-4">
+        <div class="card shadow-sm">
+            <div class="card-body p-4">
+                <h4 class="card-title text-center mb-3">Verify your identity</h4>
+                <p class="text-muted small text-center mb-4">Enter the verification code sent to you.</p>
+
+                <form asp-action="VerifyOtp" method="post" autocomplete="off">
+                    <div asp-validation-summary="ModelOnly" class="text-danger small mb-3"></div>
+
+                    <input asp-for="UserId" type="hidden" />
+
+                    <div class="mb-3">
+                        <label asp-for="Otp" class="form-label">Verification code</label>
+                        <input asp-for="Otp" class="form-control text-center"
+                               style="font-size:1.5rem;letter-spacing:0.4rem"
+                               inputmode="numeric" maxlength="6" autofocus />
+                        <span asp-validation-for="Otp" class="text-danger small"></span>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary w-100">Verify</button>
+                </form>
+
+                <div class="text-center mt-3">
+                    <a asp-action="Login" class="small text-muted">Back to sign in</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

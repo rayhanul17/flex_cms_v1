@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using Microsoft.AspNetCore.Mvc.ModelBinding.Validation;
 
 namespace FlexCms.Host.Models.Admin;
 
@@ -32,14 +33,19 @@ public class SettingsViewModel
     [Display(Name = "Enable audit logging")]
     public bool AuditEnabled { get; set; } = true;
 
-    public List<TimeZoneOption> AvailableTimeZones { get; set; } = [];
-    public string SampleFormatted { get; set; } = "";
+    // Display-only — populated server-side, never posted by the form.
+    // Without [ValidateNever] the model binder treats non-nullable refs as
+    // implicitly required (.NET 6+) and silently fails ModelState validation
+    // when the form post omits them, causing the Save action to short-circuit
+    // back to the View with no visible error.
+    [ValidateNever] public List<TimeZoneOption> AvailableTimeZones { get; set; } = [];
+    [ValidateNever] public string SampleFormatted { get; set; } = "";
 
     // ── Themes (Phase 11) ────────────────────────────────────────────────────
     [Display(Name = "Public theme")]
     public string PublicThemeId { get; set; } = "FlexCms.Default";
 
-    public List<ThemeOption> AvailableThemes { get; set; } = [];
+    [ValidateNever] public List<ThemeOption> AvailableThemes { get; set; } = [];
 }
 
 public class ThemeOption

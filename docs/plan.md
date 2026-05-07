@@ -14327,23 +14327,44 @@ tests/FlexCms.Tests.Unit/Phase3/FcmsAuthorizeFilterTests.cs # +SuperAdmin upperc
 
 ### Phase 12 — Payment + PDF + Excel + Export
 > **✅ DONE** (2026-05-06) — see [phase-12-test-cases.md](phase-12-test-cases.md)
+> **🔧 Refactored** (2026-05-07): per-gateway credentials + NetCoreCMS-style Forward/Backward charge model + admin UI. PDF replaced PdfSharpCore → QuestPDF (drops ImageSharp 1.x EOL transitive). xunit kept on 2.9.x (deprecated but stable; v3 broke IAsyncLifetime sigs).
 **কাজ:**
-- `IFcmsPaymentGateway` + `DispatchingPaymentGateway` (resolver) + `PaymentSettings` (DataProtection-encrypted ApiKey + MerchantPassword via `PaymentSettingsService`)
-- 3 BD gateway impls registered as typed HttpClient consumers: `BkashPaymentGateway` (Tokenized Checkout — sandbox + production endpoints, create/status flow wired; webhook signature verification deferred per stub doc), `SslcommerzPaymentGateway` (full create-session + validation API; IPN routes through VerifyAsync for server-to-server confirmation), `NagadPaymentGateway` (initialize/verify wired; RSA encrypt + SHA-256 sign placeholders for live integration). Each one returns `PaymentResult` instead of throwing.
+- `IFcmsPaymentGateway` + `DispatchingPaymentGateway` (resolver) + per-gateway `PaymentSettings`. Each gateway owns its own credential DTO (`BkashSettings`, `SslcommerzSettings`, `NagadSettings`) stored under separate keys (`payments:general` / `:bkash` / `:sslcommerz` / `:nagad`) — bKash needs AppKey+Secret+User+Pass, SSLCommerz wants StoreId+Password, Nagad uses RSA key pairs.
+- `PaymentSettingsService` uses gateway-scoped `IDataProtector` purposes (`FlexCms.Payments.Bkash` / `.Sslcommerz` / `.Nagad`) so ciphertext from one gateway can't be replayed against another (cross-gateway isolation tested).
+- `IPaymentChargeCalculator` + `PaymentChargeCalculator` — NetCoreCMS BkashHelper-matching math:
+  - **Forward**: `fee = base × rate / 100 + fixed` (straight percent on base)
+  - **Backward**: `fee = base / (1 - rate/100) - base + fixed` (back-calculated so the gateway's commission on the grossed-up amount leaves the merchant whole — customer still pays everything; "backward" is about derivation, not who absorbs)
+  - `ExtraCharge` is the merchant's own service fee — pass-through revenue, ALWAYS added to both `CustomerPays` and `MerchantReceives`, never deducted
+  - `ApplyChargeOnExtra` toggle (mirrors NetCoreCMS `IsServiceChargeApplyOnAdditionalFee`): default `false` means commission is calculated on order only, not on (order + extra)
+  - `VatPercent` applied to the gateway charge, not the order
+  - Rounding: NetCoreCMS's "ceiling-on-third-digit, banker's otherwise" rule
+- 3 BD gateway impls registered as typed HttpClient consumers: `BkashPaymentGateway` (Tokenized Checkout — sandbox + production endpoints, create/status flow wired; webhook signature verification deferred per stub doc), `SslcommerzPaymentGateway` (full create-session + validation API; IPN routes through VerifyAsync for server-to-server confirmation), `NagadPaymentGateway` (initialize/verify wired; RSA encrypt + SHA-256 sign placeholders for live integration). Each one fetches its own per-gateway settings, applies the charge calculator on the order amount before sending the actual `CustomerPays` total upstream, and returns `PaymentResult` instead of throwing.
 - `PaymentWebhookController` (POST `/payment/webhook/{gatewayId}`, `[AllowAnonymous]`) — normalizes form/JSON bodies, dispatches to the gateway named in the URL (not active gateway in settings — handles in-flight webhooks during a switch)
-- `IFcmsPdfService` + `PdfSharpPdfService` (PdfSharpCore MIT, pure managed): `RenderTextAsync` + `RenderTableAsync`, single-page A4
+- `PaymentsSettingsController` + tabbed admin UI at `/admin/payments-settings`: General tab (enable + active gateway + currency) plus 3 gateway tabs (each with credentials + collapsible Charge config: Bearer / Percent / Fixed / VAT / Extra / ApplyChargeOnExtra). Test-bench: charge-preview button (no upstream call) + test-initiate button (hits sandbox/prod with 1 BDT). Secret fields use the SMTP "blank means keep" pattern.
+- SMS: `BulkSmsType` enum (Text/Unicode) added to `SmsSettings` for Bengali content support — Onnorokom (`type=TEXT`/`UNICODE`) and MRAM (`type=text`/`unicode`) wired through; admin UI dropdown with "use Unicode for Bengali" hint.
+- `IFcmsPdfService` + `PdfSharpPdfService` (now QuestPDF 2026.2.4 — class name kept for DI compat; previously PdfSharpCore but its ImageSharp 1.x transitive went EOL with 7+ open advisories): `RenderTextAsync` + `RenderTableAsync`, multi-page A4 with auto-pagination
 - `IFcmsExcelService` + `ClosedXmlExcelService` (ClosedXML): bold/grey header, auto-fit columns capped at 80, sheet-name sanitization
 - `FcmsPendingExport` entity (EF + Mongo, `(ExportStatus, CreatedAt)` index) + `ExportProcessorService` (30s poll, batch 5, async scope) + `IFcmsExportHandler` interface (module-registered render handler)
 - Processor flow: Pending → Running → render → save bytes via `IFcmsFileStorage` → URL written back → `IFcmsNotificationService.NotifyUserAsync` fires download notification → Done. Missing handler / throwing handler → Failed with reason.
-- Permissions seeded: `payments.view`, `payments.manage`, `exports.request`, `exports.view`
-- Tests: 13 unit (PaymentSettings encryption round-trip, dispatcher routing, PDF/Excel magic-byte assertions) + 6 integration (4 ExportProcessor EF in-memory: happy path, missing handler, throwing handler, idempotent done-skip; 2 Mongo via Testcontainers: pending-export persist + terminal-state round-trip). Project total 264 unit + 216 integration.
+- Permissions seeded: `payments.view`, `payments.manage`, `exports.request`, `exports.view`. Menu item: System → Payments (under SettingsManage gate).
+- Tests: 23 Phase12 unit tests (13 PaymentChargeCalculator covering Forward/Backward × extra × ApplyChargeOnExtra × NetCoreCMS rounding; 7 PaymentSettingsService encryption round-trip + cross-gateway isolation; 5 DispatchingPaymentGateway routing; PDF + Excel magic-byte assertions) + 6 integration (4 ExportProcessor EF in-memory: happy path, missing handler, throwing handler, idempotent done-skip; 2 Mongo via Testcontainers: pending-export persist + terminal-state round-trip). Project total: 329 unit + 216 integration.
 
 **✅ Confirm করো:**
-- [ ] bKash test mode: `InitiateAsync` → returns redirect URL (bKash sandbox)
+- [ ] bKash test mode: `InitiateAsync` → returns redirect URL (bKash sandbox); amount sent upstream = `CustomerPays` (order + Forward charge or back-calculated Backward charge), NOT raw order
 - [ ] `VerifyAsync` with test transaction ID → verifies correctly
 - [ ] Webhook POST /payment/webhook/bkash → signature check → order status updated
-- [ ] `IDataProtector`: bKash API key encrypted in DB → not plaintext
+- [ ] `IDataProtector`: bKash AppSecret + Password encrypted in DB → not plaintext; SSLCommerz StorePassword + Nagad MerchantPrivateKey same
+- [ ] **Cross-gateway isolation**: bKash ciphertext copied into the SSLCommerz settings field → `GetSslcommerzWithSecretsAsync` returns "" instead of decrypting (gateway-scoped DataProtector purposes)
+- [ ] **Charge math (Forward)**: order 1000, 1.85% bKash → customer pays 1018.50, merchant nets 1000
+- [ ] **Charge math (Backward)**: order 1000, 1.85% bKash → customer pays 1018.85, merchant nets 1000 (back-calc grosses up so the gateway's % cut leaves merchant whole)
+- [ ] **Extra charge pass-through**: order 200, Backward 5%, ExtraCharge 10 → customer pays 220.53 (200 + 10.53 fee + 10 service), merchant nets 210 (200 + 10 service)
+- [ ] **ApplyChargeOnExtra toggle**: same 200 + 10 with toggle ON → fee calculated on 210 base = 10.50 (Forward) → customer pays 220.50; toggle OFF → fee on 200 only = 10 → customer pays 220
+- [ ] Admin `/admin/payments-settings` → 3 tabs render → enter creds + charge config → save → reload → secret placeholders show "set", charge values round-trip
+- [ ] Admin "Preview charge" button → JSON shows OrderAmount/GatewayCharge/Vat/ExtraCharge/CustomerPays/MerchantReceives breakdown without hitting upstream
+- [ ] Admin "Test initiate" → hits sandbox with 1 BDT → returns redirect URL + transactionId
+- [ ] SMS BulkSmsType=Unicode → Bengali message via Onnorokom/MRAM → renders correctly on handset (not "?"s)
 - [ ] PDF (small, instant): `GenerateFromViewAsync("Invoice", model)` → byte[] → File() download works
+- [ ] PDF (multi-page): 200+ rows → QuestPDF auto-paginates → each page valid
 - [ ] Excel: ClosedXML → `.xlsx` file generated → opens in Excel/LibreOffice
 - [ ] Heavy export: insert `FcmsPendingExport` → ExportProcessorService picks up → file generated → in-app notification → download link
 - [ ] Export restart-safe: app restart mid-export → Status=Pending → resumes on next poll

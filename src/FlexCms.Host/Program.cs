@@ -187,6 +187,8 @@ app.MapControllerRoute(
 
 // Phase 10 — chat hub
 app.MapHub<FlexCms.Framework.Chat.ChatHub>("/hubs/chat");
+// Phase 16 — admin notification hub (real-time bell push, replaces 60s polling).
+app.MapHub<FlexCms.Framework.Notifications.AdminNotificationHub>("/hubs/admin-notifications");
 
 // CMS page slug catch-all — must come after all other conventional routes
 // so attribute-routed controllers (admin, auth, blog) take priority.

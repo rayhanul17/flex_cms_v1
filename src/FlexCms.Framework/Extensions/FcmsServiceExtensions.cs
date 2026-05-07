@@ -10,8 +10,13 @@ using FlexCms.Framework.Cms.Comments;
 using FlexCms.Framework.Cms.CustomFields;
 using FlexCms.Framework.Cms.Revisions;
 using FlexCms.Framework.Backup;
+using FlexCms.Framework.Caching;
 using FlexCms.Framework.Cms.Editing;
 using FlexCms.Framework.Diagnostics;
+using FlexCms.Framework.Editorial;
+using FlexCms.Framework.ImageOptimization;
+using FlexCms.Framework.Modules.Api;
+using FlexCms.Framework.Search;
 using FlexCms.Framework.FeatureFlags;
 using FlexCms.Framework.Gdpr;
 using FlexCms.Framework.Health;
@@ -208,6 +213,17 @@ public static class FcmsServiceExtensions
         services.AddScoped<ILanguageService, LanguageService>();
         services.AddScoped<IFcmsGdprService, FcmsGdprService>();
         services.AddScoped<IModuleUpdateService, ModuleUpdateService>();
+
+        // ── Phase 16: Cache stampede + Image optimizer + Search + Editorial + Admin notify hub ─
+        services.AddSingleton<IFcmsCacheService, FcmsCacheService>();
+        services.AddSingleton<IImageOptimizer, SkiaImageOptimizer>();
+        services.AddScoped<IFcmsSearchAnalytics, FcmsSearchAnalytics>();
+        services.AddScoped<IFcmsSearchProvider, LikeSearchProvider>();
+        services.AddScoped<IEditorialService, EditorialService>();
+        services.AddSingleton<IAdminNotificationPusher, AdminNotificationPusher>();
+
+        // ── Phase 17: Module API Registry ─────────────────────────────────
+        services.AddSingleton<IFcmsModuleApiRegistry, FcmsModuleApiRegistry>();
 
         // Bearer scheme registered alongside the existing cookie scheme so
         // [Authorize]'d controllers accept BOTH session cookies and API tokens.

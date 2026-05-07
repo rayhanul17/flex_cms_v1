@@ -7,8 +7,10 @@ using FlexCms.Framework.Cms.Comments;
 using FlexCms.Framework.Cms.CustomFields;
 using FlexCms.Framework.Cms.Revisions;
 using FlexCms.Framework.Clock;
+using FlexCms.Framework.Editorial;
 using FlexCms.Framework.FeatureFlags;
 using FlexCms.Framework.I18n;
+using FlexCms.Framework.Search;
 using FlexCms.Framework.Seo;
 using FlexCms.Framework.Db;
 using FlexCms.Framework.Exports;
@@ -108,6 +110,11 @@ public class FcmsDbContext : IdentityDbContext<FcmsUser, FcmsRole, Guid>
     public DbSet<FcmsSeoMeta> SeoMeta => Set<FcmsSeoMeta>();
     public DbSet<FcmsFeatureFlag> FeatureFlags => Set<FcmsFeatureFlag>();
     public DbSet<FcmsLanguage> Languages => Set<FcmsLanguage>();
+
+    // ── Phase 16: Search analytics + Editorial ────────────────────────────
+    public DbSet<FcmsSearchQuery> SearchQueries => Set<FcmsSearchQuery>();
+    public DbSet<FcmsContentReview> ContentReviews => Set<FcmsContentReview>();
+    public DbSet<FcmsContentAnnotation> ContentAnnotations => Set<FcmsContentAnnotation>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -375,6 +382,18 @@ public class FcmsDbContext : IdentityDbContext<FcmsUser, FcmsRole, Guid>
         modelBuilder.Entity<FcmsLanguage>()
             .HasIndex(l => l.Code)
             .IsUnique();
+
+        // ── Phase 16 ───────────────────────────────────────────────────────
+        // Analytics report runs WHERE result_count = 0 AND created_at >= cutoff.
+        modelBuilder.Entity<FcmsSearchQuery>()
+            .HasIndex(s => new { s.ResultCount, s.CreatedAt });
+
+        // GetLatestAsync runs WHERE entity_type = ? AND entity_id = ?.
+        modelBuilder.Entity<FcmsContentReview>()
+            .HasIndex(r => new { r.EntityType, r.EntityId, r.CreatedAt });
+
+        modelBuilder.Entity<FcmsContentAnnotation>()
+            .HasIndex(a => new { a.EntityType, a.EntityId, a.IsResolved });
 
         // Audit log entities are append-only — strip the inherited lifecycle
         // columns and skip the soft-delete query filter (no Status column means

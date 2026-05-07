@@ -9,9 +9,16 @@
 
   <ItemGroup>
     <PackageReference Include="coverlet.collector" Version="10.0.0" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="9.0.7" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="9.0.15" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
     <PackageReference Include="NSubstitute" Version="5.3.0" />
+    <!-- xunit 2.9.x is officially deprecated in favour of xunit.v3, but it
+         remains the most-stable, most-battle-tested release line and the
+         deprecation is informational (no security/correctness implications).
+         Migrating now would carry regression risk — xunit.v3 changed
+         IAsyncLifetime to return ValueTask which breaks every Mongo
+         testcontainer test in the suite. Revisit when v3 has been stable
+         in the field longer. See memory/feedback_latest_stable.md. -->
     <PackageReference Include="xunit" Version="2.9.3" />
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" />
   </ItemGroup>

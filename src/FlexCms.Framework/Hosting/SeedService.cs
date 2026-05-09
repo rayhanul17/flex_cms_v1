@@ -382,36 +382,146 @@ public class SeedService : IHostedService
     }
 
     // ── Schema repair ─────────────────────────────────────────────────────────
-    // EnsureCreatedAsync never alters existing tables. If the model changes
-    // (new columns added) on an existing DB, EF queries fail at runtime.
-    // On every startup we probe a known new column; if it's missing we drop
-    // and recreate the entire schema. Data loss is acceptable here because
-    // this only triggers on a schema mismatch — meaning the DB is already
-    // incompatible with the running code.
+    // EnsureCreatedAsync never alters existing tables. When new columns are
+    // added to EF entities, existing DBs silently break at runtime.
+    // On every startup we compare the EF model's expected columns against
+    // INFORMATION_SCHEMA and ALTER TABLE to add any that are missing —
+    // same pattern as M2Sv3's EnsureTableStructureAsync.
     private async Task EnsureSchemaAsync(CancellationToken ct)
     {
         await using var scope = _scopeFactory.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<FcmsDbContext>();
 
-        bool schemaOk;
-        try
-        {
-            // Probe a column added in the FullName/DisplayName update.
-            // Use EF so it works across all providers.
-            await db.Users.Select(u => u.FullName).FirstOrDefaultAsync(ct);
-            schemaOk = true;
-        }
-        catch
-        {
-            schemaOk = false;
-        }
-
-        if (schemaOk) return;
-
-        _logger.LogWarning("SeedService: schema mismatch detected — recreating database.");
-        await db.Database.EnsureDeletedAsync(ct);
+        // First ensure all tables exist (no-op if already created)
         await db.Database.EnsureCreatedAsync(ct);
-        _logger.LogInformation("SeedService: database recreated with current schema.");
+
+        var providerName = db.Database.ProviderName ?? "";
+        if (providerName.Contains("InMemory") || providerName.Contains("Sqlite"))
+            return; // test providers — no INFORMATION_SCHEMA
+
+        var dbName = db.Database.GetDbConnection().Database;
+
+        // Walk EF model: for each table, collect expected column names
+        var model = db.Model;
+        foreach (var entityType in model.GetEntityTypes())
+        {
+            var tableName = entityType.GetTableName();
+            if (tableName is null) continue;
+
+            var expectedColumns = entityType.GetProperties()
+                .Select(p => p.GetColumnName())
+                .Where(c => c is not null)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase)!;
+
+            // Query existing columns from INFORMATION_SCHEMA
+            HashSet<string> existingColumns;
+            try
+            {
+                existingColumns = await GetExistingColumnsAsync(db, dbName, tableName, ct);
+            }
+            catch
+            {
+                continue; // table may not exist yet — EnsureCreated handles it
+            }
+
+            var missingColumns = expectedColumns
+                .Where(c => !existingColumns.Contains(c))
+                .ToList();
+
+            if (missingColumns.Count == 0) continue;
+
+            // Build ALTER TABLE for each missing column
+            foreach (var columnName in missingColumns)
+            {
+                var prop = entityType.GetProperties()
+                    .First(p => string.Equals(p.GetColumnName(), columnName, StringComparison.OrdinalIgnoreCase));
+
+                var columnType = prop.GetColumnType()
+                    ?? GetFallbackColumnType(prop.ClrType, providerName);
+
+                var nullable = prop.IsNullable ? "NULL" : "NOT NULL";
+                var defaultClause = prop.GetDefaultValueSql() is { } defSql
+                    ? $"DEFAULT {defSql}"
+                    : prop.IsNullable ? "DEFAULT NULL" : GetImplicitDefault(prop.ClrType, providerName);
+
+                var sql = $"ALTER TABLE {Quote(tableName, providerName)} ADD COLUMN {Quote(columnName, providerName)} {columnType} {nullable} {defaultClause}";
+
+                try
+                {
+                    await db.Database.ExecuteSqlRawAsync(sql, ct);
+                    _logger.LogInformation("SeedService: added column {Column} to {Table}.", columnName, tableName);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "SeedService: failed to add column {Column} to {Table}.", columnName, tableName);
+                }
+            }
+        }
+    }
+
+    private static async Task<HashSet<string>> GetExistingColumnsAsync(
+        FcmsDbContext db, string dbName, string tableName, CancellationToken ct)
+    {
+        var providerName = db.Database.ProviderName ?? "";
+        string sql;
+
+        if (providerName.Contains("MySql") || providerName.Contains("Pomelo"))
+            sql = $"SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = '{dbName}' AND TABLE_NAME = '{tableName}'";
+        else if (providerName.Contains("SqlServer") || providerName.Contains("MsSql"))
+            sql = $"SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_CATALOG = '{dbName}' AND TABLE_NAME = '{tableName}'";
+        else if (providerName.Contains("Npgsql") || providerName.Contains("PostgreSQL") || providerName.Contains("Postgre"))
+            sql = $"SELECT column_name FROM information_schema.columns WHERE table_catalog = '{dbName}' AND table_name = '{tableName}'";
+        else
+            return [];
+
+        var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var conn = db.Database.GetDbConnection();
+        if (conn.State != System.Data.ConnectionState.Open)
+            await conn.OpenAsync(ct);
+
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText = sql;
+        await using var reader = await cmd.ExecuteReaderAsync(ct);
+        while (await reader.ReadAsync(ct))
+            result.Add(reader.GetString(0));
+
+        return result;
+    }
+
+    private static string Quote(string name, string providerName)
+    {
+        if (providerName.Contains("SqlServer") || providerName.Contains("MsSql"))
+            return $"[{name}]";
+        if (providerName.Contains("Npgsql") || providerName.Contains("PostgreSQL") || providerName.Contains("Postgre"))
+            return $"\"{name}\"";
+        return $"`{name}`"; // MySQL default
+    }
+
+    private static string GetFallbackColumnType(Type clrType, string providerName)
+    {
+        var t = Nullable.GetUnderlyingType(clrType) ?? clrType;
+        bool isMySql = providerName.Contains("MySql") || providerName.Contains("Pomelo");
+        bool isPg    = providerName.Contains("Npgsql") || providerName.Contains("PostgreSQL") || providerName.Contains("Postgre");
+
+        if (t == typeof(string))  return isMySql ? "longtext" : isPg ? "text" : "nvarchar(max)";
+        if (t == typeof(int))     return "int";
+        if (t == typeof(long))    return isMySql ? "bigint" : isPg ? "bigint" : "bigint";
+        if (t == typeof(bool))    return isMySql ? "tinyint(1)" : isPg ? "boolean" : "bit";
+        if (t == typeof(Guid))    return isMySql ? "char(36)" : isPg ? "uuid" : "uniqueidentifier";
+        if (t == typeof(DateTime))return isMySql ? "datetime(6)" : isPg ? "timestamp with time zone" : "datetime2";
+        if (t == typeof(decimal)) return "decimal(18,2)";
+        return "nvarchar(max)";
+    }
+
+    private static string GetImplicitDefault(Type clrType, string providerName)
+    {
+        var t = Nullable.GetUnderlyingType(clrType) ?? clrType;
+        if (t == typeof(string))  return "DEFAULT ''";
+        if (t == typeof(bool))    return "DEFAULT 0";
+        if (t == typeof(int) || t == typeof(long) || t == typeof(decimal)) return "DEFAULT 0";
+        if (t == typeof(Guid))    return "DEFAULT '00000000-0000-0000-0000-000000000000'";
+        if (t == typeof(DateTime))return providerName.Contains("Npgsql") ? "DEFAULT now()" : "DEFAULT CURRENT_TIMESTAMP";
+        return "DEFAULT NULL";
     }
 
     private const string VisitorRoleName = "Visitor";

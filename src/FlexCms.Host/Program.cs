@@ -42,6 +42,9 @@ catch (Exception ex)
 Log.Logger = logConfig.CreateLogger();
 builder.Host.UseSerilog();
 
+AppDomain.CurrentDomain.UnhandledException += (_, e) =>
+    Log.Fatal(e.ExceptionObject as Exception, "Unhandled exception — application terminating");
+
 // ── Two-path startup ──────────────────────────────────────────────────────────
 // Setup mode runs a minimal pipeline (SetupController only) until the wizard
 // completes and calls StopApplication(). The process then restarts under the
@@ -75,6 +78,8 @@ if (!SetupHelper.IsSetupComplete(appDataPath))
 // DB config comes from setup.json (written by setup wizard).
 // appsettings.json values are used as fallback for non-DB options (IP filter, etc.)
 // and for developer overrides during local development.
+try
+{
 builder.Services.AddControllersWithViews(mvc =>
     {
         // Custom binder for jQuery DataTables 2.x bracket-notation form data
@@ -194,6 +199,16 @@ app.MapControllerRoute(
     defaults: new { controller = "Frontend", action = "Page" });
 
 app.Run();
+}
+catch (Exception ex)
+{
+    Log.Fatal(ex, "Production mode startup failed");
+    throw;
+}
+finally
+{
+    Log.CloseAndFlush();
+}
 
 // Needed for WebApplicationFactory in integration tests
 public partial class Program { }

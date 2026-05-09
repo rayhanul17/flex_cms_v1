@@ -27,7 +27,7 @@
 
             <div class="mb-3">
                 <label asp-for="Content" class="form-label"></label>
-                <textarea asp-for="Content" class="form-control" rows="12"></textarea>
+                <textarea asp-for="Content" class="form-control rich-editor" rows="12"></textarea>
             </div>
 
             <div class="row">
@@ -70,6 +70,7 @@
 
 @section Scripts {
     @await Html.PartialAsync("_ValidationScriptsPartial")
+    @await Html.PartialAsync("_RichTextEditor")
     <script>
     document.getElementById('Title').addEventListener('input', function () {
         const slug = document.getElementById('Slug');

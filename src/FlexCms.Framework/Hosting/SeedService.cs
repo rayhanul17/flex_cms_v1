@@ -239,6 +239,7 @@ public class SeedService : IHostedService
         new() { Key = FcmsPermissions.UsersManage,       DisplayName = "Users: Manage",              Group = "Admin" },
         new() { Key = FcmsPermissions.AuditView,         DisplayName = "Audit Log: View",            Group = "Admin" },
         new() { Key = FcmsPermissions.AuditManage,       DisplayName = "Audit Log: Manage",          Group = "Admin" },
+        new() { Key = FcmsPermissions.SettingsView,      DisplayName = "Settings: View",             Group = "Admin" },
         new() { Key = FcmsPermissions.SettingsManage,    DisplayName = "Settings: Manage",           Group = "Admin" },
         new() { Key = FcmsPermissions.SystemManage,      DisplayName = "System: Manage",             Group = "Admin" },
         new() { Key = FcmsPermissions.MessagingView,     DisplayName = "Messaging: View",            Group = "Messaging" },
@@ -285,24 +286,22 @@ public class SeedService : IHostedService
         new() { DefaultName = "Permissions",Icon = "bi bi-key",          Url = "/admin/permissions", Order = 43, ParentDefaultName = "People", RequiredPermission = FcmsPermissions.RolesPermissions },
 
         // System group
-        new() { DefaultName = "System",     Icon = "bi bi-sliders",      Url = "#system",            Order = 80 },
-        new() { DefaultName = "Modules",    Icon = "bi bi-puzzle",       Url = "/admin/modules",     Order = 81, ParentDefaultName = "System" },
-        new() { DefaultName = "Menu",       Icon = "bi bi-list-ul",      Url = "/admin/menu",        Order = 82, ParentDefaultName = "System", RequiredPermission = FcmsPermissions.SettingsManage },
-        new() { DefaultName = "Redirects",  Icon = "bi bi-sign-turn-right", Url = "/admin/redirects", Order = 83, ParentDefaultName = "System", RequiredPermission = FcmsPermissions.RedirectsEdit },
-        new() { DefaultName = "Audit Log",  Icon = "bi bi-journal-text", Url = "/admin/audit-log",   Order = 84, ParentDefaultName = "System", RequiredPermission = FcmsPermissions.AuditView },
-        new() { DefaultName = "Settings",   Icon = "bi bi-gear",         Url = "/admin/settings",    Order = 85, ParentDefaultName = "System", RequiredPermission = FcmsPermissions.SettingsManage },
-        new() { DefaultName = "System",     Icon = "bi bi-terminal",     Url = "/admin/system",      Order = 86, ParentDefaultName = "System", RequiredPermission = FcmsPermissions.SystemManage },
+        new() { DefaultName = "System",         Icon = "bi bi-sliders",             Url = "#system",                    Order = 80 },
+        new() { DefaultName = "Modules",        Icon = "bi bi-puzzle",              Url = "/admin/modules",             Order = 81, ParentDefaultName = "System" },
+        new() { DefaultName = "Menu",           Icon = "bi bi-list-ul",             Url = "/admin/menu",                Order = 82, ParentDefaultName = "System", RequiredPermission = FcmsPermissions.SettingsManage },
+        new() { DefaultName = "Redirects",      Icon = "bi bi-sign-turn-right",     Url = "/admin/redirects",           Order = 83, ParentDefaultName = "System", RequiredPermission = FcmsPermissions.RedirectsEdit },
+        new() { DefaultName = "Audit Log",      Icon = "bi bi-journal-text",        Url = "/admin/audit-log",           Order = 84, ParentDefaultName = "System", RequiredPermission = FcmsPermissions.AuditView },
+        new() { DefaultName = "Payments",       Icon = "bi bi-credit-card-2-front", Url = "/admin/payments-settings",   Order = 85, ParentDefaultName = "System", RequiredPermission = FcmsPermissions.PaymentsView },
+        new() { DefaultName = "Settings",       Icon = "bi bi-gear",                Url = "/admin/settings",            Order = 86, ParentDefaultName = "System", RequiredPermission = FcmsPermissions.SettingsManage },
+        new() { DefaultName = "System Admin",   Icon = "bi bi-terminal",            Url = "/admin/system",              Order = 87, ParentDefaultName = "System", RequiredPermission = FcmsPermissions.SystemManage },
 
         // Messaging group (Phase 8)
-        new() { DefaultName = "Messaging",  Icon = "bi bi-envelope",     Url = "#messaging",         Order = 70 },
-        new() { DefaultName = "Broadcast",  Icon = "bi bi-megaphone",    Url = "/admin/broadcast",   Order = 71, ParentDefaultName = "Messaging", RequiredPermission = FcmsPermissions.MessagingView },
-        new() { DefaultName = "SMTP / SMS", Icon = "bi bi-gear-wide-connected", Url = "/admin/messaging-settings", Order = 72, ParentDefaultName = "Messaging", RequiredPermission = FcmsPermissions.SettingsManage },
+        new() { DefaultName = "Messaging",  Icon = "bi bi-envelope",                    Url = "#messaging",                 Order = 70 },
+        new() { DefaultName = "Broadcast",  Icon = "bi bi-megaphone",                   Url = "/admin/broadcast",           Order = 71, ParentDefaultName = "Messaging", RequiredPermission = FcmsPermissions.MessagingView },
+        new() { DefaultName = "SMTP / SMS", Icon = "bi bi-gear-wide-connected",         Url = "/admin/messaging-settings",  Order = 72, ParentDefaultName = "Messaging", RequiredPermission = FcmsPermissions.SettingsManage },
 
         // Chat (Phase 10)
         new() { DefaultName = "Chat", Icon = "bi bi-chat-dots", Url = "/admin/chat", Order = 75, ParentDefaultName = "Messaging", RequiredPermission = Chat.ChatPermissions.Reply },
-
-        // Payments (Phase 12)
-        new() { DefaultName = "Payments", Icon = "bi bi-credit-card-2-front", Url = "/admin/payments-settings", Order = 86, ParentDefaultName = "System", RequiredPermission = FcmsPermissions.PaymentsView },
     ];
 
     private async Task SeedMenuItemsAsync(CancellationToken ct)

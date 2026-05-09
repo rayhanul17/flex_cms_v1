@@ -141,6 +141,8 @@ public class FcmsDbContext : IdentityDbContext<FcmsUser, FcmsRole, Guid>
         modelBuilder.Entity<FcmsUser>().Ignore(u => u.Claims);
         modelBuilder.Entity<FcmsUser>().Ignore(u => u.Logins);
         modelBuilder.Entity<FcmsUser>().Ignore(u => u.Tokens);
+        // Computed property — not mapped to a column
+        modelBuilder.Entity<FcmsUser>().Ignore(u => u.ResolvedDisplayName);
 
         modelBuilder.Entity<FcmsRole>().Ignore(r => r.Claims);
 

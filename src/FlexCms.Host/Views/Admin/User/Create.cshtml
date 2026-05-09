@@ -21,8 +21,17 @@
                         <span asp-validation-for="Email" class="text-danger small"></span>
                     </div>
                     <div class="mb-3">
-                        <label asp-for="DisplayName" class="form-label">Display Name</label>
-                        <input asp-for="DisplayName" class="form-control" />
+                        <label asp-for="FullName" class="form-label">Full Name <span class="text-danger">*</span></label>
+                        <input asp-for="FullName" class="form-control" placeholder="e.g. John Doe" />
+                        <span asp-validation-for="FullName" class="text-danger small"></span>
+                    </div>
+                    <div class="mb-3">
+                        <label asp-for="DisplayName" class="form-label">
+                            Display Name
+                            <small class="text-muted fw-normal">(optional — shown publicly; defaults to Full Name)</small>
+                        </label>
+                        <input asp-for="DisplayName" class="form-control" placeholder="e.g. Johnny" />
+                        <span asp-validation-for="DisplayName" class="text-danger small"></span>
                     </div>
                     <div class="mb-3">
                         <label asp-for="Password" class="form-label">Password <span class="text-danger">*</span></label>

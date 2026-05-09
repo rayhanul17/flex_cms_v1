@@ -51,7 +51,8 @@ public class UserController : BaseAdminController
         {
             Id = u.Id,
             Email = u.Email ?? "",
-            DisplayName = u.UserName,
+            FullName = u.FullName,
+            DisplayName = u.DisplayName,
             Status = u.Status,
             ForcePasswordChange = u.ForcePasswordChange,
             CreatedAt = u.CreatedAt,
@@ -82,6 +83,8 @@ public class UserController : BaseAdminController
             UserName = model.Email,
             Email = model.Email,
             EmailConfirmed = true,
+            FullName = model.FullName.Trim(),
+            DisplayName = string.IsNullOrWhiteSpace(model.DisplayName) ? null : model.DisplayName.Trim(),
             ForcePasswordChange = model.ForcePasswordChange
         };
 
@@ -126,7 +129,8 @@ public class UserController : BaseAdminController
         {
             Id = user.Id,
             Email = user.Email ?? "",
-            DisplayName = user.UserName,
+            FullName = user.FullName,
+            DisplayName = user.DisplayName,
             ForcePasswordChange = user.ForcePasswordChange,
             AvailableRoles = allRoles,
             SelectedRoleIds = selectedIds
@@ -147,6 +151,8 @@ public class UserController : BaseAdminController
 
         user.Email = model.Email;
         user.UserName = model.Email;
+        user.FullName = model.FullName.Trim();
+        user.DisplayName = string.IsNullOrWhiteSpace(model.DisplayName) ? null : model.DisplayName.Trim();
         user.ForcePasswordChange = model.ForcePasswordChange;
         await _userManager.UpdateAsync(user);
 

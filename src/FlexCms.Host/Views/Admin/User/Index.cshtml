@@ -16,6 +16,7 @@
         <table id="userTable" class="table table-hover mb-0 align-middle">
             <thead class="table-light">
                 <tr>
+                    <th>Name</th>
                     <th>Email</th>
                     <th>Roles</th>
                     <th>Status</th>
@@ -34,6 +35,13 @@
                         _ => "text-bg-light"
                     };
                     <tr>
+                        <td>
+                            <div class="fw-medium">@u.ResolvedDisplayName</div>
+                            @if (!string.IsNullOrWhiteSpace(u.DisplayName) && u.DisplayName != u.FullName)
+                            {
+                                <div class="text-muted small">@u.FullName</div>
+                            }
+                        </td>
                         <td class="text-break">
                             @u.Email
                             @if (u.ForcePasswordChange)

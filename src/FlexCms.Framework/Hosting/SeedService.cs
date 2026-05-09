@@ -401,6 +401,7 @@ public class SeedService : IHostedService
                 UserName = visitorEmail,
                 Email = visitorEmail,
                 EmailConfirmed = true,
+                FullName = "Demo Visitor",
                 ForcePasswordChange = false,
             };
             var result = await userManager.CreateAsync(visitor, visitorPass);

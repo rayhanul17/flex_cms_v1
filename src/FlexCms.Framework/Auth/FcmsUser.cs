@@ -10,6 +10,18 @@ public class FcmsUser : IdentityUser<Guid>
 {
     public override Guid Id { get => base.Id; set => base.Id = value; }
 
+    /// <summary>Legal / full name — required for all accounts.</summary>
+    public string FullName { get; set; } = "";
+
+    /// <summary>
+    /// Optional public-facing alias. Falls back to <see cref="FullName"/> when blank.
+    /// Use <see cref="ResolvedDisplayName"/> everywhere a human-readable name is shown.
+    /// </summary>
+    public string? DisplayName { get; set; }
+
+    /// <summary>Returns DisplayName if set, otherwise FullName.</summary>
+    public string ResolvedDisplayName => string.IsNullOrWhiteSpace(DisplayName) ? FullName : DisplayName;
+
     public bool ForcePasswordChange { get; set; }
     public DateTime CreatedAt { get; set; } = FlexCms.Framework.Clock.FcmsTime.Now;
     public DateTime UpdatedAt { get; set; } = FlexCms.Framework.Clock.FcmsTime.Now;

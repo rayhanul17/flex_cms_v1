@@ -148,12 +148,11 @@ public class BlogController : Controller
         return RedirectToAction(nameof(Post), new { slug });
     }
 
-    // Derives a human-readable display name from a user account.
-    // UserName in Identity = email address, so we strip the domain part.
-    // E.g. "john.doe@example.com" → "john.doe"
+    // Returns DisplayName if set, otherwise FullName. Falls back to email local-part for legacy accounts.
     private static string DisplayName(FcmsUser? user)
     {
         if (user is null) return "Anonymous";
+        if (!string.IsNullOrWhiteSpace(user.ResolvedDisplayName)) return user.ResolvedDisplayName;
         var email = user.Email ?? user.UserName ?? "";
         var atIdx = email.IndexOf('@');
         return atIdx > 0 ? email[..atIdx] : email;

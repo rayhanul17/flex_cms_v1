@@ -2,10 +2,12 @@ using FlexCms.Framework.Cms;
 using FlexCms.Framework.Cms.Preview;
 using FlexCms.Framework.Helpers;
 using FlexCms.Framework.I18n;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace FlexCms.Host.Controllers;
 
+[AllowAnonymous]
 public class FrontendController : Controller
 {
     private readonly IPageService _pages;

@@ -62,6 +62,24 @@ public class SeedService : IHostedService
             _logger.LogError(ex, "SeedService: failed to seed menu items.");
         }
 
+        try
+        {
+            await SeedVisitorRoleAsync(ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "SeedService: failed to seed Visitor role.");
+        }
+
+        try
+        {
+            await SeedSampleContentAsync(ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "SeedService: failed to seed sample content.");
+        }
+
         var config = _setupHelper.Read();
         if (config is null || !config.IsSetupComplete || config.AdminSeeded)
             return;
@@ -252,6 +270,7 @@ public class SeedService : IHostedService
         new() { Key = FcmsPermissions.ExportsView,       DisplayName = "Exports: View",              Group = "Exports" },
         new() { Key = FcmsPermissions.ApiTokensManage,   DisplayName = "API tokens: Manage",         Group = "API" },
         new() { Key = FcmsPermissions.WebhooksManage,    DisplayName = "Webhooks: Manage",           Group = "API" },
+        new() { Key = FcmsPermissions.CommentsSubmit,    DisplayName = "Comments: Submit",           Group = "Engagement" },
         new() { Key = FcmsPermissions.CommentsModerate,  DisplayName = "Comments: Moderate",         Group = "Engagement" },
         new() { Key = FcmsPermissions.SubscribersManage, DisplayName = "Subscribers: Manage",        Group = "Engagement" },
     ];
@@ -348,5 +367,107 @@ public class SeedService : IHostedService
                     "Drop+recreate the DB or add the table manually.");
             }
         }
+    }
+
+    private const string VisitorRoleName = "Visitor";
+    private static readonly string[] VisitorPermissions = [FcmsPermissions.CommentsSubmit];
+
+    private async Task SeedVisitorRoleAsync(CancellationToken ct)
+    {
+        await using var scope = _scopeFactory.CreateAsyncScope();
+        var userManager  = scope.ServiceProvider.GetRequiredService<UserManager<FcmsUser>>();
+        var roleManager  = scope.ServiceProvider.GetRequiredService<RoleManager<FcmsRole>>();
+        var permService  = scope.ServiceProvider.GetRequiredService<IPermissionService>();
+
+        // Ensure Visitor role exists
+        if (!await roleManager.RoleExistsAsync(VisitorRoleName))
+            await roleManager.CreateAsync(new FcmsRole { Name = VisitorRoleName });
+
+        var role = await roleManager.FindByNameAsync(VisitorRoleName);
+        if (role is null) return;
+
+        // Assign permissions to Visitor role (idempotent — AssignAsync is a no-op if already assigned)
+        foreach (var perm in VisitorPermissions)
+            await permService.AssignAsync(role.Id, perm, ct);
+
+        // Ensure demo visitor account exists
+        const string visitorEmail = "visitor@flexcms.local";
+        const string visitorPass  = "Visitor@123";
+        var visitor = await userManager.FindByEmailAsync(visitorEmail);
+        if (visitor is null)
+        {
+            visitor = new FcmsUser
+            {
+                UserName = visitorEmail,
+                Email = visitorEmail,
+                EmailConfirmed = true,
+                ForcePasswordChange = false,
+            };
+            var result = await userManager.CreateAsync(visitor, visitorPass);
+            if (result.Succeeded)
+            {
+                await userManager.AddToRoleAsync(visitor, VisitorRoleName);
+                _logger.LogInformation("SeedService: created demo Visitor account ({Email}).", visitorEmail);
+            }
+        }
+    }
+
+    private async Task SeedSampleContentAsync(CancellationToken ct)
+    {
+        await using var scope = _scopeFactory.CreateAsyncScope();
+        var repo = scope.ServiceProvider.GetService<IRepository<FcmsPost>>();
+        var uow  = scope.ServiceProvider.GetService<IFcmsUnitOfWork>();
+        if (repo is null || uow is null) return;
+
+        // Only seed if no posts exist yet (fresh install)
+        var existing = await repo.FirstOrDefaultAsync(_ => true, ct);
+        if (existing is not null) return;
+
+        var post = new FcmsPost
+        {
+            Title       = "ইসলামের মহত্ত্ব ও তাৎপর্য",
+            Slug        = "islamer-mohotto-o-tatporjo",
+            Excerpt     = "ইসলাম একটি পূর্ণাঙ্গ জীবনব্যবস্থা। এই পোস্টে ইসলামের মূল্যবোধ, নৈতিকতা এবং মানবজীবনে তার গভীর প্রভাব নিয়ে আলোচনা করা হয়েছে।",
+            Content     = """
+<h2>ভূমিকা</h2>
+<p>ইসলাম শুধু একটি ধর্ম নয় — এটি একটি সম্পূর্ণ জীবনব্যবস্থা যা মানুষের ব্যক্তিগত, সামাজিক, অর্থনৈতিক ও আধ্যাত্মিক জীবনকে পরিচালিত করে। আরবি শব্দ "ইসলাম"-এর অর্থ হলো আত্মসমর্পণ — আল্লাহর ইচ্ছার কাছে নিজেকে সমর্পণ করা।</p>
+
+<h2>ইসলামের মূল স্তম্ভ</h2>
+<p>ইসলামের পাঁচটি মূল স্তম্ভ রয়েছে যা প্রতিটি মুসলমানের জীবনের ভিত্তি:</p>
+<ol>
+  <li><strong>শাহাদাহ (বিশ্বাসের ঘোষণা):</strong> "লা ইলাহা ইল্লাল্লাহ মুহাম্মাদুর রাসূলুল্লাহ" — আল্লাহ ছাড়া কোনো ইলাহ নেই এবং মুহাম্মদ (সা.) আল্লাহর রাসূল।</li>
+  <li><strong>সালাত (নামাজ):</strong> দিনে পাঁচবার নামাজ আদায় — আল্লাহর সাথে সরাসরি যোগাযোগের মাধ্যম।</li>
+  <li><strong>যাকাত (দান):</strong> সম্পদের একটি নির্দিষ্ট অংশ গরিবদের মধ্যে বিতরণ — সমাজের ভারসাম্য রক্ষার অনন্য ব্যবস্থা।</li>
+  <li><strong>সওম (রোজা):</strong> রমজান মাসে সূর্যোদয় থেকে সূর্যাস্ত পর্যন্ত উপবাস — আত্মশুদ্ধি ও কৃতজ্ঞতার অনুশীলন।</li>
+  <li><strong>হজ্ব:</strong> জীবনে একবার মক্কায় হজ্ব পালন — বিশ্বের সকল মুসলমানের ঐক্যের প্রতীক।</li>
+</ol>
+
+<h2>ইসলামের নৈতিক মূল্যবোধ</h2>
+<p>ইসলাম মানুষকে শেখায়:</p>
+<ul>
+  <li><strong>সততা ও ন্যায়বিচার:</strong> প্রতিটি কাজে সত্যবাদিতা ও ন্যায়পরায়ণতা।</li>
+  <li><strong>করুণা ও ক্ষমা:</strong> আল্লাহ অত্যন্ত দয়ালু ও ক্ষমাশীল — মানুষকেও তেমন হতে উৎসাহিত করা হয়।</li>
+  <li><strong>পারিবারিক বন্ধন:</strong> পিতামাতার প্রতি সম্মান, স্বামী-স্ত্রীর পারস্পরিক দায়িত্ব এবং সন্তানের লালন-পালনকে ইবাদত হিসেবে গণ্য করা হয়।</li>
+  <li><strong>সামাজিক দায়বদ্ধতা:</strong> প্রতিবেশীর প্রতি দায়িত্ব, দুর্বলের পাশে দাঁড়ানো।</li>
+</ul>
+
+<h2>ইসলামের বৈশ্বিক প্রভাব</h2>
+<p>ইসলামি সভ্যতা মধ্যযুগে বিজ্ঞান, গণিত, চিকিৎসা ও দর্শনে অভূতপূর্ব অবদান রেখেছে। আল-খোয়ারিজমি বীজগণিত উদ্ভাবন করেছিলেন, ইবনে সিনা চিকিৎসাবিজ্ঞানের ভিত্তি স্থাপন করেছিলেন। ইসলামি পণ্ডিতরা গ্রিক জ্ঞানকে সংরক্ষণ করে ইউরোপের নবজাগরণের পথ তৈরি করেছিলেন।</p>
+
+<h2>উপসংহার</h2>
+<p>ইসলাম মানবজাতিকে শান্তি, ন্যায়বিচার ও ভ্রাতৃত্বের পথে আহ্বান করে। এর শিক্ষা কালজয়ী — ১৪০০ বছরেরও বেশি সময় ধরে লক্ষ কোটি মানুষের জীবনকে আলোকিত করে আসছে। ইসলামের মহত্ত্ব শুধু তার বিধানে নয়, বরং সেই বিধানগুলো মানুষের হৃদয়ে যে পরিবর্তন আনে তাতেই।</p>
+<blockquote>
+  <p>"নিশ্চয়ই আল্লাহর কাছে মনোনীত দীন হলো ইসলাম।" — সূরা আল-ইমরান, আয়াত ১৯</p>
+</blockquote>
+""",
+            IsPublished = true,
+            PublishedAt = FcmsTime.Now,
+            MetaTitle       = "ইসলামের মহত্ত্ব ও তাৎপর্য | FlexCMS Blog",
+            MetaDescription = "ইসলামের মূল স্তম্ভ, নৈতিক মূল্যবোধ এবং মানবসভ্যতায় ইসলামের অবদান নিয়ে একটি বিস্তারিত আলোচনা।",
+        };
+
+        await repo.AddAsync(post, ct);
+        await uow.SaveChangesAsync(ct);
+        _logger.LogInformation("SeedService: seeded sample post '{Title}'.", post.Title);
     }
 }

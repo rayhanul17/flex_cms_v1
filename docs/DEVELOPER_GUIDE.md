@@ -130,6 +130,17 @@ You'll see the **Setup Wizard** (first run only):
 
 **Done!** You now have FlexCms running locally.
 
+### Default Seeded Accounts
+
+On first startup the system automatically creates these accounts:
+
+| Role | Email | Password | Access |
+|---|---|---|---|
+| **SuperAdmin** | Set during Setup Wizard | Your chosen password | Full admin access at `/admin` |
+| **Visitor** | `visitor@flexcms.local` | `Visitor@123` | Can submit blog comments |
+
+> **Note:** The Visitor account is for testing the public comment workflow. Delete or change its password before going to production, or leave it — it only has `comments.submit` permission.
+
 ---
 
 ## 3. Daily Development Workflow

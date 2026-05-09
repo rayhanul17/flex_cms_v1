@@ -1,67 +1,144 @@
 @model List<FlexCms.Framework.Cms.FcmsPost>
 @using FlexCms.Framework.Cms
 @{
-    ViewData["Title"] = ViewBag.Category is FcmsCategory cat ? $"Category: {cat.Name}" : "Blog";
-    var categories = ViewBag.Categories as List<FcmsCategory> ?? [];
+    ViewData["Title"] = ViewBag.Category is FcmsCategory cat ? $"{cat.Name} — Blog" : "Blog";
+    var categories   = ViewBag.Categories as List<FcmsCategory> ?? [];
     var activeCategory = ViewBag.Category as FcmsCategory;
 }
 
-<div class="row">
-    <div class="col-md-8">
-        <h1 class="mb-4">@ViewData["Title"]</h1>
-
-        @foreach (var post in Model)
+<div class="blog-hero py-5 mb-5">
+    <div class="container">
+        <h1 class="display-5 fw-bold mb-2">
+            @if (activeCategory is not null)
+            {
+                <span class="badge bg-primary-subtle text-primary me-2" style="font-size:.6em;vertical-align:middle">Category</span>
+                @activeCategory.Name
+            }
+            else
+            {
+                <text>Blog</text>
+            }
+        </h1>
+        @if (activeCategory?.Description is { Length: > 0 } desc)
         {
-            <article class="card mb-4 shadow-sm">
-                @if (!string.IsNullOrEmpty(post.FeaturedImageUrl))
-                {
-                    <img src="@post.FeaturedImageUrl" class="card-img-top" alt="@post.Title" style="max-height:240px;object-fit:cover" />
-                }
-                <div class="card-body">
-                    <h2 class="h5 card-title">
-                        <a asp-controller="Blog" asp-action="Post" asp-route-slug="@post.Slug" class="text-decoration-none">@post.Title</a>
-                    </h2>
-                    <p class="text-muted small">
-                        @post.PublishedAt?.ToString("MMMM d, yyyy")
-                        @if (post.Category is not null)
-                        {
-                            <span class="ms-2">
-                                in <a asp-controller="Blog" asp-action="Category" asp-route-categorySlug="@post.Category.Slug">@post.Category.Name</a>
-                            </span>
-                        }
-                    </p>
-                    @if (!string.IsNullOrEmpty(post.Excerpt))
-                    {
-                        <p class="card-text">@post.Excerpt</p>
-                    }
-                    <a asp-controller="Blog" asp-action="Post" asp-route-slug="@post.Slug" class="btn btn-sm btn-outline-primary">Read more</a>
-                </div>
-            </article>
+            <p class="lead text-muted">@desc</p>
         }
-
-        @if (!Model.Any())
+        else if (activeCategory is null)
         {
-            <p class="text-muted">No posts published yet.</p>
-        }
-    </div>
-
-    <div class="col-md-4">
-        @if (categories.Any())
-        {
-            <div class="card shadow-sm mb-4">
-                <div class="card-header">Categories</div>
-                <ul class="list-group list-group-flush">
-                    @foreach (var c in categories)
-                    {
-                        <li class="list-group-item @(activeCategory?.Id == c.Id ? "active" : "")">
-                            <a asp-controller="Blog" asp-action="Category" asp-route-categorySlug="@c.Slug"
-                               class="@(activeCategory?.Id == c.Id ? "text-white" : "") text-decoration-none">
-                                @c.Name <span class="badge bg-secondary float-end">@c.Posts.Count</span>
-                            </a>
-                        </li>
-                    }
-                </ul>
-            </div>
+            <p class="lead text-muted">Thoughts, stories and ideas.</p>
         }
     </div>
 </div>
+
+<div class="container pb-5">
+    <div class="row g-4">
+        <div class="col-lg-8">
+            @if (!Model.Any())
+            {
+                <div class="text-center py-5">
+                    <i class="bi bi-journal-x display-3 text-muted opacity-50"></i>
+                    <p class="text-muted mt-3">No posts published yet. Check back soon!</p>
+                </div>
+            }
+
+            @foreach (var post in Model)
+            {
+                <article class="card border-0 shadow-sm mb-4 overflow-hidden blog-card">
+                    @if (!string.IsNullOrEmpty(post.FeaturedImageUrl))
+                    {
+                        <a asp-controller="Blog" asp-action="Post" asp-route-slug="@post.Slug">
+                            <img src="@post.FeaturedImageUrl" class="card-img-top blog-card-img" alt="@post.Title" />
+                        </a>
+                    }
+                    <div class="card-body p-4">
+                        <div class="d-flex align-items-center gap-2 mb-2 flex-wrap">
+                            @if (post.Category is not null)
+                            {
+                                <a asp-controller="Blog" asp-action="Category" asp-route-categorySlug="@post.Category.Slug"
+                                   class="badge text-bg-primary text-decoration-none">@post.Category.Name</a>
+                            }
+                            <span class="text-muted small">
+                                <i class="bi bi-calendar3 me-1"></i>@post.PublishedAt?.ToString("MMM d, yyyy")
+                            </span>
+                            <span class="text-muted small">
+                                <i class="bi bi-eye me-1"></i>@post.ViewCount
+                            </span>
+                        </div>
+
+                        <h2 class="h4 fw-bold mb-2">
+                            <a asp-controller="Blog" asp-action="Post" asp-route-slug="@post.Slug"
+                               class="text-decoration-none stretched-link">@post.Title</a>
+                        </h2>
+
+                        @if (!string.IsNullOrEmpty(post.Excerpt))
+                        {
+                            <p class="text-muted mb-3">@post.Excerpt</p>
+                        }
+
+                        @if (post.PostTags.Any())
+                        {
+                            <div class="d-flex gap-1 flex-wrap mt-auto">
+                                @foreach (var pt in post.PostTags)
+                                {
+                                    <span class="badge text-bg-secondary fw-normal">#@pt.Tag.Name</span>
+                                }
+                            </div>
+                        }
+                    </div>
+                </article>
+            }
+        </div>
+
+        <div class="col-lg-4">
+            <div class="sticky-sidebar">
+                @if (categories.Any())
+                {
+                    <div class="card border-0 shadow-sm mb-4">
+                        <div class="card-header border-0 fw-semibold">
+                            <i class="bi bi-grid me-2"></i>Categories
+                        </div>
+                        <div class="card-body p-0">
+                            <ul class="list-group list-group-flush rounded-bottom">
+                                @foreach (var c in categories)
+                                {
+                                    <li class="list-group-item border-0 px-4 @(activeCategory?.Id == c.Id ? "active" : "")">
+                                        <a asp-controller="Blog" asp-action="Category" asp-route-categorySlug="@c.Slug"
+                                           class="d-flex justify-content-between align-items-center text-decoration-none @(activeCategory?.Id == c.Id ? "text-white" : "")">
+                                            @c.Name
+                                            <span class="badge @(activeCategory?.Id == c.Id ? "bg-white text-primary" : "bg-secondary-subtle text-secondary") rounded-pill">
+                                                @c.Posts.Count
+                                            </span>
+                                        </a>
+                                    </li>
+                                }
+                            </ul>
+                        </div>
+                    </div>
+                }
+
+                @if (activeCategory is not null)
+                {
+                    <div class="d-grid">
+                        <a asp-controller="Blog" asp-action="Index" class="btn btn-outline-secondary btn-sm">
+                            <i class="bi bi-arrow-left me-1"></i> All Posts
+                        </a>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Styles {
+<style>
+.blog-hero {
+    background: linear-gradient(135deg, var(--bs-primary-bg-subtle, #e8f0fe) 0%, var(--bs-body-bg) 100%);
+    border-bottom: 1px solid var(--bs-border-color);
+}
+.blog-card { transition: transform .15s, box-shadow .15s; }
+.blog-card:hover { transform: translateY(-3px); box-shadow: 0 .5rem 1.5rem rgba(0,0,0,.12) !important; }
+.blog-card-img { height: 220px; object-fit: cover; }
+.sticky-sidebar { position: sticky; top: 1.5rem; }
+@@media (max-width: 991.98px) { .sticky-sidebar { position: static; } }
+</style>
+}

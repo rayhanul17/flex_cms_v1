@@ -73,6 +73,7 @@ public static class FcmsPermissions
     // ── Admin: API + Engagement (Phase 14) ───────────────────────────────────
     public const string ApiTokensManage = "api.tokens.manage";
     public const string WebhooksManage = "webhooks.manage";
+    public const string CommentsSubmit = "comments.submit";
     public const string CommentsModerate = "comments.moderate";
     public const string SubscribersManage = "subscribers.manage";
 

@@ -2,11 +2,13 @@ using FlexCms.Framework.Auth;
 using FlexCms.Framework.Clock;
 using FlexCms.Framework.Cms;
 using FlexCms.Framework.Db;
+using FlexCms.Framework.Db.Ef;
 using FlexCms.Framework.Models;
 using FlexCms.Framework.Modules;
 using FlexCms.Framework.Services;
 using FlexCms.Framework.Setup;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -34,6 +36,15 @@ public class SeedService : IHostedService
 
     public async Task StartAsync(CancellationToken ct)
     {
+        try
+        {
+            await EnsureSchemaAsync(ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "SeedService: schema check/repair failed.");
+        }
+
         try
         {
             // Seed module records on every startup (cheap, idempotent)
@@ -368,6 +379,39 @@ public class SeedService : IHostedService
                     "Drop+recreate the DB or add the table manually.");
             }
         }
+    }
+
+    // ── Schema repair ─────────────────────────────────────────────────────────
+    // EnsureCreatedAsync never alters existing tables. If the model changes
+    // (new columns added) on an existing DB, EF queries fail at runtime.
+    // On every startup we probe a known new column; if it's missing we drop
+    // and recreate the entire schema. Data loss is acceptable here because
+    // this only triggers on a schema mismatch — meaning the DB is already
+    // incompatible with the running code.
+    private async Task EnsureSchemaAsync(CancellationToken ct)
+    {
+        await using var scope = _scopeFactory.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<FcmsDbContext>();
+
+        bool schemaOk;
+        try
+        {
+            // Probe a column added in the FullName/DisplayName update.
+            // Use EF so it works across all providers.
+            await db.Users.Select(u => u.FullName).FirstOrDefaultAsync(ct);
+            schemaOk = true;
+        }
+        catch
+        {
+            schemaOk = false;
+        }
+
+        if (schemaOk) return;
+
+        _logger.LogWarning("SeedService: schema mismatch detected — recreating database.");
+        await db.Database.EnsureDeletedAsync(ct);
+        await db.Database.EnsureCreatedAsync(ct);
+        _logger.LogInformation("SeedService: database recreated with current schema.");
     }
 
     private const string VisitorRoleName = "Visitor";

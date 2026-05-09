@@ -21,6 +21,7 @@ var logConfig = new LoggerConfiguration()
     .WriteTo.File(logPath,
         rollingInterval: RollingInterval.Day,
         retainedFileCountLimit: 30,
+        shared: true,   // allow multiple processes (setup → production handoff)
         outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss} [{Level:u3}] {Message:lj}{NewLine}{Exception}");
 
 if (builder.Environment.IsDevelopment())
@@ -202,7 +203,9 @@ app.Run();
 }
 catch (Exception ex)
 {
+    Console.Error.WriteLine($"[FATAL] Production mode startup failed: {ex}");
     Log.Fatal(ex, "Production mode startup failed");
+    Log.CloseAndFlush();
     throw;
 }
 finally

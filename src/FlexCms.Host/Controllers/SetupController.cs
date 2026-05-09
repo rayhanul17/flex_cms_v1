@@ -264,7 +264,7 @@ public class SetupController : Controller
             DefaultLanguage = s2.DefaultLanguage,
             TimeZoneId = s2.TimeZoneId,
             AdminEmail = s3.Email,
-            AdminDisplayName = s3.DisplayName,
+            AdminFullName = s3.FullName,
             AdminPasswordEncrypted = s3.Password,
             AdminSeeded = false,
             SetupVersion = "1.0",

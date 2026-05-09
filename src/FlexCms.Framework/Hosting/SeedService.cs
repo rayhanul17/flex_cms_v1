@@ -125,6 +125,7 @@ public class SeedService : IHostedService
                     UserName = config.AdminEmail,
                     Email = config.AdminEmail,
                     EmailConfirmed = true,
+                    FullName = string.IsNullOrWhiteSpace(config.AdminFullName) ? "Administrator" : config.AdminFullName,
                     ForcePasswordChange = false
                 };
 

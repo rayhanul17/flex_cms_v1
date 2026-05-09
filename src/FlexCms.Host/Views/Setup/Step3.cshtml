@@ -17,9 +17,10 @@
     @Html.AntiForgeryToken()
 
     <div class="mb-3">
-        <label asp-for="DisplayName" class="form-label fw-semibold">Display Name <span class="text-danger">*</span></label>
-        <input asp-for="DisplayName" class="form-control" placeholder="Admin" />
-        <span asp-validation-for="DisplayName" class="text-danger small"></span>
+        <label asp-for="FullName" class="form-label fw-semibold">Full Name <span class="text-danger">*</span></label>
+        <input asp-for="FullName" class="form-control" placeholder="e.g. John Doe" />
+        <div class="form-text">Your real name — shown in the admin panel.</div>
+        <span asp-validation-for="FullName" class="text-danger small"></span>
     </div>
 
     <div class="mb-3">

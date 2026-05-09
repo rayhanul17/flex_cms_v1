@@ -5,7 +5,8 @@ namespace FlexCms.Host.Models.Setup;
 public class SetupStep3ViewModel
 {
     [Required, MaxLength(200)]
-    public string DisplayName { get; set; } = "";
+    [Display(Name = "Full Name")]
+    public string FullName { get; set; } = "";
 
     [Required, EmailAddress, MaxLength(256)]
     public string Email { get; set; } = "";
@@ -16,5 +17,6 @@ public class SetupStep3ViewModel
 
     [Required, Compare(nameof(Password), ErrorMessage = "Passwords do not match.")]
     [DataType(DataType.Password)]
+    [Display(Name = "Confirm Password")]
     public string ConfirmPassword { get; set; } = "";
 }

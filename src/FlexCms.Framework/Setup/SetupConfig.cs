@@ -20,7 +20,7 @@ public class SetupConfig
 
     // Admin account — AdminPasswordEncrypted cleared after first seed
     public string AdminEmail { get; set; } = string.Empty;
-    public string AdminDisplayName { get; set; } = "";
+    public string AdminFullName { get; set; } = "";
     public string AdminPasswordEncrypted { get; set; } = string.Empty;
     public bool AdminSeeded { get; set; }
 

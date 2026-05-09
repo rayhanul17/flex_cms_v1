@@ -1,9 +1,11 @@
+using FlexCms.Framework.Auth;
 using FlexCms.Framework.Cms;
 using FlexCms.Framework.Cms.Comments;
 using FlexCms.Framework.Cms.Preview;
 using FlexCms.Framework.I18n;
 using FlexCms.Framework.Services;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 
 namespace FlexCms.Host.Controllers;
@@ -18,6 +20,7 @@ public class BlogController : Controller
     private readonly IPreviewTokenService _previewTokens;
     private readonly ICommentService _comments;
     private readonly IFcmsContextService _ctx;
+    private readonly UserManager<FcmsUser> _userManager;
 
     public BlogController(
         IPostService posts,
@@ -25,7 +28,8 @@ public class BlogController : Controller
         IFcmsTranslator translator,
         IPreviewTokenService previewTokens,
         ICommentService comments,
-        IFcmsContextService ctx)
+        IFcmsContextService ctx,
+        UserManager<FcmsUser> userManager)
     {
         _posts = posts;
         _categories = categories;
@@ -33,6 +37,7 @@ public class BlogController : Controller
         _previewTokens = previewTokens;
         _comments = comments;
         _ctx = ctx;
+        _userManager = userManager;
     }
 
     [HttpGet("")]
@@ -87,7 +92,12 @@ public class BlogController : Controller
         var comments = await _comments.GetApprovedAsync(nameof(FcmsPost), post.Id, ct);
         ViewBag.Comments = comments;
         ViewBag.IsAuthenticated = _ctx.IsAuthenticated;
-        ViewBag.CurrentUserName = _ctx.IsAuthenticated ? User.Identity?.Name : null;
+
+        if (_ctx.IsAuthenticated)
+        {
+            var currentUser = await _userManager.GetUserAsync(User);
+            ViewBag.CurrentUserDisplayName = DisplayName(currentUser);
+        }
 
         return View(post);
     }
@@ -110,26 +120,42 @@ public class BlogController : Controller
         var ip = HttpContext.Connection.RemoteIpAddress?.ToString();
 
         Guid? authorUserId = null;
-        if (_ctx.IsAuthenticated && Guid.TryParse(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value, out var uid))
+        if (_ctx.IsAuthenticated)
         {
-            authorUserId = uid;
-            authorName  = User.Identity?.Name ?? authorName;
+            var currentUser = await _userManager.GetUserAsync(User);
+            if (currentUser is not null)
+            {
+                authorUserId = currentUser.Id;
+                authorName   = DisplayName(currentUser);
+                authorEmail  = currentUser.Email ?? "";
+            }
         }
 
         var comment = new FcmsComment
         {
-            EntityType    = nameof(FcmsPost),
-            EntityId      = post.Id,
-            Body          = body.Trim(),
-            AuthorUserId  = authorUserId,
-            AuthorName    = authorName?.Trim() ?? "Anonymous",
-            AuthorEmail   = authorEmail?.Trim() ?? "",
-            IpAddress     = ip ?? "",
+            EntityType   = nameof(FcmsPost),
+            EntityId     = post.Id,
+            Body         = body.Trim(),
+            AuthorUserId = authorUserId,
+            AuthorName   = string.IsNullOrWhiteSpace(authorName) ? "Anonymous" : authorName.Trim(),
+            AuthorEmail  = authorEmail?.Trim() ?? "",
+            IpAddress    = ip ?? "",
         };
 
         await _comments.SubmitAsync(comment, ct);
 
         TempData["CommentSuccess"] = "Your comment has been submitted and is awaiting moderation. Thank you!";
         return RedirectToAction(nameof(Post), new { slug });
+    }
+
+    // Derives a human-readable display name from a user account.
+    // UserName in Identity = email address, so we strip the domain part.
+    // E.g. "john.doe@example.com" → "john.doe"
+    private static string DisplayName(FcmsUser? user)
+    {
+        if (user is null) return "Anonymous";
+        var email = user.Email ?? user.UserName ?? "";
+        var atIdx = email.IndexOf('@');
+        return atIdx > 0 ? email[..atIdx] : email;
     }
 }

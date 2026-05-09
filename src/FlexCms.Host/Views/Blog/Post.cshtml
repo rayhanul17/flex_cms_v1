@@ -1,12 +1,41 @@
 @model FlexCms.Framework.Cms.FcmsPost
 @using FlexCms.Framework.Cms.Comments
+@using FlexCms.Framework.Services
+@inject ISettingsService SettingsService
 @{
     ViewData["Title"] = Model.MetaTitle ?? Model.Title;
-    var comments       = ViewBag.Comments as List<FcmsComment> ?? [];
-    var isAuthenticated = (bool)(ViewBag.IsAuthenticated ?? false);
-    var currentUserName = ViewBag.CurrentUserName as string;
-    var commentError    = TempData["CommentError"] as string;
-    var commentSuccess  = TempData["CommentSuccess"] as string;
+    var comments            = ViewBag.Comments as List<FcmsComment> ?? [];
+    var isAuthenticated     = (bool)(ViewBag.IsAuthenticated ?? false);
+    var currentUserDisplay  = ViewBag.CurrentUserDisplayName as string ?? "Anonymous";
+    var commentError        = TempData["CommentError"] as string;
+    var commentSuccess      = TempData["CommentSuccess"] as string;
+
+    // Resolve site timezone from settings for comment timestamps
+    string tzId = "UTC";
+    try
+    {
+        var gen = await SettingsService.GetAsync<GeneralSettingsSnapshot>("site:general");
+        if (!string.IsNullOrWhiteSpace(gen.TimeZone)) tzId = gen.TimeZone;
+    }
+    catch { }
+
+    TimeZoneInfo tz;
+    try { tz = TimeZoneInfo.FindSystemTimeZoneById(tzId); }
+    catch { tz = TimeZoneInfo.Utc; }
+}
+@functions {
+    sealed class GeneralSettingsSnapshot { public string TimeZone { get; set; } = "UTC"; }
+
+    static string FormatCommentTime(DateTime utc, TimeZoneInfo tz)
+    {
+        var local = TimeZoneInfo.ConvertTimeFromUtc(utc, tz);
+        var diff  = DateTime.UtcNow - utc;
+        if (diff.TotalMinutes < 1)  return "just now";
+        if (diff.TotalMinutes < 60) return $"{(int)diff.TotalMinutes} min ago";
+        if (diff.TotalHours   < 24) return $"{(int)diff.TotalHours} hr ago";
+        if (diff.TotalDays    < 7)  return $"{(int)diff.TotalDays} days ago";
+        return local.ToString("MMM d, yyyy 'at' h:mm tt");
+    }
 }
 
 @if (!string.IsNullOrEmpty(Model.MetaDescription))
@@ -102,16 +131,28 @@
                             <div class="comment-item d-flex gap-3 mb-4">
                                 <div class="comment-avatar flex-shrink-0">
                                     <div class="avatar-circle">
-                                        @((c.AuthorName?.Length > 0 ? c.AuthorName[0] : '?').ToString().ToUpperInvariant())
+                                        @{
+                                            var displayName = string.IsNullOrWhiteSpace(c.AuthorName) ? "Anonymous" : c.AuthorName;
+                                            var initials    = displayName[0].ToString().ToUpperInvariant();
+                                        }
+                                        @initials
                                     </div>
                                 </div>
                                 <div class="flex-grow-1">
                                     <div class="comment-bubble p-3 rounded-3">
-                                        <div class="d-flex justify-content-between align-items-center mb-1 flex-wrap gap-2">
-                                            <span class="fw-semibold">@(c.AuthorName ?? "Anonymous")</span>
-                                            <span class="text-muted small">@c.CreatedAt.ToString("MMM d, yyyy · h:mm tt")</span>
+                                        <div class="d-flex justify-content-between align-items-start mb-2 flex-wrap gap-2">
+                                            <div>
+                                                <span class="fw-semibold">@displayName</span>
+                                                @if (c.AuthorUserId.HasValue)
+                                                {
+                                                    <span class="badge bg-primary-subtle text-primary ms-2" style="font-size:.7em">Member</span>
+                                                }
+                                            </div>
+                                            <span class="text-muted small" title="@TimeZoneInfo.ConvertTimeFromUtc(c.CreatedAt, tz).ToString("dddd, MMMM d, yyyy 'at' h:mm tt")">
+                                                <i class="bi bi-clock me-1"></i>@FormatCommentTime(c.CreatedAt, tz)
+                                            </span>
                                         </div>
-                                        <p class="mb-0">@c.Body</p>
+                                        <p class="mb-0" style="white-space:pre-wrap">@c.Body</p>
                                     </div>
                                 </div>
                             </div>
@@ -152,7 +193,7 @@
                             else
                             {
                                 <p class="text-muted small mb-3">
-                                    Commenting as <strong>@currentUserName</strong>
+                                    Commenting as <strong>@currentUserDisplay</strong>
                                 </p>
                             }
                             <div class="mb-3">

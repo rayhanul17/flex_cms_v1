@@ -1,22 +1,7 @@
 @using FlexCms.Core.Models.Settings
 @using FlexCms.Framework.Services
+@using FlexCms.Framework.Themes
 @inject ISettingsService SettingsService
-@functions {
-    static string HexToRgb(string hex)
-    {
-        hex = hex.TrimStart('#');
-        if (hex.Length == 3) hex = $"{hex[0]}{hex[0]}{hex[1]}{hex[1]}{hex[2]}{hex[2]}";
-        if (hex.Length != 6) return "0, 0, 0";
-        try
-        {
-            var r = Convert.ToInt32(hex[..2], 16);
-            var g = Convert.ToInt32(hex[2..4], 16);
-            var b = Convert.ToInt32(hex[4..6], 16);
-            return $"{r}, {g}, {b}";
-        }
-        catch { return "0, 0, 0"; }
-    }
-}
 @{
     ThemeSettings? t = null;
     try { t = await SettingsService.GetAsync<ThemeSettings>(ThemeSettings.Key); } catch { }
@@ -26,22 +11,22 @@
 <style>
   :root {
     --bs-primary: @t.Primary;
-    --bs-primary-rgb: @HexToRgb(t.Primary);
+    --bs-primary-rgb: @HexColorHelper.HexToRgb(t.Primary);
     --bs-secondary: @t.Secondary;
-    --bs-secondary-rgb: @HexToRgb(t.Secondary);
+    --bs-secondary-rgb: @HexColorHelper.HexToRgb(t.Secondary);
     --bs-success: @t.Success;
-    --bs-success-rgb: @HexToRgb(t.Success);
+    --bs-success-rgb: @HexColorHelper.HexToRgb(t.Success);
     --bs-danger: @t.Danger;
-    --bs-danger-rgb: @HexToRgb(t.Danger);
+    --bs-danger-rgb: @HexColorHelper.HexToRgb(t.Danger);
     --bs-warning: @t.Warning;
-    --bs-warning-rgb: @HexToRgb(t.Warning);
+    --bs-warning-rgb: @HexColorHelper.HexToRgb(t.Warning);
     --bs-info: @t.Info;
-    --bs-info-rgb: @HexToRgb(t.Info);
+    --bs-info-rgb: @HexColorHelper.HexToRgb(t.Info);
     --bs-body-bg: @t.BodyBg;
     --bs-body-color: @t.BodyColor;
     --bs-border-color: @t.BorderColor;
     --bs-link-color: @t.LinkColor;
-    --bs-link-color-rgb: @HexToRgb(t.LinkColor);
+    --bs-link-color-rgb: @HexColorHelper.HexToRgb(t.LinkColor);
     --fcms-card-bg: @t.CardBg;
     --fcms-navbar-bg: @t.NavbarBg;
     --fcms-footer-bg: @t.FooterBg;
@@ -51,22 +36,22 @@
   }
   [data-bs-theme="dark"] {
     --bs-primary: @t.DarkPrimary;
-    --bs-primary-rgb: @HexToRgb(t.DarkPrimary);
+    --bs-primary-rgb: @HexColorHelper.HexToRgb(t.DarkPrimary);
     --bs-secondary: @t.DarkSecondary;
-    --bs-secondary-rgb: @HexToRgb(t.DarkSecondary);
+    --bs-secondary-rgb: @HexColorHelper.HexToRgb(t.DarkSecondary);
     --bs-success: @t.DarkSuccess;
-    --bs-success-rgb: @HexToRgb(t.DarkSuccess);
+    --bs-success-rgb: @HexColorHelper.HexToRgb(t.DarkSuccess);
     --bs-danger: @t.DarkDanger;
-    --bs-danger-rgb: @HexToRgb(t.DarkDanger);
+    --bs-danger-rgb: @HexColorHelper.HexToRgb(t.DarkDanger);
     --bs-warning: @t.DarkWarning;
-    --bs-warning-rgb: @HexToRgb(t.DarkWarning);
+    --bs-warning-rgb: @HexColorHelper.HexToRgb(t.DarkWarning);
     --bs-info: @t.DarkInfo;
-    --bs-info-rgb: @HexToRgb(t.DarkInfo);
+    --bs-info-rgb: @HexColorHelper.HexToRgb(t.DarkInfo);
     --bs-body-bg: @t.DarkBodyBg;
     --bs-body-color: @t.DarkBodyColor;
     --bs-border-color: @t.DarkBorderColor;
     --bs-link-color: @t.DarkLinkColor;
-    --bs-link-color-rgb: @HexToRgb(t.DarkLinkColor);
+    --bs-link-color-rgb: @HexColorHelper.HexToRgb(t.DarkLinkColor);
     --fcms-card-bg: @t.DarkCardBg;
     --fcms-navbar-bg: @t.DarkNavbarBg;
     --fcms-footer-bg: @t.DarkFooterBg;

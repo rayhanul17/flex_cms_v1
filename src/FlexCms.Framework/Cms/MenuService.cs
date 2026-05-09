@@ -1,28 +1,28 @@
+using FlexCms.Framework.Caching;
 using FlexCms.Framework.Db;
 using FlexCms.Framework.Models;
 using FlexCms.Framework.Services;
 using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.Caching.Memory;
 
 namespace FlexCms.Framework.Cms;
 
 public class MenuService : IMenuService
 {
-    private const string CacheKeyPrefix = "fcms_menu_";
+    private const string Group = "menu";
     private static readonly TimeSpan CacheTtl = TimeSpan.FromMinutes(15);
 
     private readonly IRepository<FcmsMenuItem> _repo;
     private readonly IFcmsUnitOfWork _uow;
     private readonly IPermissionService _permService;
     private readonly IHttpContextAccessor _httpContextAccessor;
-    private readonly IMemoryCache _cache;
+    private readonly IFcmsGroupCacheService _cache;
 
     public MenuService(
         IRepository<FcmsMenuItem> repo,
         IFcmsUnitOfWork uow,
         IPermissionService permService,
         IHttpContextAccessor httpContextAccessor,
-        IMemoryCache cache)
+        IFcmsGroupCacheService cache)
     {
         _repo = repo;
         _uow = uow;
@@ -33,13 +33,12 @@ public class MenuService : IMenuService
 
     public async Task<List<FcmsMenuItem>> GetMenuAsync(string location, CancellationToken ct = default)
     {
-        var cacheKey = CacheKeyPrefix + location;
-
-        if (!_cache.TryGetValue(cacheKey, out List<FcmsMenuItem>? allItems) || allItems is null)
+        var allItems = _cache.Get<List<FcmsMenuItem>>(Group, location);
+        if (allItems is null)
         {
             allItems = await _repo.FindAsync(m => m.Location == location, ct);
             allItems = [.. allItems.OrderBy(m => m.Order)];
-            _cache.Set(cacheKey, allItems, CacheTtl);
+            _cache.Set(Group, location, allItems, CacheTtl);
         }
 
         var user = _httpContextAccessor.HttpContext?.User;
@@ -243,13 +242,8 @@ public class MenuService : IMenuService
     public void InvalidateCache(string? location = null)
     {
         if (location is not null)
-        {
-            _cache.Remove(CacheKeyPrefix + location);
-        }
+            _cache.Invalidate(Group, location);
         else
-        {
-            foreach (var loc in new[] { "AdminSidebar", "MainMenu", "FooterMenu" })
-                _cache.Remove(CacheKeyPrefix + loc);
-        }
+            _cache.InvalidateGroup(Group);
     }
 }

@@ -227,7 +227,7 @@ public static class FcmsServiceExtensions
         services.AddScoped<IModuleUpdateService, ModuleUpdateService>();
 
         // ── Phase 16: Cache stampede + Image optimizer + Search + Editorial + Admin notify hub ─
-        services.AddSingleton<IFcmsCacheService, FcmsCacheService>();
+        services.AddSingleton<IFcmsCacheService, FcmsCacheService>(); // stampede-protected single-key cache
         services.AddSingleton<IImageOptimizer, SkiaImageOptimizer>();
         services.AddScoped<IFcmsSearchAnalytics, FcmsSearchAnalytics>();
         services.AddScoped<IFcmsSearchProvider, LikeSearchProvider>();
@@ -258,15 +258,11 @@ public static class FcmsServiceExtensions
             .AddScheme<FcmsApiTokenAuthenticationOptions, FcmsApiTokenAuthenticationHandler>(
                 FcmsApiTokenAuthenticationHandler.SchemeName, _ => { });
 
-        // ── Phase 11: Themes ─────────────────────────────────────────────────
-        var themesRoot = Path.Combine(options.AppDataPath, "..", "themes");
-        services.AddSingleton<IThemeManager>(sp =>
-            new ThemeManager(themesRoot, sp.GetService<Microsoft.Extensions.Logging.ILogger<ThemeManager>>()));
-        services.Configure<Microsoft.AspNetCore.Mvc.Razor.RazorViewEngineOptions>(o =>
-            o.ViewLocationExpanders.Add(new ThemeViewLocationExpander()));
-
-        // Permission service (15min IMemoryCache — requires IRepository<> to be registered)
+        // Group-aware cache service — enables bulk invalidation by group (settings/permissions/menu)
         services.AddMemoryCache();
+        services.AddSingleton<IFcmsGroupCacheService, FcmsGroupCacheService>();
+
+        // Permission service (15min cache — requires IRepository<> to be registered)
         services.AddScoped<IPermissionService, PermissionService>();
 
         // Menu service — loads items from DB, filters by permission, caches 15 min

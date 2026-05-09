@@ -1,8 +1,10 @@
+using FlexCms.Framework.Caching;
 using FlexCms.Framework.Db;
 using FlexCms.Framework.Cms;
 using FlexCms.Framework.Db.Ef;
 using FlexCms.Framework.Services;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using NSubstitute;
 
 namespace FlexCms.Tests.Integration.Phase6;
@@ -25,7 +27,8 @@ public class FcmsLogServiceTests : IDisposable
             .Options;
         _db = new FcmsDbContext(opts);
 #pragma warning disable CA2000
-        _settings = new SettingsService(new EfRepository<FlexCms.Framework.Db.FcmsSettings>(_db), new EfUnitOfWork(_db));
+        _settings = new SettingsService(new EfRepository<FlexCms.Framework.Db.FcmsSettings>(_db), new EfUnitOfWork(_db),
+            new FcmsGroupCacheService(new MemoryCache(new MemoryCacheOptions())));
 #pragma warning restore CA2000
 
         var context = Substitute.For<IFcmsContextService>();

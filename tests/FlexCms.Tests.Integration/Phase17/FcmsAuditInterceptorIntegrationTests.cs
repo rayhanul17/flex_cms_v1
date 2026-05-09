@@ -1,9 +1,11 @@
+using FlexCms.Framework.Caching;
 using FlexCms.Framework.Cms;
 using FlexCms.Framework.Db;
 using FlexCms.Framework.Db.Ef;
 using FlexCms.Framework.Services;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using NSubstitute;
 using Xunit;
 
@@ -48,7 +50,8 @@ public sealed class FcmsAuditInterceptorIntegrationTests : IDisposable
         var settingsRepo = new EfRepository<FcmsSettings>(settingsDb);
         var settingsUow  = new EfUnitOfWork(settingsDb);
 #pragma warning restore CA2000
-        _settings = new SettingsService(settingsRepo, settingsUow);
+        _settings = new SettingsService(settingsRepo, settingsUow,
+            new FcmsGroupCacheService(new MemoryCache(new MemoryCacheOptions())));
 
         _interceptor = new FcmsAuditInterceptor(
             userCtx, _settings,
@@ -181,7 +184,8 @@ public sealed class FcmsAuditInterceptorIntegrationTests : IDisposable
         // same EF identity cache — no stale snapshot across two DbContexts.
         var settingsRepo = new EfRepository<FcmsSettings>(_db);
         var settingsUow  = new EfUnitOfWork(_db);
-        var localSettings = new SettingsService(settingsRepo, settingsUow);
+        var localSettings = new SettingsService(settingsRepo, settingsUow,
+            new FcmsGroupCacheService(new MemoryCache(new MemoryCacheOptions())));
         await localSettings.SaveAsync(AuditLogSettings.Key, new AuditEnabledDto { Enabled = false });
 
         // Clear tracker so the setting row doesn't count as a "pending" entity

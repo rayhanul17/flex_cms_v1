@@ -1,5 +1,6 @@
 using System.Linq.Expressions;
 using System.Security.Claims;
+using FlexCms.Framework.Caching;
 using FlexCms.Framework.Cms;
 using FlexCms.Framework.Db;
 using FlexCms.Framework.Models;
@@ -22,7 +23,7 @@ public class MenuServiceTests
         public IFcmsUnitOfWork Uow { get; } = Substitute.For<IFcmsUnitOfWork>();
         public IPermissionService Perm { get; } = Substitute.For<IPermissionService>();
         public IHttpContextAccessor Http { get; } = Substitute.For<IHttpContextAccessor>();
-        public IMemoryCache Cache { get; } = new MemoryCache(new MemoryCacheOptions());
+        public IFcmsGroupCacheService Cache { get; } = new FcmsGroupCacheService(new MemoryCache(new MemoryCacheOptions()));
 
         public TestState()
         {

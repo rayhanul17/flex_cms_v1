@@ -96,27 +96,11 @@ builder.Services.AddControllersWithViews(mvc =>
         // so admin views can be grouped alongside their controllers.
         o.ViewLocationFormats.Add("/Views/Admin/{1}/{0}.cshtml");
     })
-    // Themes ship cshtml under /themes/{Id}/Views/ — outside the default
-    // /Views/ tree the Razor SDK precompiles, so the runtime view engine
-    // needs RuntimeCompilation to discover them.
     .AddRazorRuntimeCompilation();
 
 // SignalR (Phase 10 — chat). Default in-memory backplane is fine for
 // single-instance deploys; multi-node would swap in Redis backplane here.
 builder.Services.AddSignalR();
-
-// Register the themes/ folder as an additional file provider for the Razor
-// runtime view engine — the ThemeViewLocationExpander emits paths like
-// /themes/{Id}/Views/Shared/_PublicLayout.cshtml that resolve against the
-// project content root once registered here.
-var themesPhysical = Path.Combine(builder.Environment.ContentRootPath, "themes");
-if (Directory.Exists(themesPhysical))
-{
-    builder.Services.Configure<Microsoft.AspNetCore.Mvc.Razor.RuntimeCompilation.MvcRazorRuntimeCompilationOptions>(o =>
-    {
-        o.FileProviders.Add(new Microsoft.Extensions.FileProviders.PhysicalFileProvider(builder.Environment.ContentRootPath));
-    });
-}
 
 var setup = SetupHelper.ReadStatic(appDataPath);
 var cfg = builder.Configuration;

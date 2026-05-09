@@ -75,4 +75,7 @@ public static class FcmsPermissions
     public const string WebhooksManage = "webhooks.manage";
     public const string CommentsModerate = "comments.moderate";
     public const string SubscribersManage = "subscribers.manage";
+
+    // ── Admin: System (Phase 18) ─────────────────────────────────────────────
+    public const string SystemManage = "system.manage";
 }

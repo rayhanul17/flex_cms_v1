@@ -1,0 +1,117 @@
+@model FlexCms.Core.Models.Settings.ThemeSettings
+
+<div class="card shadow-sm mb-3">
+    <div class="card-header fw-semibold d-flex justify-content-between align-items-center">
+        <span>Appearance</span>
+        <div class="d-flex gap-2">
+            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="applyPreset('default')">Default</button>
+            <button type="button" class="btn btn-sm btn-outline-dark" onclick="applyPreset('dark-pro')">Dark Pro</button>
+            <button type="button" class="btn btn-sm btn-outline-primary" onclick="applyPreset('corporate')">Corporate</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" style="color:#6366f1;border-color:#6366f1" onclick="applyPreset('modern')">Modern</button>
+        </div>
+    </div>
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-md-6">
+                <h6 class="fw-semibold mb-3">Light Mode</h6>
+                <div class="row g-2">
+                    @{ void ColorInput(string fieldName, string label, string value) { }  }
+                    <div class="col-6"><label class="form-label small">Primary</label><input type="color" name="Theme.Primary" value="@Model.Primary" class="form-control form-control-color w-100" /></div>
+                    <div class="col-6"><label class="form-label small">Secondary</label><input type="color" name="Theme.Secondary" value="@Model.Secondary" class="form-control form-control-color w-100" /></div>
+                    <div class="col-6"><label class="form-label small">Success</label><input type="color" name="Theme.Success" value="@Model.Success" class="form-control form-control-color w-100" /></div>
+                    <div class="col-6"><label class="form-label small">Danger</label><input type="color" name="Theme.Danger" value="@Model.Danger" class="form-control form-control-color w-100" /></div>
+                    <div class="col-6"><label class="form-label small">Warning</label><input type="color" name="Theme.Warning" value="@Model.Warning" class="form-control form-control-color w-100" /></div>
+                    <div class="col-6"><label class="form-label small">Info</label><input type="color" name="Theme.Info" value="@Model.Info" class="form-control form-control-color w-100" /></div>
+                    <div class="col-6"><label class="form-label small">Body Background</label><input type="color" name="Theme.BodyBg" value="@Model.BodyBg" class="form-control form-control-color w-100" /></div>
+                    <div class="col-6"><label class="form-label small">Body Text</label><input type="color" name="Theme.BodyColor" value="@Model.BodyColor" class="form-control form-control-color w-100" /></div>
+                    <div class="col-6"><label class="form-label small">Border</label><input type="color" name="Theme.BorderColor" value="@Model.BorderColor" class="form-control form-control-color w-100" /></div>
+                    <div class="col-6"><label class="form-label small">Links</label><input type="color" name="Theme.LinkColor" value="@Model.LinkColor" class="form-control form-control-color w-100" /></div>
+                    <div class="col-6"><label class="form-label small">Card Background</label><input type="color" name="Theme.CardBg" value="@Model.CardBg" class="form-control form-control-color w-100" /></div>
+                    <div class="col-6"><label class="form-label small">Navbar Background</label><input type="color" name="Theme.NavbarBg" value="@Model.NavbarBg" class="form-control form-control-color w-100" /></div>
+                    <div class="col-6"><label class="form-label small">Footer Background</label><input type="color" name="Theme.FooterBg" value="@Model.FooterBg" class="form-control form-control-color w-100" /></div>
+                    <div class="col-6"><label class="form-label small">Footer Text</label><input type="color" name="Theme.FooterColor" value="@Model.FooterColor" class="form-control form-control-color w-100" /></div>
+                    <div class="col-6"><label class="form-label small">Sidebar Background</label><input type="color" name="Theme.SidebarBg" value="@Model.SidebarBg" class="form-control form-control-color w-100" /></div>
+                    <div class="col-6"><label class="form-label small">Sidebar Text</label><input type="color" name="Theme.SidebarColor" value="@Model.SidebarColor" class="form-control form-control-color w-100" /></div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <h6 class="fw-semibold mb-3">Dark Mode</h6>
+                <div class="row g-2">
+                    <div class="col-6"><label class="form-label small">Primary</label><input type="color" name="Theme.DarkPrimary" value="@Model.DarkPrimary" class="form-control form-control-color w-100" /></div>
+                    <div class="col-6"><label class="form-label small">Secondary</label><input type="color" name="Theme.DarkSecondary" value="@Model.DarkSecondary" class="form-control form-control-color w-100" /></div>
+                    <div class="col-6"><label class="form-label small">Success</label><input type="color" name="Theme.DarkSuccess" value="@Model.DarkSuccess" class="form-control form-control-color w-100" /></div>
+                    <div class="col-6"><label class="form-label small">Danger</label><input type="color" name="Theme.DarkDanger" value="@Model.DarkDanger" class="form-control form-control-color w-100" /></div>
+                    <div class="col-6"><label class="form-label small">Warning</label><input type="color" name="Theme.DarkWarning" value="@Model.DarkWarning" class="form-control form-control-color w-100" /></div>
+                    <div class="col-6"><label class="form-label small">Info</label><input type="color" name="Theme.DarkInfo" value="@Model.DarkInfo" class="form-control form-control-color w-100" /></div>
+                    <div class="col-6"><label class="form-label small">Body Background</label><input type="color" name="Theme.DarkBodyBg" value="@Model.DarkBodyBg" class="form-control form-control-color w-100" /></div>
+                    <div class="col-6"><label class="form-label small">Body Text</label><input type="color" name="Theme.DarkBodyColor" value="@Model.DarkBodyColor" class="form-control form-control-color w-100" /></div>
+                    <div class="col-6"><label class="form-label small">Border</label><input type="color" name="Theme.DarkBorderColor" value="@Model.DarkBorderColor" class="form-control form-control-color w-100" /></div>
+                    <div class="col-6"><label class="form-label small">Links</label><input type="color" name="Theme.DarkLinkColor" value="@Model.DarkLinkColor" class="form-control form-control-color w-100" /></div>
+                    <div class="col-6"><label class="form-label small">Card Background</label><input type="color" name="Theme.DarkCardBg" value="@Model.DarkCardBg" class="form-control form-control-color w-100" /></div>
+                    <div class="col-6"><label class="form-label small">Navbar Background</label><input type="color" name="Theme.DarkNavbarBg" value="@Model.DarkNavbarBg" class="form-control form-control-color w-100" /></div>
+                    <div class="col-6"><label class="form-label small">Footer Background</label><input type="color" name="Theme.DarkFooterBg" value="@Model.DarkFooterBg" class="form-control form-control-color w-100" /></div>
+                    <div class="col-6"><label class="form-label small">Footer Text</label><input type="color" name="Theme.DarkFooterColor" value="@Model.DarkFooterColor" class="form-control form-control-color w-100" /></div>
+                    <div class="col-6"><label class="form-label small">Sidebar Background</label><input type="color" name="Theme.DarkSidebarBg" value="@Model.DarkSidebarBg" class="form-control form-control-color w-100" /></div>
+                    <div class="col-6"><label class="form-label small">Sidebar Text</label><input type="color" name="Theme.DarkSidebarColor" value="@Model.DarkSidebarColor" class="form-control form-control-color w-100" /></div>
+                </div>
+            </div>
+        </div>
+        <p class="text-muted small mt-3 mb-0">
+            Changes apply on next page load after save. Developers use <code>var(--bs-primary)</code>, <code>var(--fcms-sidebar-bg)</code>, etc.
+        </p>
+    </div>
+</div>
+
+<script>
+const PRESETS = {
+    'default': {
+        Primary:'#0d6efd',Secondary:'#6c757d',Success:'#198754',Danger:'#dc3545',Warning:'#ffc107',Info:'#0dcaf0',
+        BodyBg:'#ffffff',BodyColor:'#212529',BorderColor:'#dee2e6',LinkColor:'#0d6efd',
+        CardBg:'#ffffff',NavbarBg:'#ffffff',FooterBg:'#f8f9fa',FooterColor:'#6c757d',
+        SidebarBg:'#1e2a3a',SidebarColor:'#cdd6e0',
+        DarkPrimary:'#6ea8fe',DarkSecondary:'#a7acb1',DarkSuccess:'#75b798',DarkDanger:'#ea868f',DarkWarning:'#ffda6a',DarkInfo:'#6edff6',
+        DarkBodyBg:'#1e2a3a',DarkBodyColor:'#dee2e6',DarkBorderColor:'#2d3d50',DarkLinkColor:'#6ea8fe',
+        DarkCardBg:'#243447',DarkNavbarBg:'#1e2a3a',DarkFooterBg:'#16202d',DarkFooterColor:'#a7acb1',
+        DarkSidebarBg:'#111827',DarkSidebarColor:'#9ca3af'
+    },
+    'dark-pro': {
+        Primary:'#818cf8',Secondary:'#6b7280',Success:'#34d399',Danger:'#f87171',Warning:'#fbbf24',Info:'#38bdf8',
+        BodyBg:'#f8fafc',BodyColor:'#1e293b',BorderColor:'#e2e8f0',LinkColor:'#6366f1',
+        CardBg:'#ffffff',NavbarBg:'#1e293b',FooterBg:'#1e293b',FooterColor:'#94a3b8',
+        SidebarBg:'#0f172a',SidebarColor:'#94a3b8',
+        DarkPrimary:'#818cf8',DarkSecondary:'#9ca3af',DarkSuccess:'#34d399',DarkDanger:'#f87171',DarkWarning:'#fbbf24',DarkInfo:'#38bdf8',
+        DarkBodyBg:'#0f172a',DarkBodyColor:'#e2e8f0',DarkBorderColor:'#1e293b',DarkLinkColor:'#818cf8',
+        DarkCardBg:'#1e293b',DarkNavbarBg:'#0f172a',DarkFooterBg:'#020617',DarkFooterColor:'#64748b',
+        DarkSidebarBg:'#020617',DarkSidebarColor:'#64748b'
+    },
+    'corporate': {
+        Primary:'#003366',Secondary:'#546e7a',Success:'#2e7d32',Danger:'#c62828',Warning:'#f9a825',Info:'#0277bd',
+        BodyBg:'#f5f5f5',BodyColor:'#212121',BorderColor:'#bdbdbd',LinkColor:'#003366',
+        CardBg:'#ffffff',NavbarBg:'#003366',FooterBg:'#003366',FooterColor:'#90a4ae',
+        SidebarBg:'#002244',SidebarColor:'#cfd8dc',
+        DarkPrimary:'#5b8dd9',DarkSecondary:'#90a4ae',DarkSuccess:'#66bb6a',DarkDanger:'#ef9a9a',DarkWarning:'#ffee58',DarkInfo:'#4fc3f7',
+        DarkBodyBg:'#1c2333',DarkBodyColor:'#e0e0e0',DarkBorderColor:'#37474f',DarkLinkColor:'#5b8dd9',
+        DarkCardBg:'#263043',DarkNavbarBg:'#1c2333',DarkFooterBg:'#111827',DarkFooterColor:'#78909c',
+        DarkSidebarBg:'#0d1b2a',DarkSidebarColor:'#90a4ae'
+    },
+    'modern': {
+        Primary:'#6366f1',Secondary:'#64748b',Success:'#10b981',Danger:'#ef4444',Warning:'#f59e0b',Info:'#06b6d4',
+        BodyBg:'#f9fafb',BodyColor:'#111827',BorderColor:'#e5e7eb',LinkColor:'#6366f1',
+        CardBg:'#ffffff',NavbarBg:'#ffffff',FooterBg:'#f3f4f6',FooterColor:'#6b7280',
+        SidebarBg:'#1e1b4b',SidebarColor:'#c7d2fe',
+        DarkPrimary:'#818cf8',DarkSecondary:'#94a3b8',DarkSuccess:'#34d399',DarkDanger:'#f87171',DarkWarning:'#fbbf24',DarkInfo:'#22d3ee',
+        DarkBodyBg:'#0f0e2a',DarkBodyColor:'#e5e7eb',DarkBorderColor:'#312e81',DarkLinkColor:'#818cf8',
+        DarkCardBg:'#1e1b4b',DarkNavbarBg:'#0f0e2a',DarkFooterBg:'#06050f',DarkFooterColor:'#6b7280',
+        DarkSidebarBg:'#06050f',DarkSidebarColor:'#a5b4fc'
+    }
+};
+
+function applyPreset(name) {
+    const p = PRESETS[name];
+    if (!p) return;
+    Object.entries(p).forEach(([k, v]) => {
+        const el = document.querySelector(`[name="Theme.${k}"]`);
+        if (el) el.value = v;
+    });
+}
+</script>

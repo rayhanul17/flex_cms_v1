@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using FlexCms.Core.Models.Settings;
 using Microsoft.AspNetCore.Mvc.ModelBinding.Validation;
 
 namespace FlexCms.Host.Models.Admin;
@@ -8,8 +9,6 @@ public class SettingsViewModel
     [Display(Name = "Site Name")]
     public string SiteName { get; set; } = "";
 
-    // Optional — nullable so an empty form value isn't treated as a missing
-    // required field by the .NET 6+ implicit-required behavior.
     [Display(Name = "Site Tagline")]
     public string? SiteTagline { get; set; }
 
@@ -35,26 +34,11 @@ public class SettingsViewModel
     [Display(Name = "Enable audit logging")]
     public bool AuditEnabled { get; set; } = true;
 
-    // Display-only — populated server-side, never posted by the form.
-    // Without [ValidateNever] the model binder treats non-nullable refs as
-    // implicitly required (.NET 6+) and silently fails ModelState validation
-    // when the form post omits them, causing the Save action to short-circuit
-    // back to the View with no visible error.
+    // Theme color settings
+    public ThemeSettings Theme { get; set; } = new();
+
     [ValidateNever] public List<TimeZoneOption> AvailableTimeZones { get; set; } = [];
     [ValidateNever] public string SampleFormatted { get; set; } = "";
-
-    // ── Themes (Phase 11) ────────────────────────────────────────────────────
-    [Display(Name = "Public theme")]
-    public string PublicThemeId { get; set; } = "FlexCms.Default";
-
-    [ValidateNever] public List<ThemeOption> AvailableThemes { get; set; } = [];
-}
-
-public class ThemeOption
-{
-    public string Id { get; set; } = "";
-    public string Name { get; set; } = "";
-    public bool IsBuiltIn { get; set; }
 }
 
 public class TimeZoneOption

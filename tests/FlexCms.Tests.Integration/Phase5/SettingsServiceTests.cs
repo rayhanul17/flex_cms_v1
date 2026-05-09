@@ -1,6 +1,8 @@
+using FlexCms.Framework.Caching;
 using FlexCms.Framework.Db.Ef;
 using FlexCms.Framework.Services;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace FlexCms.Tests.Integration.Phase5;
 
@@ -16,7 +18,8 @@ public class SettingsServiceTests : IDisposable
             .Options;
         _db = new FcmsDbContext(opts);
 #pragma warning disable CA2000
-        _svc = new SettingsService(new EfRepository<FlexCms.Framework.Db.FcmsSettings>(_db), new EfUnitOfWork(_db));
+        _svc = new SettingsService(new EfRepository<FlexCms.Framework.Db.FcmsSettings>(_db), new EfUnitOfWork(_db),
+            new FcmsGroupCacheService(new MemoryCache(new MemoryCacheOptions())));
 #pragma warning restore CA2000
     }
 

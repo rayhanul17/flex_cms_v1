@@ -1,4 +1,5 @@
 using FlexCms.Framework.Auth;
+using FlexCms.Framework.Caching;
 using FlexCms.Framework.Db;
 using FlexCms.Framework.Db.Ef;
 using FlexCms.Framework.Services;
@@ -19,7 +20,7 @@ namespace FlexCms.Tests.Integration.Phase3;
 public class PermissionServiceTests : IDisposable
 {
     private readonly FcmsDbContext _db;
-    private readonly IMemoryCache _cache;
+    private readonly IFcmsGroupCacheService _cache;
     private readonly RoleManager<FcmsRole> _roleManager;
     private readonly EfUnitOfWork _uow;
     private readonly PermissionService _svc;
@@ -31,7 +32,7 @@ public class PermissionServiceTests : IDisposable
             .Options;
         _db = new FcmsDbContext(opts);
 
-        _cache = new MemoryCache(new MemoryCacheOptions());
+        _cache = new FcmsGroupCacheService(new MemoryCache(new MemoryCacheOptions()));
 
 #pragma warning disable CA2000 // RoleManager takes ownership and disposes the store
         _roleManager = new RoleManager<FcmsRole>(
@@ -49,11 +50,7 @@ public class PermissionServiceTests : IDisposable
         _svc = new PermissionService(permRepo, rpRepo, _roleManager, _cache, _uow);
     }
 
-    public void Dispose()
-    {
-        _db.Dispose();
-        _cache.Dispose();
-    }
+    public void Dispose() => _db.Dispose();
 
     // ── Assign / Revoke ───────────────────────────────────────────────────────
 

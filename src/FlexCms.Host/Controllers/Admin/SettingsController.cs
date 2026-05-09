@@ -3,7 +3,6 @@ using FlexCms.Framework.Auth;
 using FlexCms.Framework.Cms;
 using FlexCms.Framework.Clock;
 using FlexCms.Framework.Services;
-using FlexCms.Framework.Themes;
 using FlexCms.Host.Models.Admin;
 using Microsoft.AspNetCore.Mvc;
 
@@ -15,12 +14,10 @@ public class SettingsController : BaseAdminController
     private const string SiteSettingsKey = "site:general";
 
     private readonly ISettingsService _settings;
-    private readonly IThemeManager _themes;
 
-    public SettingsController(ISettingsService settings, IThemeManager themes)
+    public SettingsController(ISettingsService settings)
     {
         _settings = settings;
-        _themes = themes;
     }
 
     [HttpGet("")]
@@ -29,7 +26,8 @@ public class SettingsController : BaseAdminController
     {
         var site = await _settings.GetAsync<SiteSettings>(SiteSettingsKey, ct: ct);
         var audit = await _settings.GetAsync<AuditEnabledDto>(AuditLogSettings.Key, ct: ct);
-        return View(BuildVm(site, audit.Enabled));
+        var theme = await _settings.GetAsync<ThemeSettings>(ThemeSettings.Key, ct: ct);
+        return View(BuildVm(site, audit.Enabled, theme));
     }
 
     [HttpPost("")]
@@ -43,7 +41,6 @@ public class SettingsController : BaseAdminController
 
         var site = await _settings.GetAsync<SiteSettings>(SiteSettingsKey, ct: ct);
 
-        // Apply changes — only the fields the form exposes
         site.SiteName = vm.SiteName?.Trim() ?? "";
         site.Tagline = vm.SiteTagline?.Trim() ?? "";
         site.BaseUrl = vm.SiteBaseUrl?.Trim() ?? "";
@@ -52,17 +49,17 @@ public class SettingsController : BaseAdminController
         site.TimeZone = vm.TimeZoneId ?? site.TimeZone;
         site.DateTimeFormat = string.IsNullOrWhiteSpace(vm.DateTimeFormat) ? "yyyy-MM-dd HH:mm" : vm.DateTimeFormat.Trim();
         site.TrashRetentionDays = vm.TrashRetentionDays;
-        site.PublicThemeId = string.IsNullOrWhiteSpace(vm.PublicThemeId) ? ThemeManager.DefaultId : vm.PublicThemeId;
 
         await _settings.SaveAsync(SiteSettingsKey, site, ct);
         await _settings.SaveAsync(AuditLogSettings.Key, new AuditEnabledDto { Enabled = vm.AuditEnabled }, ct);
+        await _settings.SaveAsync(ThemeSettings.Key, vm.Theme, ct);
 
         FcmsLogContext.SetValue(HttpContext, site);
         ShowSuccess("Settings saved.");
         return RedirectToAction(nameof(Index));
     }
 
-    // ── Audit log toggle (kept for inline AJAX from elsewhere) ───────────────
+    // ── Audit log toggle ──────────────────────────────────────────────────────
 
     [HttpPost("audit/toggle")]
     [ValidateAntiForgeryToken]
@@ -77,7 +74,7 @@ public class SettingsController : BaseAdminController
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    private SettingsViewModel BuildVm(SiteSettings site, bool auditEnabled)
+    private SettingsViewModel BuildVm(SiteSettings site, bool auditEnabled, ThemeSettings theme)
     {
         var vm = new SettingsViewModel
         {
@@ -90,7 +87,7 @@ public class SettingsController : BaseAdminController
             DateTimeFormat = site.DateTimeFormat,
             TrashRetentionDays = site.TrashRetentionDays,
             AuditEnabled = auditEnabled,
-            PublicThemeId = string.IsNullOrWhiteSpace(site.PublicThemeId) ? ThemeManager.DefaultId : site.PublicThemeId
+            Theme = theme,
         };
         PopulateAvailable(vm);
         try { vm.SampleFormatted = FcmsTime.Format(FcmsTime.Now, vm.DateTimeFormat); }
@@ -103,10 +100,6 @@ public class SettingsController : BaseAdminController
         vm.AvailableTimeZones = TimeZoneInfo.GetSystemTimeZones()
             .Select(tz => new TimeZoneOption { Id = tz.Id, DisplayName = tz.DisplayName })
             .OrderBy(t => t.DisplayName)
-            .ToList();
-        vm.AvailableThemes = _themes.All
-            .Where(t => t.SupportsPublic)
-            .Select(t => new ThemeOption { Id = t.Id, Name = t.Name, IsBuiltIn = t.IsBuiltIn })
             .ToList();
         try { vm.SampleFormatted = FcmsTime.Format(FcmsTime.Now, vm.DateTimeFormat); }
         catch { vm.SampleFormatted = "(invalid format)"; }

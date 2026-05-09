@@ -240,6 +240,7 @@ public class SeedService : IHostedService
         new() { Key = FcmsPermissions.AuditView,         DisplayName = "Audit Log: View",            Group = "Admin" },
         new() { Key = FcmsPermissions.AuditManage,       DisplayName = "Audit Log: Manage",          Group = "Admin" },
         new() { Key = FcmsPermissions.SettingsManage,    DisplayName = "Settings: Manage",           Group = "Admin" },
+        new() { Key = FcmsPermissions.SystemManage,      DisplayName = "System: Manage",             Group = "Admin" },
         new() { Key = FcmsPermissions.MessagingView,     DisplayName = "Messaging: View",            Group = "Messaging" },
         new() { Key = FcmsPermissions.MessagingBroadcast,DisplayName = "Messaging: Broadcast",       Group = "Messaging" },
         new() { Key = Chat.ChatPermissions.Send,         DisplayName = "Chat: Send (user)",          Group = "Chat" },
@@ -290,6 +291,7 @@ public class SeedService : IHostedService
         new() { DefaultName = "Redirects",  Icon = "bi bi-sign-turn-right", Url = "/admin/redirects", Order = 83, ParentDefaultName = "System", RequiredPermission = FcmsPermissions.RedirectsEdit },
         new() { DefaultName = "Audit Log",  Icon = "bi bi-journal-text", Url = "/admin/audit-log",   Order = 84, ParentDefaultName = "System", RequiredPermission = FcmsPermissions.AuditView },
         new() { DefaultName = "Settings",   Icon = "bi bi-gear",         Url = "/admin/settings",    Order = 85, ParentDefaultName = "System", RequiredPermission = FcmsPermissions.SettingsManage },
+        new() { DefaultName = "System",     Icon = "bi bi-terminal",     Url = "/admin/system",      Order = 86, ParentDefaultName = "System", RequiredPermission = FcmsPermissions.SystemManage },
 
         // Messaging group (Phase 8)
         new() { DefaultName = "Messaging",  Icon = "bi bi-envelope",     Url = "#messaging",         Order = 70 },

@@ -26,8 +26,8 @@ body {
 #sidebar {
     width: 240px;
     min-width: 240px;
-    background: #1e2a3a;
-    color: #cdd6e0;
+    background: var(--fcms-sidebar-bg, #1e2a3a);
+    color: var(--fcms-sidebar-color, #cdd6e0);
     display: flex;
     flex-direction: column;
     position: fixed;
@@ -85,7 +85,7 @@ body {
 }
 
 #sidebar .nav-link:hover { color: #fff; background: #2d3f53; }
-#sidebar .nav-link.active { color: #fff; background: #0d6efd; }
+#sidebar .nav-link.active { color: #fff; background: var(--bs-primary, #0d6efd); }
 
 #sidebar .nav-link i {
     width: 1.1rem;
@@ -117,7 +117,7 @@ body {
 }
 
 #sidebar .nav-children .nav-link:hover { background: #243443; }
-#sidebar .nav-children .nav-link.active { background: #0d6efd; color: #fff; }
+#sidebar .nav-children .nav-link.active { background: var(--bs-primary, #0d6efd); color: #fff; }
 
 /* ── Sidebar footer (notifications + user menu) ──────────────────────── */
 
@@ -154,7 +154,7 @@ body {
     width: 36px;
     height: 36px;
     border-radius: 50%;
-    background: linear-gradient(135deg, #0d6efd, #6f42c1);
+    background: linear-gradient(135deg, var(--bs-primary, #0d6efd), var(--bs-purple, #6f42c1));
     color: #fff;
     display: inline-flex;
     align-items: center;
@@ -275,7 +275,7 @@ body {
     border-color: #dee2e6;
 }
 .sidebar-toggle-btn:focus-visible {
-    outline: 2px solid #0d6efd;
+    outline: 2px solid var(--bs-primary, #0d6efd);
     outline-offset: 2px;
 }
 
@@ -466,8 +466,8 @@ body {
     color: #f3f4f6 !important;
 }
 [data-bs-theme="dark"] .dataTables_wrapper .dataTables_paginate .paginate_button.current {
-    background: #0d6efd !important;
-    border-color: #0d6efd !important;
+    background: var(--bs-primary, #0d6efd) !important;
+    border-color: var(--bs-primary, #0d6efd) !important;
     color: #fff !important;
 }
 
@@ -717,7 +717,7 @@ body {
     width: 0;
     z-index: 9999;
     pointer-events: none;
-    background: linear-gradient(90deg, #0d6efd, #6ea8fe, #0d6efd);
+    background: linear-gradient(90deg, var(--bs-primary, #0d6efd), var(--bs-primary-text-emphasis, #6ea8fe), var(--bs-primary, #0d6efd));
     background-size: 200% 100%;
     transition: opacity .3s ease, width .3s ease;
     opacity: 0;

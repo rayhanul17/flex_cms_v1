@@ -1,0 +1,44 @@
+@{
+    ViewData["Title"] = "System";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="mb-0">System</h4>
+</div>
+
+@* ── Cache Management ─────────────────────────────────────────────────── *@
+<div class="card shadow-sm mb-3">
+    <div class="card-header fw-semibold">Cache Management</div>
+    <div class="card-body">
+        <p class="text-muted mb-3">
+            In normal operation, cache is invalidated automatically when settings, permissions,
+            or menus are saved. Use this only for troubleshooting or after a manual DB change.
+        </p>
+        <form method="post" asp-action="ClearCache">
+            @Html.AntiForgeryToken()
+            <button type="submit" class="btn btn-outline-warning"
+                    onclick="return confirm('Clear all application cache? Next page loads will reload from database.')">
+                <i class="bi bi-trash3 me-1"></i> Clear All Cache
+            </button>
+        </form>
+    </div>
+</div>
+
+@* ── Application ──────────────────────────────────────────────────────── *@
+<div class="card shadow-sm mb-3 border-danger">
+    <div class="card-header fw-semibold text-danger">Application</div>
+    <div class="card-body">
+        <div class="alert alert-warning mb-3">
+            <i class="bi bi-exclamation-triangle me-1"></i>
+            This will cause ~5 seconds of downtime. Active sessions will be preserved (cookie-based auth).
+            The hosting environment (IIS / systemd / Docker) will restart the process automatically.
+        </div>
+        <form method="post" asp-action="Restart">
+            @Html.AntiForgeryToken()
+            <button type="submit" class="btn btn-danger"
+                    onclick="return confirm('Restart the application? This will cause brief downtime.')">
+                <i class="bi bi-arrow-clockwise me-1"></i> Restart Application
+            </button>
+        </form>
+    </div>
+</div>

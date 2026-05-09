@@ -2,13 +2,11 @@ using FlexCms.Framework.Auth;
 using FlexCms.Framework.Clock;
 using FlexCms.Framework.Cms;
 using FlexCms.Framework.Db;
-using FlexCms.Framework.Db.Ef;
 using FlexCms.Framework.Models;
 using FlexCms.Framework.Modules;
 using FlexCms.Framework.Services;
 using FlexCms.Framework.Setup;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -36,15 +34,6 @@ public class SeedService : IHostedService
 
     public async Task StartAsync(CancellationToken ct)
     {
-        try
-        {
-            await EnsureSchemaAsync(ct);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "SeedService: schema check/repair failed.");
-        }
-
         try
         {
             // Seed module records on every startup (cheap, idempotent)
@@ -379,165 +368,6 @@ public class SeedService : IHostedService
                     "Drop+recreate the DB or add the table manually.");
             }
         }
-    }
-
-    // ── Schema repair ─────────────────────────────────────────────────────────
-    // EnsureCreatedAsync never alters existing tables. When new columns are
-    // added to EF entities, existing DBs silently break at runtime.
-    // On every startup we compare the EF model's expected columns against
-    // INFORMATION_SCHEMA and ALTER TABLE to add any that are missing —
-    // same pattern as M2Sv3's EnsureTableStructureAsync.
-    private async Task EnsureSchemaAsync(CancellationToken ct)
-    {
-        await using var scope = _scopeFactory.CreateAsyncScope();
-
-        // MongoDB-only deployments don't register FcmsDbContext — skip.
-        var db = scope.ServiceProvider.GetService<FcmsDbContext>();
-        if (db is null) return;
-
-        // First ensure all tables exist (no-op if DB already has them)
-        await db.Database.EnsureCreatedAsync(ct);
-
-        var providerName = db.Database.ProviderName ?? "";
-        if (providerName.Contains("InMemory") || providerName.Contains("Sqlite"))
-            return; // test providers — no INFORMATION_SCHEMA
-
-        bool isMsSql = providerName.Contains("SqlServer") || providerName.Contains("MsSql");
-        bool isPg    = providerName.Contains("Npgsql") || providerName.Contains("PostgreSQL") || providerName.Contains("Postgre");
-
-        // Use EF's own connection — open it if not already open, close after if we opened it.
-        var conn = db.Database.GetDbConnection();
-        var wasOpen = conn.State == System.Data.ConnectionState.Open;
-        if (!wasOpen) await conn.OpenAsync(ct);
-        try
-        {
-
-        var dbName = conn.Database;
-
-        // Walk EF model: for each table, collect expected column names
-        var model = db.Model;
-        foreach (var entityType in model.GetEntityTypes())
-        {
-            var tableName = entityType.GetTableName();
-            if (tableName is null) continue;
-
-            var expectedColumns = entityType.GetProperties()
-                .Select(p => p.GetColumnName())
-                .Where(c => c is not null)
-                .ToHashSet(StringComparer.OrdinalIgnoreCase)!;
-
-            // Query existing columns from INFORMATION_SCHEMA
-            HashSet<string> existingColumns;
-            try
-            {
-                existingColumns = await GetExistingColumnsAsync(conn, dbName, tableName, isMsSql, isPg, ct);
-            }
-            catch
-            {
-                continue; // table may not exist yet — EnsureCreated handles it
-            }
-
-            var missingColumns = expectedColumns
-                .Where(c => !existingColumns.Contains(c))
-                .ToList();
-
-            if (missingColumns.Count == 0) continue;
-
-            // Build ALTER TABLE for each missing column
-            // SQL Server uses ADD, MySQL/PostgreSQL use ADD COLUMN
-            var addKeyword = isMsSql ? "ADD" : "ADD COLUMN";
-
-            foreach (var columnName in missingColumns)
-            {
-                var prop = entityType.GetProperties()
-                    .First(p => string.Equals(p.GetColumnName(), columnName, StringComparison.OrdinalIgnoreCase));
-
-                var columnType = prop.GetColumnType()
-                    ?? GetFallbackColumnType(prop.ClrType, isMsSql, isPg);
-
-                var nullable = prop.IsNullable ? "NULL" : "NOT NULL";
-                var defaultClause = prop.GetDefaultValueSql() is { } defSql
-                    ? $"DEFAULT {defSql}"
-                    : prop.IsNullable ? "DEFAULT NULL" : GetImplicitDefault(prop.ClrType, isPg);
-
-                var sql = $"ALTER TABLE {Quote(tableName, isMsSql, isPg)} {addKeyword} {Quote(columnName, isMsSql, isPg)} {columnType} {nullable} {defaultClause}";
-
-                try
-                {
-                    await using var cmd = conn.CreateCommand();
-                    cmd.CommandText = sql;
-                    await cmd.ExecuteNonQueryAsync(ct);
-                    _logger.LogInformation("SeedService: added column {Column} to {Table}.", columnName, tableName);
-                }
-                catch (Exception ex)
-                {
-                    // Log but continue — concurrent startup may have already added it
-                    _logger.LogWarning("SeedService: could not add column {Column} to {Table}: {Error}",
-                        columnName, tableName, ex.Message);
-                }
-            }
-        }
-
-        } // end try
-        finally
-        {
-            if (!wasOpen) await conn.CloseAsync();
-        }
-    }
-
-    private static async Task<HashSet<string>> GetExistingColumnsAsync(
-        System.Data.Common.DbConnection conn, string dbName, string tableName,
-        bool isMsSql, bool isPg, CancellationToken ct)
-    {
-        string sql;
-        if (isMsSql)
-            sql = $"SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_CATALOG = '{dbName}' AND TABLE_NAME = '{tableName}'";
-        else if (isPg)
-            sql = $"SELECT column_name FROM information_schema.columns WHERE table_catalog = '{dbName}' AND table_name = '{tableName}'";
-        else
-            sql = $"SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = '{dbName}' AND TABLE_NAME = '{tableName}'";
-
-        var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        await using var cmd = conn.CreateCommand();
-        cmd.CommandText = sql;
-        await using var reader = await cmd.ExecuteReaderAsync(ct);
-        while (await reader.ReadAsync(ct))
-            result.Add(reader.GetString(0));
-        return result;
-    }
-
-    private static string Quote(string name, bool isMsSql, bool isPg)
-    {
-        if (isMsSql) return $"[{name}]";
-        if (isPg)    return $"\"{name}\"";
-        return $"`{name}`";
-    }
-
-    private static string GetFallbackColumnType(Type clrType, bool isMsSql, bool isPg)
-    {
-        var t = Nullable.GetUnderlyingType(clrType) ?? clrType;
-        if (t == typeof(string))   return isMsSql ? "nvarchar(max)" : isPg ? "text" : "longtext";
-        if (t == typeof(int))      return "int";
-        if (t == typeof(long))     return "bigint";
-        if (t == typeof(bool))     return isMsSql ? "bit" : isPg ? "boolean" : "tinyint(1)";
-        if (t == typeof(Guid))     return isMsSql ? "uniqueidentifier" : isPg ? "uuid" : "char(36)";
-        if (t == typeof(DateTime)) return isMsSql ? "datetime2" : isPg ? "timestamp with time zone" : "datetime(6)";
-        if (t == typeof(decimal))  return "decimal(18,2)";
-        if (t == typeof(byte[]))   return isMsSql ? "varbinary(max)" : isPg ? "bytea" : "longblob";
-        if (t.IsEnum)              return "int";
-        return isMsSql ? "nvarchar(max)" : isPg ? "text" : "longtext";
-    }
-
-    private static string GetImplicitDefault(Type clrType, bool isPg)
-    {
-        var t = Nullable.GetUnderlyingType(clrType) ?? clrType;
-        if (t == typeof(string))   return "DEFAULT ''";
-        if (t == typeof(bool))     return "DEFAULT 0";
-        if (t == typeof(int) || t == typeof(long) || t == typeof(decimal)) return "DEFAULT 0";
-        if (t == typeof(Guid))     return "DEFAULT '00000000-0000-0000-0000-000000000000'";
-        if (t == typeof(DateTime)) return isPg ? "DEFAULT now()" : "DEFAULT CURRENT_TIMESTAMP";
-        if (t.IsEnum)              return "DEFAULT 0";
-        return "DEFAULT NULL";
     }
 
     private const string VisitorRoleName = "Visitor";

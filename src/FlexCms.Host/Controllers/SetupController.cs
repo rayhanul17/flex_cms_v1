@@ -12,14 +12,16 @@ public class SetupController : Controller
 {
     private readonly SetupHelper _setup;
     private readonly IHostApplicationLifetime _lifetime;
+    private readonly IWebHostEnvironment _env;
 
     private const string S1 = "setup_step1";
     private const string S2 = "setup_step2";
 
-    public SetupController(SetupHelper setup, IHostApplicationLifetime lifetime)
+    public SetupController(SetupHelper setup, IHostApplicationLifetime lifetime, IWebHostEnvironment env)
     {
         _setup = setup;
         _lifetime = lifetime;
+        _env = env;
     }
 
     // ── Step 1 — Database ─────────────────────────────────────────────────────
@@ -138,7 +140,11 @@ public class SetupController : Controller
     // ── Step 4 — Complete ─────────────────────────────────────────────────────
 
     [HttpGet("/Setup/Complete")]
-    public IActionResult Complete() => View();
+    public IActionResult Complete()
+    {
+        ViewBag.IsDevelopment = _env.IsDevelopment();
+        return View();
+    }
 
     [HttpPost("/Setup/Restart")]
     [ValidateAntiForgeryToken]

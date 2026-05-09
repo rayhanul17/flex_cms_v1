@@ -1,6 +1,7 @@
 @{
     Layout = "_SetupLayout";
     ViewData["Title"] = "Setup Complete";
+    bool isDev = ViewBag.IsDevelopment == true;
 }
 
 @section Steps {
@@ -16,6 +17,23 @@
     </div>
     <h5 class="fw-bold text-success mb-3">Setup complete!</h5>
 
+@if (isDev)
+{
+    <div class="alert alert-info text-start small mb-3">
+        <strong>Development mode detected.</strong> Auto-restart is not supported
+        when running under a debugger (VS / <code>dotnet watch</code>).<br />
+        <ol class="mb-0 mt-2 ps-3">
+            <li>Stop the app (<kbd>Shift+F5</kbd> in VS, or <kbd>Ctrl+C</kbd> in terminal).</li>
+            <li>Run it again — setup.json is already written.</li>
+            <li>Open <code>/auth/login</code>.</li>
+        </ol>
+    </div>
+    <a href="/auth/login" class="btn btn-success w-100">
+        <i class="bi bi-box-arrow-in-right"></i> Go to Login
+    </a>
+}
+else
+{
     <p class="text-muted small mb-3">
         The app needs to restart to load production-mode services
         (database, identity, modules). Click the button below — the page
@@ -37,21 +55,13 @@
     <a id="loginLink" href="/auth/login" class="btn btn-success w-100 disabled" aria-disabled="true" style="display:none">
         <i class="bi bi-box-arrow-in-right"></i> Go to Login
     </a>
-
-    <div class="alert alert-info text-start small mt-3">
-        <strong>Running in development?</strong> If auto-restart doesn't work
-        (e.g. <code>dotnet watch run</code> requires <kbd>Ctrl+R</kbd>), restart manually,
-        then open <code>/auth/login</code> directly.
-    </div>
+}
 </div>
 
+@if (!isDev)
+{
 @section Scripts {
 <script>
-    // Poll the login endpoint. While the app is in setup mode, /auth/login is
-    // caught by MapFallback and 302-redirects back to /Setup. Once production
-    // mode is up, the response is the real login page (200 + form, URL stays
-    // at /auth/login). Connection refused (fetch throws) means the app is
-    // shutting down or stopped — keep retrying.
     const link   = document.getElementById('loginLink');
     const icon   = document.getElementById('readinessIcon');
     const text   = document.getElementById('readinessText');
@@ -61,7 +71,7 @@
         banner.classList.remove('alert-warning');
         banner.classList.add('alert-success');
         icon.textContent = '\u2705';
-        text.textContent = 'App restarted — redirecting to login…';
+        text.textContent = 'App restarted — redirecting to login\u2026';
         link.classList.remove('disabled');
         link.removeAttribute('aria-disabled');
         setTimeout(() => { window.location.href = '/auth/login'; }, 800);
@@ -71,9 +81,21 @@
         try {
             const r = await fetch('/auth/login', { redirect: 'follow', cache: 'no-store' });
             if (r.ok && !r.url.includes('/Setup')) { ready(); return; }
-        } catch { /* connection refused → app is restarting; keep polling */ }
+        } catch { /* connection refused — app restarting; keep polling */ }
         setTimeout(probe, 1500);
     }
-    probe();
+
+    document.getElementById('restartForm').addEventListener('submit', function (e) {
+        e.preventDefault();
+        this.querySelector('button').disabled = true;
+        fetch(this.action, {
+            method: 'POST',
+            body: new FormData(this)
+        }).finally(() => {
+            banner.style.display = '';
+            probe();
+        });
+    });
 </script>
+}
 }

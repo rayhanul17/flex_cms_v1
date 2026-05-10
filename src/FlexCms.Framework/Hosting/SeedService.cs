@@ -477,6 +477,7 @@ public class SeedService : IHostedService
 """,
             IsPublished = true,
             PublishedAt = FcmsTime.Now,
+            FeaturedImageUrl = "/images/seed/sample-post-hero.svg",
             MetaTitle       = "ইসলামের মহত্ত্ব ও তাৎপর্য | FlexCMS Blog",
             MetaDescription = "ইসলামের মূল স্তম্ভ, নৈতিক মূল্যবোধ এবং মানবসভ্যতায় ইসলামের অবদান নিয়ে একটি বিস্তারিত আলোচনা।",
         };

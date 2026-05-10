@@ -1,9 +1,7 @@
 using FlexCms.Framework.Auth;
-using FlexCms.Framework.Db.Ef;
 using FlexCms.Host.Models.Admin;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace FlexCms.Host.Controllers.Admin;
 
@@ -12,13 +10,16 @@ public class UserController : BaseAdminController
 {
     private readonly UserManager<FcmsUser> _userManager;
     private readonly RoleManager<FcmsRole> _roleManager;
-    private readonly FcmsDbContext _db;
 
-    public UserController(UserManager<FcmsUser> userManager, RoleManager<FcmsRole> roleManager, FcmsDbContext db)
+    // Removed direct FcmsDbContext dependency — broke on Mongo-only deploys
+    // because FcmsDbContext is only registered when a relational provider is
+    // configured. UserManager.GetRolesAsync works on both EF and Mongo
+    // identity stores; the per-user N+1 cost is acceptable for typical
+    // admin user counts (<100).
+    public UserController(UserManager<FcmsUser> userManager, RoleManager<FcmsRole> roleManager)
     {
         _userManager = userManager;
         _roleManager = roleManager;
-        _db = db;
     }
 
     // ── List ──────────────────────────────────────────────────────────────────
@@ -26,38 +27,27 @@ public class UserController : BaseAdminController
     [HttpGet("")]
     public async Task<IActionResult> Index(CancellationToken ct)
     {
-        // Single round-trip for users + a single round-trip for the role
-        // map. Previous loop did N+1 queries (one GetRolesAsync per user)
-        // — broke on instances with even a few hundred users.
-        var users = await _userManager.Users
+        var users = _userManager.Users
             .OrderByDescending(u => u.CreatedAt)
-            .ToListAsync(ct);
+            .ToList();
         if (users.Count == 0) return View(new List<UserListItemViewModel>());
 
-        var ids = users.Select(u => u.Id).ToList();
-        var roleMap = await _db.Set<IdentityUserRole<Guid>>()
-            .Where(ur => ids.Contains(ur.UserId))
-            .Join(_db.Set<FcmsRole>(),
-                  ur => ur.RoleId,
-                  r => r.Id,
-                  (ur, r) => new { ur.UserId, RoleName = r.Name })
-            .ToListAsync(ct);
-
-        var rolesByUser = roleMap
-            .GroupBy(x => x.UserId)
-            .ToDictionary(g => g.Key, g => g.Select(x => x.RoleName ?? "").ToList());
-
-        var list = users.Select(u => new UserListItemViewModel
+        var list = new List<UserListItemViewModel>(users.Count);
+        foreach (var u in users)
         {
-            Id = u.Id,
-            Email = u.Email ?? "",
-            FullName = u.FullName,
-            DisplayName = u.DisplayName,
-            Status = u.Status,
-            ForcePasswordChange = u.ForcePasswordChange,
-            CreatedAt = u.CreatedAt,
-            Roles = rolesByUser.TryGetValue(u.Id, out var rs) ? rs : []
-        }).ToList();
+            var roles = await _userManager.GetRolesAsync(u);
+            list.Add(new UserListItemViewModel
+            {
+                Id = u.Id,
+                Email = u.Email ?? "",
+                FullName = u.FullName,
+                DisplayName = u.DisplayName,
+                Status = u.Status,
+                ForcePasswordChange = u.ForcePasswordChange,
+                CreatedAt = u.CreatedAt,
+                Roles = roles.ToList()
+            });
+        }
 
         return View(list);
     }

@@ -1,7 +1,7 @@
 using System.Linq.Expressions;
 using FlexCms.Framework.Auth;
 using FlexCms.Framework.Cms;
-using FlexCms.Framework.Db.Ef;
+using FlexCms.Framework.Db;
 using FlexCms.Framework.Models;
 using Microsoft.AspNetCore.Mvc;
 
@@ -11,12 +11,21 @@ namespace FlexCms.Host.Controllers.Admin;
 public class AuditLogController : BaseAdminController
 {
     private readonly IFcmsLogService _auditLog;
-    private readonly FcmsDbContext _db;
+    private readonly IRepository<FcmsLog> _logs;
+    private readonly IRepository<FcmsLogArchive> _archives;
 
-    public AuditLogController(IFcmsLogService auditLog, FcmsDbContext db)
+    // Inject IRepository<> instead of FcmsDbContext directly so the
+    // controller works on both EF and Mongo deployments — Mongo-only
+    // installs don't register FcmsDbContext, which previously broke
+    // /admin/audit-log with "Unable to resolve service for type FcmsDbContext".
+    public AuditLogController(
+        IFcmsLogService auditLog,
+        IRepository<FcmsLog> logs,
+        IRepository<FcmsLogArchive> archives)
     {
         _auditLog = auditLog;
-        _db = db;
+        _logs = logs;
+        _archives = archives;
     }
 
     [HttpGet("")]
@@ -40,7 +49,7 @@ public class AuditLogController : BaseAdminController
             l => l.Severity
         };
         return DataTableResult(
-            _db.Logs,
+            _logs.Query(),
             req,
             select: l => new
             {
@@ -78,7 +87,7 @@ public class AuditLogController : BaseAdminController
             l => l.Severity
         };
         return DataTableResult(
-            _db.LogArchives,
+            _archives.Query(),
             req,
             select: l => new
             {

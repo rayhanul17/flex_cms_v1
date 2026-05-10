@@ -1,16 +1,24 @@
-using FlexCms.Framework.Db.Ef;
+using FlexCms.Framework.Cms;
+using FlexCms.Framework.Db;
 using FlexCms.Host.Models;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace FlexCms.Host.Controllers;
 
 [Route("search")]
 public class SearchController : Controller
 {
-    private readonly FcmsDbContext _db;
+    // IRepository<> abstraction so this works on EF and Mongo.
+    // string.Contains is translatable by both providers (EF emits LIKE,
+    // Mongo emits $regex), so we don't need EF.Functions.Like.
+    private readonly IRepository<FcmsPage> _pages;
+    private readonly IRepository<FcmsPost> _posts;
 
-    public SearchController(FcmsDbContext db) => _db = db;
+    public SearchController(IRepository<FcmsPage> pages, IRepository<FcmsPost> posts)
+    {
+        _pages = pages;
+        _posts = posts;
+    }
 
     [HttpGet("")]
     public async Task<IActionResult> Index([FromQuery] string? q, CancellationToken ct)
@@ -19,25 +27,34 @@ public class SearchController : Controller
             return View(new SearchResultsViewModel { Query = "" });
 
         var term = q.Trim();
-        var pattern = $"%{term}%";
 
-        var pages = await _db.Pages
-            .AsNoTracking()
-            .Where(p => p.IsPublished &&
-                (EF.Functions.Like(p.Title, pattern) || EF.Functions.Like(p.Content, pattern)))
+        var pages = (await _pages.FindAsync(
+                p => p.IsPublished &&
+                     (p.Title.Contains(term) || p.Content.Contains(term)),
+                ct))
             .OrderBy(p => p.Title)
-            .Select(p => new SearchResultItem { Title = p.Title, Slug = "/" + p.Slug, Excerpt = p.MetaDescription ?? "" })
-            .ToListAsync(ct);
+            .Select(p => new SearchResultItem
+            {
+                Title = p.Title,
+                Slug = "/" + p.Slug,
+                Excerpt = p.MetaDescription ?? ""
+            })
+            .ToList();
 
-        var posts = await _db.Posts
-            .AsNoTracking()
-            .Where(p => p.IsPublished &&
-                (EF.Functions.Like(p.Title, pattern) ||
-                 EF.Functions.Like(p.Content, pattern) ||
-                 (p.Excerpt != null && EF.Functions.Like(p.Excerpt, pattern))))
+        var posts = (await _posts.FindAsync(
+                p => p.IsPublished &&
+                     (p.Title.Contains(term) ||
+                      p.Content.Contains(term) ||
+                      (p.Excerpt != null && p.Excerpt.Contains(term))),
+                ct))
             .OrderByDescending(p => p.PublishedAt)
-            .Select(p => new SearchResultItem { Title = p.Title, Slug = "/blog/" + p.Slug, Excerpt = p.Excerpt ?? p.MetaDescription ?? "" })
-            .ToListAsync(ct);
+            .Select(p => new SearchResultItem
+            {
+                Title = p.Title,
+                Slug = "/blog/" + p.Slug,
+                Excerpt = p.Excerpt ?? p.MetaDescription ?? ""
+            })
+            .ToList();
 
         return View(new SearchResultsViewModel
         {

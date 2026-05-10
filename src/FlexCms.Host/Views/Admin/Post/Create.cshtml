@@ -49,8 +49,21 @@
             <div class="row">
                 <div class="col-md-8 mb-3">
                     <label asp-for="FeaturedImageUrl" class="form-label"></label>
-                    <input asp-for="FeaturedImageUrl" class="form-control" placeholder="https://..." />
+                    <div class="input-group">
+                        <input asp-for="FeaturedImageUrl" class="form-control" placeholder="Pick an image or paste a URL" />
+                        <button type="button" class="btn btn-outline-secondary" data-fcms-pick-image="#FeaturedImageUrl">
+                            <i class="bi bi-images"></i> Pick
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary" data-fcms-clear-image="#FeaturedImageUrl" title="Clear">
+                            <i class="bi bi-x-lg"></i>
+                        </button>
+                    </div>
                     <span asp-validation-for="FeaturedImageUrl" class="text-danger"></span>
+                    <div class="mt-2" data-fcms-image-preview-for="#FeaturedImageUrl"
+                         style="@(string.IsNullOrEmpty(Model.FeaturedImageUrl) ? "display:none" : "")">
+                        <img src="@Model.FeaturedImageUrl" alt="Featured image preview"
+                             style="max-height:140px; border-radius:.375rem; border:1px solid var(--bs-border-color);" />
+                    </div>
                 </div>
                 <div class="col-md-4 mb-3 d-flex align-items-end pb-1">
                     <div class="form-check">
@@ -80,6 +93,7 @@
 @section Scripts {
     @await Html.PartialAsync("_ValidationScriptsPartial")
     @await Html.PartialAsync("_RichTextEditor")
+    @await Html.PartialAsync("_MediaPicker")
     <script>
     document.getElementById('Title').addEventListener('input', function () {
         const slug = document.getElementById('Slug');

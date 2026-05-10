@@ -115,7 +115,10 @@ public class CreateEditPostViewModel
     [MaxLength(500)]
     public string? MetaDescription { get; set; }
 
-    [MaxLength(1000), Url]
+    // Allow either a relative path (from the built-in media picker, e.g.
+    // "/uploads/media/2026/05/foo.png") or a fully-qualified URL pasted by the
+    // user. [Url] would reject the relative form, so validate manually.
+    [MaxLength(1000)]
     public string? FeaturedImageUrl { get; set; }
 
     public Guid? CategoryId { get; set; }

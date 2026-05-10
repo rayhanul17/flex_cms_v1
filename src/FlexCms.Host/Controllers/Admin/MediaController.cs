@@ -35,6 +35,32 @@ public class MediaController : BaseAdminController
         return View(items);
     }
 
+    /// <summary>
+    /// JSON list of recent media items, used by the media picker partial
+    /// (_MediaPicker.cshtml). Images-only by default — `kind=all` to lift the filter.
+    /// </summary>
+    [HttpGet("picker-list")]
+    [FcmsAuthorize(FcmsPermissions.MediaView)]
+    public async Task<IActionResult> PickerList(string kind = "image")
+    {
+        var items = await _media.GetByFolderAsync(null);
+        if (kind == "image")
+        {
+            string[] imageExts = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg"];
+            items = [.. items.Where(m => imageExts.Contains(m.Extension?.ToLowerInvariant() ?? ""))];
+        }
+        return Json(items
+            .OrderByDescending(m => m.CreatedAt)
+            .Take(100)
+            .Select(m => new {
+                id = m.Id,
+                url = m.Url,
+                thumb = m.ThumbnailUrl ?? m.Url,
+                name = m.OriginalFileName,
+                ext = m.Extension
+            }));
+    }
+
     [HttpPost("upload")]
     [ValidateAntiForgeryToken]
     [FcmsAuthorize(FcmsPermissions.MediaUpload)]

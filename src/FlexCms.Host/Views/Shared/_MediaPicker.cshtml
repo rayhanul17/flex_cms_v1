@@ -1,0 +1,150 @@
+@*
+    Media picker — drop-in image chooser for any form field that holds a
+    media URL (e.g. FeaturedImageUrl on Post). Render once per page:
+        <partial name="_MediaPicker" />
+
+    Then attach to a hidden <input> via:
+        <button type="button" data-fcms-pick-image="#FieldId">Pick image</button>
+
+    The button:
+      • opens the modal
+      • on selection, sets the input's value to the picked image URL
+      • shows a thumbnail preview next to the input
+      • clears the value via the matching "Clear" button (data-fcms-clear-image)
+
+    The modal also supports inline upload (POST /admin/media/upload), so users
+    don't have to leave the form to add a new image.
+*@
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
+@{
+    var antiTok = Antiforgery.GetAndStoreTokens(Context).RequestToken;
+}
+
+<div class="modal fade" id="fcmsMediaPickerModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-images me-1"></i> Pick an image</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="d-flex gap-2 mb-3 align-items-center">
+                    <label class="btn btn-primary btn-sm mb-0">
+                        <i class="bi bi-upload me-1"></i> Upload new
+                        <input type="file" id="fcmsMediaPickerUpload" accept="image/*" hidden />
+                    </label>
+                    <span class="text-muted small" id="fcmsMediaPickerStatus">Showing recent images.</span>
+                </div>
+                <div class="row g-3" id="fcmsMediaPickerGrid">
+                    <div class="col-12 text-center text-muted py-5">
+                        <div class="spinner-border spinner-border-sm" role="status"></div>
+                        Loading…
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function () {
+    const modalEl = document.getElementById('fcmsMediaPickerModal');
+    if (!modalEl) return;
+    const modal  = new bootstrap.Modal(modalEl);
+    const grid   = document.getElementById('fcmsMediaPickerGrid');
+    const status = document.getElementById('fcmsMediaPickerStatus');
+    const upload = document.getElementById('fcmsMediaPickerUpload');
+    const tok    = '@antiTok';
+    let activeTargetSelector = null;   // which input is currently being filled
+
+    // ── Helpers ──────────────────────────────────────────────────────
+    function thumbForInput(selector) {
+        return document.querySelector(`[data-fcms-image-preview-for="${CSS.escape(selector)}"]`);
+    }
+    function setValue(selector, url) {
+        const input = document.querySelector(selector);
+        if (!input) return;
+        input.value = url || '';
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+        const preview = thumbForInput(selector);
+        if (preview) {
+            if (url) {
+                preview.querySelector('img').src = url;
+                preview.style.display = '';
+            } else {
+                preview.style.display = 'none';
+            }
+        }
+    }
+
+    async function loadGrid() {
+        grid.innerHTML = '<div class="col-12 text-center text-muted py-5"><div class="spinner-border spinner-border-sm"></div> Loading…</div>';
+        try {
+            const r = await fetch('/admin/media/picker-list?kind=image', { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+            const items = await r.json();
+            if (!items.length) {
+                grid.innerHTML = '<div class="col-12 text-center text-muted py-5">No images yet — upload one above.</div>';
+                return;
+            }
+            grid.innerHTML = items.map(m => `
+                <div class="col-6 col-sm-4 col-md-3 col-lg-2">
+                    <button type="button" class="btn p-0 border w-100 h-100 fcms-pick-tile" data-url="${m.url}" title="${m.name}">
+                        <img src="${m.thumb}" class="w-100" style="aspect-ratio:1/1; object-fit:cover; border-radius:.25rem;" alt="${m.name}" />
+                    </button>
+                </div>
+            `).join('');
+            grid.querySelectorAll('.fcms-pick-tile').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    setValue(activeTargetSelector, btn.dataset.url);
+                    modal.hide();
+                });
+            });
+        } catch (ex) {
+            grid.innerHTML = `<div class="col-12 text-danger small">Failed to load: ${ex.message}</div>`;
+        }
+    }
+
+    // ── Inline upload from picker ────────────────────────────────────
+    upload.addEventListener('change', async () => {
+        if (!upload.files.length) return;
+        const file = upload.files[0];
+        status.textContent = `Uploading ${file.name}…`;
+        const fd = new FormData();
+        fd.append('__RequestVerificationToken', tok);
+        fd.append('file', file);
+        try {
+            const r = await fetch('/admin/media/upload', {
+                method: 'POST', body: fd,
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            });
+            const data = await r.json();
+            if (data.isSuccess && data.data?.url) {
+                setValue(activeTargetSelector, data.data.url);
+                status.textContent = 'Uploaded.';
+                modal.hide();
+            } else {
+                status.textContent = data.message || 'Upload failed.';
+            }
+        } catch (ex) {
+            status.textContent = 'Upload failed: ' + ex.message;
+        } finally {
+            upload.value = '';
+        }
+    });
+
+    // ── Wire all "Pick image" + "Clear" buttons on the page ──────────
+    document.querySelectorAll('[data-fcms-pick-image]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            activeTargetSelector = btn.getAttribute('data-fcms-pick-image');
+            status.textContent = 'Showing recent images.';
+            loadGrid();
+            modal.show();
+        });
+    });
+    document.querySelectorAll('[data-fcms-clear-image]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            setValue(btn.getAttribute('data-fcms-clear-image'), '');
+        });
+    });
+})();
+</script>

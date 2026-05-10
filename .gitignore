@@ -76,10 +76,20 @@ backups/
 *.tar.gz
 *.zip
 !docs/**/*.zip
-!modules/**/*.zip.example
 
-# Module build outputs
-modules/*/publish/
+# Module folders — each module is its OWN git repo cloned into these
+# directories at deploy/dev time. The folders themselves are tracked
+# (via .gitkeep) so the host runtime + the published image have the
+# right layout, but every child folder/file underneath stays untracked
+# in this repo. To work on a module locally:
+#   cd modules/   (or src/FlexCms.Host/modules/ for runtime drop-ins)
+#   git clone https://github.com/<org>/FlexCms.Module.<Name>.git
+# Parent repo never sees the module's source tree.
+modules/*
+!modules/.gitkeep
+!modules/**/*.zip.example
+src/FlexCms.Host/modules/*
+!src/FlexCms.Host/modules/.gitkeep
 
 # Environment
 .env

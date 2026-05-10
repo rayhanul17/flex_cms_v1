@@ -15,9 +15,11 @@ This guide takes you from **zero to production**. Follow each step in order. Exa
 7. [Building and Packaging](#7-building-and-packaging)
 8. [Local Testing with Docker](#8-local-testing-with-docker)
 9. [Deploying to Production](#9-deploying-to-production)
-10. [Updating an Existing Production Server](#10-updating-an-existing-production-server)
-11. [Module Deployment to Production](#11-module-deployment-to-production)
-12. [Troubleshooting](#12-troubleshooting)
+10. [Backup & Restore](#10-backup--restore)
+11. [Updating an Existing Production Server](#11-updating-an-existing-production-server)
+12. [Module Deployment to Production](#12-module-deployment-to-production)
+13. [Troubleshooting](#13-troubleshooting)
+14. [NuGet Package Management](#14-nuget-package-management)
 
 ---
 
@@ -85,7 +87,9 @@ notepad .env        # Windows
 nano .env           # Linux/Mac
 ```
 
-### Step 5: Start local databases via Docker
+### Step 5: Start local databases
+
+#### Option A — Docker Compose (recommended for most contributors)
 
 ```bash
 docker compose -f docker/docker-compose.dev.yml up -d
@@ -103,6 +107,45 @@ Verify they're running:
 docker ps
 # You should see 4 containers running
 ```
+
+#### Option B — Direct host install (if you skip Docker locally)
+
+If you don't want Docker on your dev machine but you'll only ever target one
+DB engine, install it natively. **Same single-node-replica-set requirement
+as production for MongoDB** — pure standalone Mongo silently degrades
+transactional writes (see §13 "Mongo transactions: standalone vs replica set").
+
+**MongoDB on Windows** (PowerShell, one time):
+
+```powershell
+# 1. Download installer from https://www.mongodb.com/try/download/community
+#    Pick "msi" — defaults are fine; install as a service.
+
+# 2. Stop the auto-started service so we can rewrite mongod.cfg
+Stop-Service MongoDB
+
+# 3. Edit C:\Program Files\MongoDB\Server\7.0\bin\mongod.cfg — append:
+#       replication:
+#         replSetName: rs0
+#    (auth not needed locally; skip the keyFile section)
+
+# 4. Restart and initiate the replica set
+Start-Service MongoDB
+& "C:\Program Files\MongoDB\Server\7.0\bin\mongosh.exe" --eval 'rs.initiate()'
+
+# Verify — should print 1
+& "C:\Program Files\MongoDB\Server\7.0\bin\mongosh.exe" --eval 'rs.status().ok'
+```
+
+Local connection string (no auth, single-node rs0):
+`mongodb://localhost:27017/?directConnection=true`
+
+**MongoDB on Linux/Mac (host install)** — follow the production §9b Step 2
+recipe but skip the `security:` block and the `createUser` step (local dev
+typically doesn't need auth). Same `--replSet rs0` + `rs.initiate()`.
+
+**MySQL/Postgres on host** — standard `apt install mysql-server` /
+`brew install mysql` works; no special config needed.
 
 ### Step 6: Build the solution
 
@@ -1082,7 +1125,7 @@ docker compose -f docker/docker-compose.prod.yml down -v
 
 ## 9. Deploying to Production
 
-This is the **first-time** production deployment. Once done, see [Section 8](#8-updating-an-existing-production-server) for updates.
+This is the **first-time** production deployment. Once done, see [§11 "Updating an Existing Production Server"](#11-updating-an-existing-production-server) for the update workflow and [§10 "Backup & Restore"](#10-backup--restore) for the safety-net cron job.
 
 ### Step 1: Get a VPS
 
@@ -1267,6 +1310,27 @@ setup vs `docker compose up -d`, but saves the Docker daemon's ~100 MB RSS and
 puts everything under standard `systemd` so you debug with `journalctl` and
 `systemctl status` instead of `docker logs`.
 
+**End-to-end roadmap** (read once, then follow the steps):
+
+```
+[Local PC]                              [Production VM (Ubuntu 22.04)]
+─────────────────────────────────       ─────────────────────────────────
+1. dotnet publish -c Release            1. Bootstrap: firewall + nginx
+2. Build Mongo + App_Data backup        2. Install MongoDB (single-node rs0)
+   from local dev (optional —           3. Install .NET 10 ASP.NET runtime
+   only if migrating data)              4. SCP publish/ → /opt/flexcms/
+                                        5. systemd unit + start service
+3. SCP publish/ to VM                   6. Nginx reverse proxy + TLS
+4. SCP backup tarballs to VM            7. Run /Setup wizard once
+                                        8. (Optional) Restore mongodump
+                                        9. Set up nightly backup cron
+                                       10. Verify [BOOT] markers in log
+```
+
+Steps 1–2 happen on your laptop. Steps 3 onwards happen on the VM. The
+backup/restore for migration is covered in detail in §10 ("Backup &
+Restore") — link below at Step 7.
+
 **Why a single-node replica set, not standalone?** MongoDB transactions only
 work on replica sets / mongos. `MongoUnitOfWork.BeginTransactionAsync` falls
 back to non-atomic writes on standalone — silent data integrity loss on any
@@ -1364,23 +1428,54 @@ sudo apt update && sudo apt install -y aspnetcore-runtime-10.0
 dotnet --info | head -5   # confirm 10.0.x runtime is installed
 ```
 
-#### Step 4 — Deploy the published FlexCMS bits
+#### Step 4 — Build locally + ship to the VM
 
-Build locally (`dotnet publish src/FlexCms.Host -c Release -o ./publish`),
-SCP the `publish/` folder to the VM, or use GitHub Actions. Target layout:
+**On your laptop:**
+
+```bash
+# From the repo root
+dotnet publish src/FlexCms.Host/FlexCms.Host.csproj \
+    -c Release \
+    -o ./publish \
+    --self-contained false \
+    -p:PublishReadyToRun=true \
+    -p:UseAppHost=false
+
+# Result: ./publish/ contains FlexCMS.Host.dll + dependencies (~80 MB).
+# Sanity-check the entry assembly is there:
+ls publish/FlexCms.Host.dll
+
+# Bundle modules you want to ship (optional — see §6 for the module workflow)
+# Each module subfolder under publish/modules/ must contain its DLL +
+# embedded module.json. The host scans this folder on startup.
+mkdir -p publish/modules
+# cp -r modules/MyModule.Published publish/modules/
+```
+
+**Ship to the VM:**
+
+```bash
+# Tar + gzip locally so the upload is one fast transfer instead of
+# thousands of small file SCPs.
+tar -czf flexcms-deploy.tgz -C publish .
+scp flexcms-deploy.tgz <user>@<vm-ip>:/tmp/
+
+# On the VM — extract into /opt/flexcms/
+ssh <user>@<vm-ip>
+sudo useradd -r -s /usr/sbin/nologin flexcms     # service account, one time
+sudo mkdir -p /opt/flexcms/App_Data /opt/flexcms/modules
+sudo tar -xzf /tmp/flexcms-deploy.tgz -C /opt/flexcms
+sudo chown -R flexcms:flexcms /opt/flexcms
+rm /tmp/flexcms-deploy.tgz
+```
+
+Target layout on the VM:
 
 ```
 /opt/flexcms/                       # the published app
-/opt/flexcms/App_Data/              # writable — setup.json, logs, uploads, keys
+/opt/flexcms/FlexCms.Host.dll       # entry assembly
+/opt/flexcms/App_Data/              # writable — setup.json, logs, uploads, DataProtection keys
 /opt/flexcms/modules/               # drop-in module folders (see §6)
-```
-
-```bash
-sudo useradd -r -s /usr/sbin/nologin flexcms     # service account, no shell
-sudo mkdir -p /opt/flexcms/App_Data /opt/flexcms/modules
-# scp -r ./publish/* user@vm:/tmp/flexcms-deploy
-sudo cp -r /tmp/flexcms-deploy/* /opt/flexcms/
-sudo chown -R flexcms:flexcms /opt/flexcms
 ```
 
 #### Step 5 — systemd unit
@@ -1466,48 +1561,61 @@ sudo apt install -y certbot python3-certbot-nginx
 sudo certbot --nginx -d yourdomain.com   # follow prompts
 ```
 
-#### Step 7 — Run the setup wizard
+#### Step 7 — First-run choice: fresh wizard OR restore from backup
+
+**Path A — fresh production install (no migration):**
 
 Open `https://yourdomain.com/Setup` once. Pick `MongoDB`, paste the conn
-string from Step 2, finish the wizard. Restart the service so production
-mode kicks in:
+string from Step 2, finish the 3-step wizard. Restart the service so
+production mode kicks in:
 
 ```bash
 sudo systemctl restart flexcms
 journalctl -u flexcms -n 50 --no-pager   # confirm "[BOOT] app.Run() …"
 ```
 
-#### Step 8 — Backups (cron + offsite)
+**Path B — migrating from local dev or another server:**
+
+If you have data to bring in (posts, pages, users, media), don't run the
+wizard at all. Instead, restore your backup tarballs into place:
+
+1. Take a backup on the source machine — see [§10 "Backup & Restore"](#10-backup--restore)
+2. SCP both `mongo.gz` + `app_data.tgz` to the new VM
+3. Restore them into the running stack — same §10 covers the restore
+   commands step by step
+
+After restoration, FlexCMS sees a populated `setup.json` + DB and skips
+the wizard entirely on next boot.
+
+#### Step 8 — Set up nightly backups
+
+The backup recipe is in [§10 "Backup & Restore"](#10-backup--restore).
+Wire up the cron job before you forget — backups you don't have when
+you need them are the most expensive software bug there is.
+
+#### Pushing updates after the first deploy
+
+Each release: rebuild on your laptop, ship the new tarball, swap in place.
 
 ```bash
-sudo mkdir -p /var/backups/flexcms
-sudo tee /usr/local/sbin/flexcms-backup.sh > /dev/null << 'EOF'
-#!/usr/bin/env bash
-set -euo pipefail
-TS=$(date +%Y%m%d-%H%M)
-DEST=/var/backups/flexcms/$TS
-mkdir -p "$DEST"
-mongodump --uri "mongodb://flexcms:<STRONG_PWD_URLENCODED>@127.0.0.1:27017/?authSource=admin&directConnection=true" \
-          --gzip --archive="$DEST/mongo.gz"
-tar -czf "$DEST/app_data.tgz" -C /opt/flexcms App_Data
-# Optional: rclone copy "$DEST" remote:flexcms-backups/$TS
-find /var/backups/flexcms -mindepth 1 -maxdepth 1 -mtime +14 -exec rm -rf {} +
-EOF
-sudo chmod +x /usr/local/sbin/flexcms-backup.sh
+# Local: rebuild
+dotnet publish src/FlexCms.Host/FlexCms.Host.csproj -c Release -o ./publish \
+    --self-contained false -p:PublishReadyToRun=true -p:UseAppHost=false
+tar -czf flexcms-deploy.tgz -C publish .
+scp flexcms-deploy.tgz <user>@<vm-ip>:/tmp/
 
-# Run nightly at 02:30
-sudo crontab -e
-# Add:
-30 2 * * * /usr/local/sbin/flexcms-backup.sh >> /var/log/flexcms-backup.log 2>&1
-```
-
-#### Updates on this setup
-
-```bash
-# Build new bits locally, then on the VM:
+# On the VM:
 sudo systemctl stop flexcms
-sudo cp -r /tmp/flexcms-deploy/* /opt/flexcms/
+# Optional safety net: snapshot before overwriting (see §10)
+sudo /usr/local/sbin/flexcms-backup.sh
+
+# Replace app code — keep App_Data + modules untouched
+sudo find /opt/flexcms -maxdepth 1 -type f -delete
+sudo find /opt/flexcms -mindepth 1 -maxdepth 1 -type d \
+    ! -name App_Data ! -name modules -exec rm -rf {} +
+sudo tar -xzf /tmp/flexcms-deploy.tgz -C /opt/flexcms
 sudo chown -R flexcms:flexcms /opt/flexcms
+
 sudo systemctl start flexcms
 journalctl -u flexcms -n 20 --no-pager   # verify [BOOT] markers
 ```
@@ -1518,7 +1626,261 @@ nightly backups, systemd-supervised — production-grade for the
 
 ---
 
-## 10. Updating an Existing Production Server
+## 10. Backup & Restore
+
+Two things to back up: **the MongoDB data** (posts, pages, users, settings,
+audit log) and **the app `App_Data/` folder** (setup.json with encrypted DB
+password, DataProtection keys, uploaded media files, log files).
+
+If you lose either, you lose half the system. The `App_Data/keys/` folder
+in particular: lose those and every encrypted value in setup.json + every
+existing auth cookie becomes unreadable.
+
+### When you'll use this
+
+| Scenario | What you need |
+|---|---|
+| Nightly safety net on prod | Cron-driven backup script + offsite copy |
+| Migrating local dev → first prod deploy | Mongo dump + App_Data tarball, restore on VM |
+| Migrating prod → another VM (server move) | Same as above, source is prod |
+| Pulling prod data down to local for debugging | Same recipe in reverse |
+| Rollback a bad release | Restore the most recent pre-deploy snapshot |
+
+The same two artifacts (`mongo.gz` + `app_data.tgz`) cover all five.
+
+### What to back up — the two artifacts
+
+**1. MongoDB dump (`mongo.gz`)** — created by `mongodump --gzip --archive=...`.
+A single binary file containing every collection. Restored with `mongorestore`.
+
+**2. `App_Data/` tarball (`app_data.tgz`)** — gzipped tar of the entire
+`App_Data/` folder. Includes:
+
+- `setup.json` — DB connection string + encrypted admin password
+- `keys/` — DataProtection keys; required to decrypt anything in setup.json
+  and to validate cookies issued before this restore
+- `logs/` — Serilog files (skip if too big — not critical)
+- `uploads/` — every media file the user has uploaded (`uploads/media/`,
+  `uploads/thumbs/`)
+
+Skip `bin/`, `obj/`, the publish folder — those are rebuilt from source.
+
+### Backing up — local dev machine
+
+```bash
+# Local PC, from the repo root. Mongo dev container assumed running.
+mkdir -p backups && TS=$(date +%Y%m%d-%H%M)
+
+# 1. Mongo (dev creds: dev / Dev@123456)
+docker exec mongodb mongodump \
+    --uri "mongodb://dev:Dev%40123456@localhost:27017/?authSource=admin&directConnection=true" \
+    --gzip --archive="/tmp/mongo.gz"
+docker cp mongodb:/tmp/mongo.gz backups/mongo-$TS.gz
+
+# 2. App_Data
+tar -czf backups/app_data-$TS.tgz -C src/FlexCms.Host App_Data
+
+ls -lh backups/
+```
+
+Or, if you installed Mongo directly on the host (no Docker, see §2 Step 5
+Option B):
+
+```bash
+mongodump --uri "mongodb://localhost:27017/?directConnection=true" \
+          --gzip --archive="backups/mongo-$TS.gz"
+tar -czf backups/app_data-$TS.tgz -C src/FlexCms.Host App_Data
+```
+
+### Backing up — production VM (manual)
+
+```bash
+ssh <user>@<vm-ip>
+TS=$(date +%Y%m%d-%H%M)
+sudo mkdir -p /var/backups/flexcms
+
+# Mongo
+sudo mongodump \
+    --uri "mongodb://flexcms:<STRONG_PWD_URLENCODED>@127.0.0.1:27017/?authSource=admin&directConnection=true" \
+    --gzip --archive="/var/backups/flexcms/mongo-$TS.gz"
+
+# App_Data
+sudo tar -czf /var/backups/flexcms/app_data-$TS.tgz -C /opt/flexcms App_Data
+
+ls -lh /var/backups/flexcms/
+```
+
+### Backing up — production VM (nightly cron)
+
+This is the recipe to install once on the VM so you stop worrying about
+forgetting.
+
+```bash
+sudo mkdir -p /var/backups/flexcms
+
+# Wrapper script — idempotent, cleans backups older than 14 days
+sudo tee /usr/local/sbin/flexcms-backup.sh > /dev/null << 'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+
+TS=$(date +%Y%m%d-%H%M)
+DEST=/var/backups/flexcms
+MONGO_URI="mongodb://flexcms:<STRONG_PWD_URLENCODED>@127.0.0.1:27017/?authSource=admin&directConnection=true"
+
+mkdir -p "$DEST"
+
+# 1. Mongo
+mongodump --uri "$MONGO_URI" --gzip --archive="$DEST/mongo-$TS.gz"
+
+# 2. App_Data (excludes bulky/regenerable log files — keep keys + uploads + setup.json)
+tar -czf "$DEST/app_data-$TS.tgz" \
+    --exclude='App_Data/logs/*' \
+    -C /opt/flexcms App_Data
+
+# 3. Optional: ship offsite (rclone/rsync/aws-cli — pick one)
+# rclone copy "$DEST/mongo-$TS.gz"    remote:flexcms-backups/
+# rclone copy "$DEST/app_data-$TS.tgz" remote:flexcms-backups/
+
+# 4. Prune local copies older than 14 days
+find "$DEST" -maxdepth 1 -type f -mtime +14 -delete
+
+echo "Backup OK: $TS"
+EOF
+
+sudo chmod +x /usr/local/sbin/flexcms-backup.sh
+sudo touch /var/log/flexcms-backup.log
+sudo chmod 644 /var/log/flexcms-backup.log
+
+# Run nightly at 02:30 — quiet hours, well before any UTC-based traffic spike
+echo "30 2 * * * root /usr/local/sbin/flexcms-backup.sh >> /var/log/flexcms-backup.log 2>&1" | \
+    sudo tee /etc/cron.d/flexcms-backup
+
+# Test it once now to make sure cron will succeed at 02:30
+sudo /usr/local/sbin/flexcms-backup.sh
+tail -20 /var/log/flexcms-backup.log
+ls -lh /var/backups/flexcms/
+```
+
+**Offsite copy is not optional in real production.** Pick one of:
+
+- **rclone** to S3 / B2 / Wasabi / Cloudflare R2 — uncomment the rclone
+  lines in the script and `rclone config` once
+- **rsync** to a second VM in a different region
+- **AWS CLI**: `aws s3 cp` to a bucket with versioning enabled
+
+A backup file sitting on the same VM as the database doesn't survive a
+VM accidentally getting deleted. Same disk = same fate.
+
+### Restore — into a fresh production VM
+
+This is the step that turns "I have backups" into "I have a working site."
+Practice this at least once before you need it for real.
+
+**Pre-condition:** §9 alternative path Steps 1–5 already done — Mongo
+running, .NET runtime installed, FlexCMS deployed to `/opt/flexcms/`,
+systemd unit registered but service **not** yet started.
+
+```bash
+# Copy backup files onto the VM
+scp mongo-<TS>.gz    <user>@<vm-ip>:/tmp/
+scp app_data-<TS>.tgz <user>@<vm-ip>:/tmp/
+ssh <user>@<vm-ip>
+
+# 1. Restore App_Data first — setup.json tells FlexCMS to skip the wizard
+sudo systemctl stop flexcms 2>/dev/null || true
+sudo rm -rf /opt/flexcms/App_Data
+sudo tar -xzf /tmp/app_data-<TS>.tgz -C /opt/flexcms
+sudo chown -R flexcms:flexcms /opt/flexcms/App_Data
+
+# 2. Restore Mongo — --drop wipes existing collections first so the restore
+#    is deterministic. Skip --drop if you want a merge instead (rare).
+sudo mongorestore \
+    --uri "mongodb://flexcms:<STRONG_PWD_URLENCODED>@127.0.0.1:27017/?authSource=admin&directConnection=true" \
+    --gzip --archive="/tmp/mongo-<TS>.gz" \
+    --drop
+
+# 3. The setup.json from the source machine has its OWN MongoConnectionString.
+#    If the new VM uses a different password / host, update it now:
+sudo nano /opt/flexcms/App_Data/setup.json
+#   → change "MongoConnectionString" to the new VM's conn string
+#   → leave "DbProvider": "mongodb" alone
+
+# 4. Start FlexCMS
+sudo systemctl start flexcms
+journalctl -u flexcms -n 80 --no-pager   # look for [BOOT] markers + no exceptions
+
+# 5. Hit the public URL — site should look identical to source
+curl -I https://yourdomain.com
+```
+
+### Restore — pulling production data down to local dev
+
+When you need to debug something with real data:
+
+```bash
+# On the VM
+sudo /usr/local/sbin/flexcms-backup.sh   # snapshot
+ls /var/backups/flexcms/                 # find latest mongo-*.gz + app_data-*.tgz
+
+# Pull to laptop (from your laptop)
+scp <user>@<vm-ip>:/var/backups/flexcms/mongo-<TS>.gz    .
+scp <user>@<vm-ip>:/var/backups/flexcms/app_data-<TS>.tgz .
+
+# Restore into local dev Mongo (Docker)
+docker cp mongo-<TS>.gz mongodb:/tmp/mongo.gz
+docker exec mongodb mongorestore \
+    --uri "mongodb://dev:Dev%40123456@localhost:27017/?authSource=admin&directConnection=true" \
+    --gzip --archive="/tmp/mongo.gz" --drop
+
+# Replace local App_Data — IMPORTANT: this includes setup.json from prod,
+# so update the MongoConnectionString to your local creds before starting.
+rm -rf src/FlexCms.Host/App_Data
+tar -xzf app_data-<TS>.tgz -C src/FlexCms.Host
+# Edit setup.json → set MongoConnectionString to the dev URI:
+#   mongodb://dev:Dev%40123456@localhost:27017/?authSource=admin&directConnection=true
+
+cd src/FlexCms.Host && dotnet watch run
+```
+
+> **Warning:** the prod `App_Data/keys/` you just imported decrypts prod
+> session cookies. Don't deploy local builds with prod keys back to prod
+> machines you don't own — keys are sensitive material.
+
+### Verifying a restore worked
+
+```bash
+# Mongo doc count — should match source
+mongosh -u flexcms -p '<PWD>' --authenticationDatabase admin --eval '
+  db.getSiblingDB("flexcms").getCollectionNames().forEach(c =>
+    print(c + ": " + db.getSiblingDB("flexcms")[c].countDocuments({})))'
+
+# App_Data sanity
+ls -la /opt/flexcms/App_Data/         # setup.json present
+ls -la /opt/flexcms/App_Data/keys/    # at least one .xml DataProtection key
+du -sh /opt/flexcms/App_Data/uploads/ # roughly matches source
+
+# FlexCMS health
+curl -s -o /dev/null -w '%{http_code}\n' https://yourdomain.com/        # 200
+curl -s -o /dev/null -w '%{http_code}\n' https://yourdomain.com/admin   # 302 → /auth/login
+```
+
+### Backup hygiene checklist
+
+- [ ] Cron is installed and `/var/log/flexcms-backup.log` shows recent "Backup OK"
+- [ ] At least one offsite copy lands somewhere outside the VM
+- [ ] You've done a restore drill **at least once** — into a throwaway VM
+- [ ] Pruning is working — `/var/backups/flexcms/` doesn't fill the disk
+- [ ] Backup file permissions are 600 (owner-only) — they contain encrypted
+      passwords + keys; readable backups are a leak waiting to happen
+
+```bash
+sudo chmod 600 /var/backups/flexcms/*
+sudo chown root:root /var/backups/flexcms/*
+```
+
+---
+
+## 11. Updating an Existing Production Server
 
 ### Option A: Automatic (via GitHub Actions — recommended)
 
@@ -1560,7 +1922,7 @@ curl https://mysite.com/health/ready
 
 ---
 
-## 11. Module Deployment to Production
+## 12. Module Deployment to Production
 
 ### Step 1: Build the module ZIP locally (see Section 5)
 
@@ -1617,7 +1979,7 @@ docker compose -f /opt/flexcms/docker/docker-compose.prod.yml \
 
 ---
 
-## 12. Troubleshooting
+## 13. Troubleshooting
 
 ### Build errors
 
@@ -1844,7 +2206,7 @@ Then visit `/auth/forgot-password` and use the email reset flow.
 
 ---
 
-## 13. NuGet Package Management
+## 14. NuGet Package Management
 
 This section covers two things:
 - **Publishing** the FlexCms.Framework as a NuGet package (so external developers can build modules)

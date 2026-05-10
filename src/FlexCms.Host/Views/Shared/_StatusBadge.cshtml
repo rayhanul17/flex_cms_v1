@@ -1,0 +1,25 @@
+@*
+    Single source of truth for rendering an EntityStatus as a colored badge.
+
+    Usage:
+        @await Html.PartialAsync("_StatusBadge", entity.Status)
+
+    The same status→colour mapping lives in fcms-datatable.js for the dynamic
+    status column. Keep them in lockstep — if one changes, change both.
+
+    Maps:
+      Active   → green (text-bg-success)
+      InActive → gray  (text-bg-secondary)
+      Deleted  → red   (text-bg-danger)
+*@
+@model FlexCms.Framework.Db.EntityStatus
+@{
+    var (cls, label) = Model switch
+    {
+        FlexCms.Framework.Db.EntityStatus.Active   => ("text-bg-success",   "Active"),
+        FlexCms.Framework.Db.EntityStatus.InActive => ("text-bg-secondary", "Inactive"),
+        FlexCms.Framework.Db.EntityStatus.Deleted  => ("text-bg-danger",    "Deleted"),
+        _                                           => ("text-bg-light",     Model.ToString())
+    };
+}
+<span class="badge @cls">@label</span>

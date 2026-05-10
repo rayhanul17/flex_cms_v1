@@ -46,6 +46,45 @@ public static class FcmsHelper
     }
 
     /// <summary>
+    /// Normalize an arbitrary string into a URL-safe slug. Mirrors the JS
+    /// the &lt;fcms-slug-input&gt; tag helper emits — keep both in lockstep.
+    /// "Hello, World!" → "hello-world", "  foo__bar  " → "foo-bar".
+    /// Empty/null → "".
+    /// </summary>
+    public static string ToSlug(string? input, int maxLength = 200)
+    {
+        if (string.IsNullOrWhiteSpace(input)) return "";
+
+        var sb = new StringBuilder(input.Length);
+        bool lastWasDash = false;
+
+        foreach (var c in input.Normalize(System.Text.NormalizationForm.FormKD))
+        {
+            if (c >= 'A' && c <= 'Z')
+            {
+                sb.Append((char)(c + 32));
+                lastWasDash = false;
+            }
+            else if ((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9'))
+            {
+                sb.Append(c);
+                lastWasDash = false;
+            }
+            else if (!lastWasDash && sb.Length > 0)
+            {
+                sb.Append('-');
+                lastWasDash = true;
+            }
+        }
+
+        // Trim trailing dash
+        if (sb.Length > 0 && sb[^1] == '-') sb.Length--;
+
+        var result = sb.ToString();
+        return result.Length > maxLength ? result[..maxLength].TrimEnd('-') : result;
+    }
+
+    /// <summary>
     /// Convert PascalCase / camelCase to snake_case.
     /// "FcmsUser" → "fcms_user", "BlogPost" → "blog_post".
     /// </summary>

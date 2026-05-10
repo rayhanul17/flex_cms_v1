@@ -18,7 +18,7 @@
 
             <div class="mb-3">
                 <label asp-for="Slug" class="form-label"></label>
-                <input asp-for="Slug" class="form-control" />
+                <fcms-slug-input asp-for="Slug" from="#Name" />
                 <span asp-validation-for="Slug" class="text-danger"></span>
             </div>
 
@@ -42,15 +42,4 @@
 
 @section Scripts {
     @await Html.PartialAsync("_ValidationScriptsPartial")
-    <script>
-    document.getElementById('Name').addEventListener('input', function () {
-        const slug = document.getElementById('Slug');
-        if (!slug.dataset.manual) {
-            slug.value = this.value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-        }
-    });
-    document.getElementById('Slug').addEventListener('input', function () {
-        this.dataset.manual = '1';
-    });
-    </script>
 }

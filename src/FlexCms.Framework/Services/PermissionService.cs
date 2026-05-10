@@ -1,5 +1,6 @@
 using FlexCms.Framework.Auth;
 using FlexCms.Framework.Caching;
+using FlexCms.Framework.Cms;
 using FlexCms.Framework.Db;
 using Microsoft.AspNetCore.Identity;
 using System.Security.Claims;
@@ -13,6 +14,13 @@ public class PermissionService : IPermissionService
     private readonly RoleManager<FcmsRole> _roleManager;
     private readonly IFcmsGroupCacheService _cache;
     private readonly IFcmsUnitOfWork _uow;
+    // Optional — when present, AssignAsync/RevokeAsync emit a dedicated audit
+    // entry ("Permission.Assigned" / "Permission.Revoked") in addition to the
+    // generic FcmsRolePermission write captured by the EF interceptor /
+    // Mongo AuditingRepository decorator. Without this you only see
+    // "RolePermission.Created" rows in the audit log, which makes it hard
+    // to track WHICH permission was granted to WHICH role.
+    private readonly IFcmsLogService? _audit;
 
     private const string Group = "permissions";
     private static readonly TimeSpan PermTtl = TimeSpan.FromMinutes(15);
@@ -26,13 +34,15 @@ public class PermissionService : IPermissionService
         IRepository<FcmsRolePermission> rolePerms,
         RoleManager<FcmsRole> roleManager,
         IFcmsGroupCacheService cache,
-        IFcmsUnitOfWork uow)
+        IFcmsUnitOfWork uow,
+        IFcmsLogService? audit = null)
     {
         _permissions = permissions;
         _rolePerms = rolePerms;
         _roleManager = roleManager;
         _cache = cache;
         _uow = uow;
+        _audit = audit;
     }
 
     public async Task<bool> HasPermissionAsync(
@@ -112,6 +122,16 @@ public class PermissionService : IPermissionService
 
         await _uow.SaveChangesAsync(ct);
         InvalidateRoleCache(roleId);
+
+        if (_audit is not null)
+            await _audit.LogAsync(
+                action:     "Permission.Assigned",
+                entityType: nameof(FcmsRolePermission),
+                entityId:   roleId.ToString(),
+                value:      new { roleId, permissionKey },
+                module:     "auth",
+                severity:   FcmsLogSeverity.Info,
+                ct:         ct);
     }
 
     public async Task RevokeAsync(Guid roleId, string permissionKey, CancellationToken ct = default)
@@ -124,6 +144,16 @@ public class PermissionService : IPermissionService
         await _rolePerms.SoftDeleteAsync(rp, ct);
         await _uow.SaveChangesAsync(ct);
         InvalidateRoleCache(roleId);
+
+        if (_audit is not null)
+            await _audit.LogAsync(
+                action:     "Permission.Revoked",
+                entityType: nameof(FcmsRolePermission),
+                entityId:   roleId.ToString(),
+                value:      new { roleId, permissionKey },
+                module:     "auth",
+                severity:   FcmsLogSeverity.Warning,
+                ct:         ct);
     }
 
     public async Task SeedPermissionsAsync(IEnumerable<FcmsPermission> permissions, CancellationToken ct = default)

@@ -16,10 +16,7 @@
 
             <div class="mb-3">
                 <label asp-for="Slug" class="form-label"></label>
-                <div class="input-group">
-                    <span class="input-group-text">/</span>
-                    <input asp-for="Slug" class="form-control" />
-                </div>
+                <fcms-slug-input asp-for="Slug" from="#Title" prefix="/" />
                 <span asp-validation-for="Slug" class="text-danger"></span>
             </div>
 
@@ -67,15 +64,4 @@
 @section Scripts {
     @await Html.PartialAsync("_ValidationScriptsPartial")
     @await Html.PartialAsync("_RichTextEditor")
-    <script>
-    document.getElementById('Title').addEventListener('input', function () {
-        const slug = document.getElementById('Slug');
-        if (!slug.dataset.manual) {
-            slug.value = this.value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-        }
-    });
-    document.getElementById('Slug').addEventListener('input', function () {
-        this.dataset.manual = '1';
-    });
-    </script>
 }

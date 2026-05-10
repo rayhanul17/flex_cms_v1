@@ -1624,6 +1624,73 @@ That's the whole setup. One VM, no Docker, full transactional Mongo, TLS,
 nightly backups, systemd-supervised — production-grade for the
 "single-instance, won't ever multi-node" case.
 
+### Architecture decision: Redis (deferred — DB-backed cart instead)
+
+A common question when planning an e-commerce deployment: *do we need
+Redis for session storage?* For FlexCMS's typical shape (single-instance,
+single VM, anonymous browsing, admin-managed users) the answer is **no,
+not now** — and here's the reasoning so future-you doesn't second-guess
+the decision.
+
+**What ASP.NET Core's default in-memory session actually loses:**
+
+| Failure mode | In-memory impact | Frequency |
+|---|---|---|
+| Planned deploy / restart | Active shoppers' cart lost | Weekly during active dev |
+| App crash | Same | Rare on .NET 10 |
+| 2+ instances behind load balancer | Cart "disappears" between requests | Only matters if you horizontally scale |
+| Memory pressure | Sessions evicted unpredictably | Very rare on 4GB+ VMs |
+
+**Why we still don't need Redis for the e-commerce module:**
+
+The real cart-survival problem is solved by **storing the cart in the
+database**, not in session. When the e-commerce module ships, anonymous
+shoppers get a `cart_id` cookie that maps to a row in `fcms_carts`. Every
+page load that needs the cart re-reads from DB. The cart survives:
+
+- App restart ✓ (data is in DB)
+- App crash ✓ (data is in DB)
+- Future horizontal scale ✓ (DB is shared)
+- Server move ✓ (cart restored with the rest of the data via §10)
+- "Abandoned cart" emails ✓ (cart row queryable by age)
+
+Multi-step checkout state lives **on the cart row itself** (a `CheckoutState`
+JSON column) rather than in `HttpContext.Session`, for the same reason.
+
+**What's left for session?** Mostly:
+- CSRF antiforgery tokens — already cookie-based, not session-backed
+- "Last viewed product" personalization — nice-to-have, OK to lose on restart
+- Multi-step admin form wizards — same, OK to lose
+
+None of these are worth running, monitoring, securing, and backing up a
+Redis instance for.
+
+**When to revisit this decision:**
+
+| Trigger | Action |
+|---|---|
+| Adding a 2nd app instance behind a load balancer | Redis becomes mandatory for session + DataProtection key sync |
+| Active brute-force attack making rate-limit state survival critical | Redis-backed rate limiter |
+| Output cache hit rate matters across restarts (CMS pages with expensive renders) | Redis distributed cache |
+| Real-time pub/sub needs (live notifications, inventory across instances) | Redis pub/sub |
+
+When that day comes the wiring is straightforward (`AddStackExchangeRedisCache`
++ `AddDataProtection().PersistKeysToStackExchangeRedis(...)` + a docker-compose
+entry). It's roughly half a day's work plus tests. Don't pre-emptively pay
+the operational tax of running Redis "for the option" — the option is
+cheap to exercise later when you actually need it.
+
+**Cost of running Redis you'd be saving:**
+- One more service to start, monitor, secure, back up, upgrade
+- One more dependency in the dev environment for new contributors
+- One more failure mode in your incident playbook
+- Per-VM RAM (~150 MB minimum)
+
+For a single-instance e-commerce deployment serving Bangladesh-scale
+traffic from a single VM with DB-backed cart, **Redis is a "nice in
+theory, unnecessary in practice" addition**. Skip it. Add it the day you
+actually need horizontal scale.
+
 ---
 
 ## 10. Backup & Restore

@@ -7,12 +7,41 @@ version: '3.8'
 #  Usage:
 #    docker compose up -d
 #
-#  Connection strings:
-#    MSSQL                 : Server=localhost,1433;User=sa;Password=Dev@123456;
-#    MySQL                 : Server=localhost;Port=3306;Uid=dev;Pwd=Dev@123456;
-#    PostgreSQL            : Host=localhost;Port=5432;Username=dev;Password=Dev@123456;
-#    MongoDB (PC)          : mongodb://dev:Dev%40123456@localhost:27017/?replicaSet=rs0&authSource=admin
-#    MongoDB (Container)   : mongodb://dev:Dev%40123456@mongodb:27017/?replicaSet=rs0&authSource=admin
+#  Default credentials (DEV ONLY — change for production):
+#    Username: dev / sa / postgres
+#    Password: Dev@123456
+#
+#  ── DEV connection strings ────────────────────────────────────────
+#  When the app runs on your PC (dotnet run / dotnet watch):
+#    MSSQL                 : Server=localhost,1433;User Id=sa;Password=Dev@123456;TrustServerCertificate=True;
+#    MySQL                 : Server=localhost;Port=3306;Database=flexcms;User=dev;Password=Dev@123456;
+#    PostgreSQL            : Host=localhost;Port=5432;Database=flexcms;Username=dev;Password=Dev@123456;
+#    MongoDB (from PC)     : mongodb://dev:Dev%40123456@localhost:27017/?authSource=admin&directConnection=true
+#
+#  When the app runs INSIDE docker-compose (same Docker network):
+#    MongoDB (container)   : mongodb://dev:Dev%40123456@mongodb:27017/?authSource=admin&replicaSet=rs0
+#
+#  Why two Mongo strings? The replica-set member is registered as
+#  `mongodb:27017` (Docker hostname). From the PC, that hostname doesn't
+#  resolve, so directConnection=true tells the driver to skip topology
+#  discovery and use the seed host (localhost) directly. Transactions
+#  still work because the underlying server IS a replica-set primary.
+#  See DEVELOPER_GUIDE.md §13 "MongoDB connection strings" for details.
+#
+#  Password URL-encoding: `@` must be `%40` in the URI form. The plain
+#  password is `Dev@123456`; `%40` is its encoded form.
+#
+#  ── PROD connection strings (replace placeholders) ────────────────
+#    MSSQL (Azure SQL)     : Server=tcp:<server>.database.windows.net,1433;Database=<db>;User ID=<user>;Password=<pwd>;Encrypt=true;
+#    MySQL (managed)       : Server=<host>;Port=3306;Database=<db>;User=<user>;Password=<pwd>;SslMode=Required;
+#    PostgreSQL (managed)  : Host=<host>;Port=5432;Database=<db>;Username=<user>;Password=<pwd>;SSL Mode=Require;
+#    MongoDB Atlas         : mongodb+srv://<user>:<pwd>@<cluster>.mongodb.net/?retryWrites=true&w=majority&authSource=admin
+#    MongoDB self-hosted   : mongodb://<user>:<pwd>@<host>:27017/?authSource=admin&replicaSet=rs0
+#  Notes:
+#    • Always URL-encode `@` `:` `/` `+` in passwords (use https://www.urlencoder.org).
+#    • Mongo MUST be a replica set (even single-node) — transactions
+#      silently degrade on standalone. See DEVELOPER_GUIDE §13.
+#    • Don't commit prod strings — pass via env var or setup wizard.
 # ─────────────────────────────────────────────────────────────────
 
 services:

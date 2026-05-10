@@ -1,17 +1,44 @@
 version: '3.8'
 
 # ─────────────────────────────────────────────────────────────────────────────
-#  FlexCMS — Production Stack
+#  FlexCMS — Production Stack (single-VM, Docker-compose)
 #
-#  Required secrets (set via environment or .env file on the server):
-#    FLEXCMS_IMAGE      — GHCR image tag, e.g. ghcr.io/org/flex_cms_v1:latest
-#    MONGO_PASSWORD     — MongoDB root/app password
-#    APP_DATA_PATH      — Host path for App_Data volume (default: ./data/app_data)
-#    MONGO_DATA_PATH    — Host path for MongoDB data   (default: ./data/mongo)
-#    DOMAIN             — Public domain, used by Traefik labels
+#  Required env vars (set via .env on the server, NEVER commit to git):
+#    FLEXCMS_IMAGE      GHCR image tag, e.g. ghcr.io/org/flex_cms_v1:latest
+#    MONGO_PASSWORD     MongoDB root password (generate strong: openssl rand -base64 32)
+#    APP_DATA_PATH      Host path for App_Data volume (default: ./data/app_data)
+#    MONGO_DATA_PATH    Host path for MongoDB data   (default: ./data/mongo)
+#    DOMAIN             Public domain (used if Traefik / nginx labels enabled)
+#
+#  Sample .env on the server:
+#    FLEXCMS_IMAGE=ghcr.io/yourorg/flex_cms_v1:1.0.0
+#    MONGO_PASSWORD=Generated-Strong-Password-Here
+#    APP_DATA_PATH=/opt/flexcms/data/app_data
+#    MONGO_DATA_PATH=/opt/flexcms/data/mongo
+#    DOMAIN=mysite.com
 #
 #  Usage:
-#    docker compose -f docker/docker-compose.prod.yml up -d
+#    cd /opt/flexcms
+#    docker compose -f docker/docker-compose.prod.yml --env-file .env up -d
+#
+#  ── App → Mongo connection (used by the setup wizard / setup.json) ──────────
+#  The app container resolves `mongodb` (the service name) to the Mongo
+#  container's IP within the compose network. Use this exact form in the
+#  setup wizard or in setup.json:
+#
+#    mongodb://dev:<MONGO_PASSWORD>@mongodb:27017/?authSource=admin&replicaSet=rs0
+#
+#  Notes:
+#    • URL-encode `@` as `%40`, `:` as `%3A`, `/` as `%2F` if your password
+#      contains them (https://www.urlencoder.org).
+#    • Mongo is bound to 127.0.0.1:27017 on the HOST (line below) — that's
+#      so you can mongodump from the host without exposing 27017 to the
+#      internet. Do not change to 0.0.0.0 unless you also firewall it.
+#    • Mongo runs as a single-node replica set (rs0) — required for
+#      transactions. See DEVELOPER_GUIDE §13 if transactions don't work.
+#    • If you need a separate read-only / app user instead of root,
+#      create it once after rs.initiate() and reference that user in the
+#      conn string. Never share the root password with the app long-term.
 # ─────────────────────────────────────────────────────────────────────────────
 
 services:

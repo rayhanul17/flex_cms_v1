@@ -145,9 +145,19 @@ body {
     cursor: pointer;
     text-align: left;
 }
-#sidebar .sidebar-user-trigger:hover {
+#sidebar .sidebar-user-trigger:hover,
+#sidebar .sidebar-user-trigger[aria-expanded="true"] {
     background: #2d3f53;
     border-color: #3d556e;
+}
+/* When the dropdown is open, flip the chevron to point down (it points up
+   in resting state because the menu opens upward). Keeps the visual cue
+   in sync with the menu state. */
+#sidebar .sidebar-user-trigger[aria-expanded="true"] .sidebar-user-chevron {
+    transform: rotate(180deg);
+}
+#sidebar .sidebar-user-chevron {
+    transition: transform .15s ease;
 }
 #sidebar .sidebar-user-avatar {
     flex-shrink: 0;

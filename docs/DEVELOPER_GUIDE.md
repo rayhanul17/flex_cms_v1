@@ -1425,6 +1425,75 @@ periodic flush, so the file stays empty even though log entries were emitted.
 The file sink in `Program.cs` now passes `flushToDiskInterval: TimeSpan.FromSeconds(1)`
 to guarantee writes reach disk during a hang.
 
+### MongoDB connection strings — dev / Docker / production
+
+The dev `docker-compose.yml` runs Mongo as a **single-node replica set named
+`rs0`** with keyfile auth enabled (root user `dev` / password `Dev@123456`).
+Replica-set mode is required because **MongoDB transactions only work on
+replica sets / mongos** — `MongoUnitOfWork.BeginTransactionAsync` falls back
+to non-atomic writes on standalone instances and logs a warning.
+
+Pick the connection string that matches *where the app is running*:
+
+| Where the app runs | Connection string |
+|---|---|
+| **Your PC, app via `dotnet run`** | `mongodb://dev:Dev%40123456@localhost:27017/?authSource=admin&directConnection=true` |
+| **Inside docker-compose (same network as `mongodb`)** | `mongodb://dev:Dev%40123456@mongodb:27017/?authSource=admin&replicaSet=rs0` |
+| **Production — managed Atlas / dedicated cluster** | `mongodb+srv://<user>:<pwd>@<cluster>.mongodb.net/?retryWrites=true&w=majority&authSource=admin` |
+
+**Why `directConnection=true` from your PC:** the replica-set member is
+registered inside Docker as `mongodb:27017`. The .NET driver resolves that
+hostname after handshake and tries to dial `mongodb:27017` from your host —
+which doesn't resolve unless you add it to `C:\Windows\System32\drivers\etc\hosts`
+or `/etc/hosts`. `directConnection=true` tells the driver to skip topology
+discovery and use the seed host (`localhost:27017`) verbatim. Transactions
+still work because the underlying server *is* a replica-set primary.
+
+**Alternative — map the hostname instead** (lets you keep `replicaSet=rs0`
+and behave identically to a multi-node cluster):
+
+```
+# C:\Windows\System32\drivers\etc\hosts  (or /etc/hosts on Linux/Mac)
+127.0.0.1   mongodb
+```
+
+Then the PC connection string becomes:
+`mongodb://dev:Dev%40123456@mongodb:27017/?authSource=admin&replicaSet=rs0`
+
+**Password URL-encoding:** the `@` in `Dev@123456` is the user/host separator
+in URIs, so it must be encoded as `%40`. Same for `:` (`%3A`), `/` (`%2F`).
+Forgetting this is the most common "auth failed" surprise.
+
+**Production (self-hosted single-node Mongo):** if you can't run a real
+replica set, run a single-node replica set the same way `docker-compose.yml`
+does — start `mongod --replSet rs0 --keyFile ...` then run `rs.initiate()`
+once. Atlas / DocumentDB / managed offerings handle this for you.
+
+**Quick sanity check from your PC:**
+
+```bash
+docker exec mongodb mongosh -u dev -p Dev@123456 --authenticationDatabase admin --eval "rs.status().ok"
+```
+
+Should print `1`. If it prints `0` or errors, the replica set isn't
+initialized — `docker compose up -d` again so the `mongo-rs-init` job runs.
+
+### Mongo transactions: standalone vs replica set
+
+`MongoUnitOfWork.BeginTransactionAsync` probes once per process. If the
+server is a standalone instance it latches `_transactionsSupported = false`,
+logs a warning, and skips `StartTransaction` on every subsequent call. The
+session is still created (so read-concern routing works) but writes commit
+immediately on the cluster — no atomicity, no rollback.
+
+Three signals you're hitting this:
+- Log warning: *"MongoDB transactions are not supported by this server (standalone instance)"*
+- `RollbackAsync` is called but data is still present
+- Cross-document writes that should be atomic show partial state on failure
+
+Fix: switch to a replica set (`--replSet rs0` + `rs.initiate()`) — the dev
+`docker-compose.yml` already does this; production needs it too.
+
 ### Database connection fails
 
 1. Is the DB container running? `docker ps`

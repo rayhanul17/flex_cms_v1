@@ -1257,6 +1257,267 @@ sudo crontab -e
 
 ---
 
+### Alternative: Single-VM deploy without Docker (no cluster, no Docker daemon)
+
+The Docker-based steps above are the default. If you have a **single VM, no
+multi-instance plans, only one DB engine (MongoDB), and want minimum overhead**,
+this alternative skips Docker entirely. Same FlexCMS, same features — including
+transactions — just no container layer. This adds about 15 minutes of one-time
+setup vs `docker compose up -d`, but saves the Docker daemon's ~100 MB RSS and
+puts everything under standard `systemd` so you debug with `journalctl` and
+`systemctl status` instead of `docker logs`.
+
+**Why a single-node replica set, not standalone?** MongoDB transactions only
+work on replica sets / mongos. `MongoUnitOfWork.BeginTransactionAsync` falls
+back to non-atomic writes on standalone — silent data integrity loss on any
+multi-document write. Even on a single VM, run `mongod --replSet rs0` +
+`rs.initiate()`. It's still one node, but Mongo treats it as a 1-member
+replica set and transactions work.
+
+#### Step 1 — VM bootstrap
+
+```bash
+# As root or with sudo. Ubuntu 22.04 / 24.04 assumed.
+sudo apt update && sudo apt -y upgrade
+sudo apt install -y curl gnupg ca-certificates apt-transport-https \
+                    nginx ufw fail2ban unattended-upgrades
+
+# Firewall — allow SSH + HTTP + HTTPS only. Mongo stays bound to 127.0.0.1.
+sudo ufw allow OpenSSH
+sudo ufw allow 'Nginx Full'
+sudo ufw --force enable
+```
+
+#### Step 2 — Install MongoDB 7 + run as single-node replica set
+
+```bash
+# Add Mongo apt repo
+wget -qO - https://www.mongodb.org/static/pgp/server-7.0.asc | \
+  sudo gpg --dearmor -o /usr/share/keyrings/mongo.gpg
+echo "deb [signed-by=/usr/share/keyrings/mongo.gpg] https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/7.0 multiverse" | \
+  sudo tee /etc/apt/sources.list.d/mongodb-org-7.0.list
+sudo apt update && sudo apt install -y mongodb-org
+
+# Keyfile — required for replication + auth combo (Mongo refuses to start
+# without it once both are enabled). Single random secret, file mode 400.
+sudo openssl rand -base64 756 | sudo tee /etc/mongo-keyfile > /dev/null
+sudo chmod 400 /etc/mongo-keyfile
+sudo chown mongodb:mongodb /etc/mongo-keyfile
+
+# Replace mongod.conf with a prod-ready config
+sudo tee /etc/mongod.conf > /dev/null << 'EOF'
+storage:
+  dbPath: /var/lib/mongodb
+systemLog:
+  destination: file
+  logAppend: true
+  path: /var/log/mongodb/mongod.log
+net:
+  port: 27017
+  bindIp: 127.0.0.1   # localhost only — the FlexCMS app on the same VM
+                      # is the only client. Change to a private/VPC IP if
+                      # the app is on a different VM, then lock 27017 down
+                      # at the firewall to that source.
+security:
+  authorization: enabled
+  keyFile: /etc/mongo-keyfile
+replication:
+  replSetName: rs0
+EOF
+
+sudo systemctl restart mongod
+sudo systemctl enable mongod
+
+# One-time: initialize the replica set + create the FlexCMS user.
+# After authorization is enabled, the very first connection is allowed via
+# the localhost exception ONLY to create the first admin user — use it.
+mongosh --eval 'rs.initiate({_id:"rs0", members:[{_id:0, host:"127.0.0.1:27017"}]})'
+
+# Wait ~5 seconds for the node to become PRIMARY, then create the user.
+# Replace <STRONG_PWD> with a real generated password.
+mongosh --eval '
+  db.getSiblingDB("admin").createUser({
+    user: "flexcms",
+    pwd: "<STRONG_PWD>",
+    roles: [{role: "root", db: "admin"}]
+  })
+'
+
+# Verify — should print 1
+mongosh -u flexcms -p '<STRONG_PWD>' --authenticationDatabase admin \
+        --eval 'rs.status().ok'
+```
+
+If `rs.status().ok` prints `1`, transactions work. Connection string for
+FlexCMS (URL-encode `@` in the password as `%40`):
+
+```
+mongodb://flexcms:<STRONG_PWD_URLENCODED>@127.0.0.1:27017/?authSource=admin&directConnection=true
+```
+
+#### Step 3 — Install .NET 10 runtime
+
+```bash
+wget https://packages.microsoft.com/config/ubuntu/22.04/packages-microsoft-prod.deb
+sudo dpkg -i packages-microsoft-prod.deb && rm packages-microsoft-prod.deb
+sudo apt update && sudo apt install -y aspnetcore-runtime-10.0
+dotnet --info | head -5   # confirm 10.0.x runtime is installed
+```
+
+#### Step 4 — Deploy the published FlexCMS bits
+
+Build locally (`dotnet publish src/FlexCms.Host -c Release -o ./publish`),
+SCP the `publish/` folder to the VM, or use GitHub Actions. Target layout:
+
+```
+/opt/flexcms/                       # the published app
+/opt/flexcms/App_Data/              # writable — setup.json, logs, uploads, keys
+/opt/flexcms/modules/               # drop-in module folders (see §6)
+```
+
+```bash
+sudo useradd -r -s /usr/sbin/nologin flexcms     # service account, no shell
+sudo mkdir -p /opt/flexcms/App_Data /opt/flexcms/modules
+# scp -r ./publish/* user@vm:/tmp/flexcms-deploy
+sudo cp -r /tmp/flexcms-deploy/* /opt/flexcms/
+sudo chown -R flexcms:flexcms /opt/flexcms
+```
+
+#### Step 5 — systemd unit
+
+```bash
+sudo tee /etc/systemd/system/flexcms.service > /dev/null << 'EOF'
+[Unit]
+Description=FlexCMS
+After=network.target mongod.service
+Wants=mongod.service
+
+[Service]
+Type=notify
+User=flexcms
+Group=flexcms
+WorkingDirectory=/opt/flexcms
+ExecStart=/usr/bin/dotnet /opt/flexcms/FlexCms.Host.dll --urls http://127.0.0.1:5000
+Restart=always
+RestartSec=5
+KillSignal=SIGINT
+SyslogIdentifier=flexcms
+
+# Hardening — adjust if a module needs broader access
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/opt/flexcms/App_Data /opt/flexcms/modules
+
+Environment=ASPNETCORE_ENVIRONMENT=Production
+Environment=DOTNET_PRINT_TELEMETRY_MESSAGE=false
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+sudo systemctl daemon-reload
+sudo systemctl enable --now flexcms
+sudo systemctl status flexcms      # should show "active (running)"
+journalctl -u flexcms -f           # tail the live log
+```
+
+#### Step 6 — Nginx as TLS front + reverse proxy
+
+```bash
+sudo tee /etc/nginx/sites-available/flexcms > /dev/null << 'EOF'
+server {
+    listen 80;
+    server_name yourdomain.com;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name yourdomain.com;
+
+    ssl_certificate     /etc/letsencrypt/live/yourdomain.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/yourdomain.com/privkey.pem;
+
+    # File upload cap — must match SiteSettings.MaxUploadSizeMb
+    client_max_body_size 50M;
+
+    location / {
+        proxy_pass         http://127.0.0.1:5000;
+        proxy_http_version 1.1;
+        proxy_set_header   Host              $host;
+        proxy_set_header   X-Real-IP         $remote_addr;
+        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto $scheme;
+
+        # SignalR (chat hub + admin notifications) needs WebSocket upgrade
+        proxy_set_header   Upgrade           $http_upgrade;
+        proxy_set_header   Connection        "upgrade";
+        proxy_read_timeout 1h;
+    }
+}
+EOF
+
+sudo ln -sf /etc/nginx/sites-available/flexcms /etc/nginx/sites-enabled/
+sudo nginx -t && sudo systemctl reload nginx
+
+# TLS via certbot
+sudo apt install -y certbot python3-certbot-nginx
+sudo certbot --nginx -d yourdomain.com   # follow prompts
+```
+
+#### Step 7 — Run the setup wizard
+
+Open `https://yourdomain.com/Setup` once. Pick `MongoDB`, paste the conn
+string from Step 2, finish the wizard. Restart the service so production
+mode kicks in:
+
+```bash
+sudo systemctl restart flexcms
+journalctl -u flexcms -n 50 --no-pager   # confirm "[BOOT] app.Run() …"
+```
+
+#### Step 8 — Backups (cron + offsite)
+
+```bash
+sudo mkdir -p /var/backups/flexcms
+sudo tee /usr/local/sbin/flexcms-backup.sh > /dev/null << 'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+TS=$(date +%Y%m%d-%H%M)
+DEST=/var/backups/flexcms/$TS
+mkdir -p "$DEST"
+mongodump --uri "mongodb://flexcms:<STRONG_PWD_URLENCODED>@127.0.0.1:27017/?authSource=admin&directConnection=true" \
+          --gzip --archive="$DEST/mongo.gz"
+tar -czf "$DEST/app_data.tgz" -C /opt/flexcms App_Data
+# Optional: rclone copy "$DEST" remote:flexcms-backups/$TS
+find /var/backups/flexcms -mindepth 1 -maxdepth 1 -mtime +14 -exec rm -rf {} +
+EOF
+sudo chmod +x /usr/local/sbin/flexcms-backup.sh
+
+# Run nightly at 02:30
+sudo crontab -e
+# Add:
+30 2 * * * /usr/local/sbin/flexcms-backup.sh >> /var/log/flexcms-backup.log 2>&1
+```
+
+#### Updates on this setup
+
+```bash
+# Build new bits locally, then on the VM:
+sudo systemctl stop flexcms
+sudo cp -r /tmp/flexcms-deploy/* /opt/flexcms/
+sudo chown -R flexcms:flexcms /opt/flexcms
+sudo systemctl start flexcms
+journalctl -u flexcms -n 20 --no-pager   # verify [BOOT] markers
+```
+
+That's the whole setup. One VM, no Docker, full transactional Mongo, TLS,
+nightly backups, systemd-supervised — production-grade for the
+"single-instance, won't ever multi-node" case.
+
+---
+
 ## 10. Updating an Existing Production Server
 
 ### Option A: Automatic (via GitHub Actions — recommended)

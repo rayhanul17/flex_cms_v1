@@ -42,7 +42,22 @@ public record PaymentInitiateRequest(
     string OrderReference,
     string CallbackUrl,
     string? CustomerPhone = null,
-    string? CustomerEmail = null);
+    string? CustomerEmail = null,
+    /// <summary>
+    /// Optional idempotency key. When supplied, the dispatcher caches the
+    /// <see cref="PaymentInitiateResult"/> for this key (default 10 minutes)
+    /// and returns it verbatim on any subsequent call with the same key —
+    /// preventing the customer being charged twice from a browser retry,
+    /// double-click, network blip, or server restart mid-checkout.
+    ///
+    /// <para>If null, the dispatcher auto-generates one based on
+    /// <see cref="OrderReference"/> + amount, so callers that haven't
+    /// adopted the pattern yet still get duplicate-protection within an
+    /// order. Pass an explicit value (e.g. a stored per-checkout-attempt
+    /// GUID) when you want the protection to span retries that happen on
+    /// different requests.</para>
+    /// </summary>
+    string? IdempotencyKey = null);
 
 public record PaymentInitiateResult(
     bool Success,

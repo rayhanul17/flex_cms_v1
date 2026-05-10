@@ -59,6 +59,10 @@
   "auth.invalid_credentials": "Invalid email or password.",
   "auth.welcome_back": "Welcome back",
 
+  "nav.home": "Home",
+  "nav.blog": "Blog",
+  "nav.privacy": "Privacy",
+  "nav.admin_dashboard": "Admin dashboard",
   "nav.dashboard": "Dashboard",
   "nav.content": "Content",
   "nav.pages": "Pages",

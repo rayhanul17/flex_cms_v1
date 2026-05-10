@@ -5,6 +5,7 @@ using FlexCms.Framework.Db.Ef;
 using FlexCms.Framework.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace FlexCms.Framework.Cms;
@@ -37,7 +38,10 @@ public sealed class FcmsAuditInterceptor : SaveChangesInterceptor
     };
 
     private readonly IFcmsContextService _ctx;
-    private readonly ISettingsService _settings;
+    // ISettingsService resolved lazily via IServiceProvider — injecting it directly
+    // creates a DI cycle: FcmsDbContext → FcmsAuditInterceptor → ISettingsService →
+    // IRepository<FcmsSettings> → DbContext (= FcmsDbContext). Lazy lookup breaks the cycle.
+    private readonly IServiceProvider _sp;
     private readonly ILogger<FcmsAuditInterceptor> _logger;
 
     // AsyncLocal is safe across async continuations (unlike [ThreadStatic] which
@@ -47,11 +51,11 @@ public sealed class FcmsAuditInterceptor : SaveChangesInterceptor
 
     public FcmsAuditInterceptor(
         IFcmsContextService ctx,
-        ISettingsService settings,
+        IServiceProvider sp,
         ILogger<FcmsAuditInterceptor> logger)
     {
         _ctx = ctx;
-        _settings = settings;
+        _sp = sp;
         _logger = logger;
     }
 
@@ -89,7 +93,8 @@ public sealed class FcmsAuditInterceptor : SaveChangesInterceptor
         // (e.g. during DB migration/setup) never breaks the main operation.
         try
         {
-            var cfg = await _settings.GetAsync<AuditConfig>(AuditLogSettings.Key, ct: ct);
+            var settings = _sp.GetRequiredService<ISettingsService>();
+            var cfg = await settings.GetAsync<AuditConfig>(AuditLogSettings.Key, ct: ct);
             if (!cfg.Enabled) return result;
         }
         catch

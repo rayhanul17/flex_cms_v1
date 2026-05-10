@@ -34,9 +34,13 @@ public class SeedService : IHostedService
 
     public async Task StartAsync(CancellationToken ct)
     {
+        // Stage logging — IHostedServices block Kestrel port binding until
+        // StartAsync returns. If a seed step hangs (DI cycle, DB unreachable),
+        // these markers show in the log file exactly where it stopped.
+        _logger.LogInformation("[SEED] StartAsync entered");
         try
         {
-            // Seed module records on every startup (cheap, idempotent)
+            _logger.LogInformation("[SEED] modules");
             await SeedModuleRecordsAsync(ct);
         }
         catch (Exception ex)
@@ -46,6 +50,7 @@ public class SeedService : IHostedService
 
         try
         {
+            _logger.LogInformation("[SEED] permissions");
             await SeedPermissionsAsync(ct);
         }
         catch (Exception ex)
@@ -55,6 +60,7 @@ public class SeedService : IHostedService
 
         try
         {
+            _logger.LogInformation("[SEED] menu items");
             await SeedMenuItemsAsync(ct);
         }
         catch (Exception ex)
@@ -64,6 +70,7 @@ public class SeedService : IHostedService
 
         try
         {
+            _logger.LogInformation("[SEED] visitor role");
             await SeedVisitorRoleAsync(ct);
         }
         catch (Exception ex)
@@ -73,6 +80,7 @@ public class SeedService : IHostedService
 
         try
         {
+            _logger.LogInformation("[SEED] sample content");
             await SeedSampleContentAsync(ct);
         }
         catch (Exception ex)
@@ -80,9 +88,13 @@ public class SeedService : IHostedService
             _logger.LogError(ex, "SeedService: failed to seed sample content.");
         }
 
+        _logger.LogInformation("[SEED] admin user (if needed)");
         var config = _setupHelper.Read();
         if (config is null || !config.IsSetupComplete || config.AdminSeeded)
+        {
+            _logger.LogInformation("[SEED] StartAsync complete (admin already seeded)");
             return;
+        }
 
         if (string.IsNullOrEmpty(config.AdminEmail) || string.IsNullOrEmpty(config.AdminPasswordEncrypted))
         {
@@ -154,6 +166,7 @@ public class SeedService : IHostedService
         {
             _logger.LogError(ex, "SeedService: failed during admin/role seeding.");
         }
+        _logger.LogInformation("[SEED] StartAsync complete");
     }
 
     public Task StopAsync(CancellationToken ct) => Task.CompletedTask;

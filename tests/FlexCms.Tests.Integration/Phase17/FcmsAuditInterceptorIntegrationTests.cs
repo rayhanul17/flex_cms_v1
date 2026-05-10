@@ -6,6 +6,7 @@ using FlexCms.Framework.Services;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 using Xunit;
 
@@ -53,8 +54,12 @@ public sealed class FcmsAuditInterceptorIntegrationTests : IDisposable
         _settings = new SettingsService(settingsRepo, settingsUow,
             new FcmsGroupCacheService(new MemoryCache(new MemoryCacheOptions())));
 
+        var sp = new ServiceCollection()
+            .AddSingleton<ISettingsService>(_settings)
+            .BuildServiceProvider();
+
         _interceptor = new FcmsAuditInterceptor(
-            userCtx, _settings,
+            userCtx, sp,
             Microsoft.Extensions.Logging.Abstractions.NullLogger<FcmsAuditInterceptor>.Instance);
 
         var opts = new DbContextOptionsBuilder<FcmsDbContext>()

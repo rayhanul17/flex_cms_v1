@@ -34,7 +34,7 @@
 </head>
 <body class="d-flex flex-column min-vh-100">
     <header>
-        <nav class="navbar navbar-expand-md navbar-light bg-white border-bottom shadow-sm">
+        <nav class="navbar navbar-expand-md bg-body border-bottom shadow-sm">
             <div class="container">
                 <a class="navbar-brand fw-semibold" asp-controller="Home" asp-action="Index">
                     <i class="bi bi-grid-3x3-gap me-1"></i>@siteName
@@ -51,16 +51,19 @@
                 <div class="navbar-collapse collapse" id="publicNav">
                     <ul class="navbar-nav me-auto">
                         <li class="nav-item">
-                            <a class="nav-link" asp-controller="Home" asp-action="Index">Home</a>
+                            <a class="nav-link" asp-controller="Home" asp-action="Index">@Html.T("nav.home")</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="/blog">Blog</a>
+                            <a class="nav-link" href="/blog">@Html.T("nav.blog")</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" asp-controller="Home" asp-action="Privacy">Privacy</a>
+                            <a class="nav-link" asp-controller="Home" asp-action="Privacy">@Html.T("nav.privacy")</a>
                         </li>
                     </ul>
                     <ul class="navbar-nav">
+                        <li class="nav-item">
+                            @await Html.PartialAsync("_LangSwitcher")
+                        </li>
                         <li class="nav-item">
                             @await Html.PartialAsync("_ThemeModeToggle")
                         </li>
@@ -68,7 +71,7 @@
                         {
                             <li class="nav-item">
                                 <a class="nav-link" href="/admin">
-                                    <i class="bi bi-speedometer2 me-1"></i> Admin dashboard
+                                    <i class="bi bi-speedometer2 me-1"></i> @Html.T("nav.admin_dashboard")
                                 </a>
                             </li>
                             <li class="nav-item">

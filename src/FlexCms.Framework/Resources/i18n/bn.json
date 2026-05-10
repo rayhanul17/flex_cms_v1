@@ -59,6 +59,10 @@
   "auth.invalid_credentials": "ভুল ইমেইল বা পাসওয়ার্ড।",
   "auth.welcome_back": "স্বাগতম",
 
+  "nav.home": "হোম",
+  "nav.blog": "ব্লগ",
+  "nav.privacy": "গোপনীয়তা",
+  "nav.admin_dashboard": "অ্যাডমিন ড্যাশবোর্ড",
   "nav.dashboard": "ড্যাশবোর্ড",
   "nav.content": "কন্টেন্ট",
   "nav.pages": "পেজ",

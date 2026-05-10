@@ -43,22 +43,20 @@ public class MediaController : BaseAdminController
         if (file is null || file.Length == 0)
             return FcmsFail("No file provided.");
 
+        // MediaService.UploadAsync already calls _uow.SaveChangesAsync internally.
+        // No need to wrap in an explicit transaction here — explicit BeginTransaction
+        // conflicts with the MySQL retrying execution strategy.
         try
         {
-            await _uow.BeginTransactionAsync();
             var media = await _media.UploadAsync(file, folderId);
-            await _uow.SaveChangesAsync();
-            await _uow.CommitAsync();
             return FcmsOk("Uploaded.", new { id = media.Id, url = media.Url, thumb = media.ThumbnailUrl, name = media.OriginalFileName });
         }
         catch (InvalidOperationException ex)
         {
-            await _uow.RollbackAsync();
             return FcmsFail(ex.Message);
         }
         catch
         {
-            await _uow.RollbackAsync();
             return FcmsFail("Upload failed.");
         }
     }

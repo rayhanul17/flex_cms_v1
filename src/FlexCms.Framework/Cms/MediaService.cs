@@ -210,15 +210,29 @@ public class MediaService : IMediaService
             sig.Length <= read && sig.SequenceEqual(header.Take(sig.Length)));
     }
 
+    // SKBitmap.Decode(Stream) takes ownership and disposes the stream — pass byte[]
+    // overload instead so the caller's MemoryStream stays usable for subsequent ops.
+    private static byte[] ReadAllBytes(Stream stream)
+    {
+        if (stream is MemoryStream existing && existing.TryGetBuffer(out var seg))
+            return seg.Array!.AsSpan(seg.Offset, seg.Count).ToArray();
+        using var ms = new MemoryStream();
+        stream.Position = 0;
+        stream.CopyTo(ms);
+        return ms.ToArray();
+    }
+
     private static (int? width, int? height) GetImageDimensions(Stream stream)
     {
-        using var bitmap = SKBitmap.Decode(stream);
+        var bytes = ReadAllBytes(stream);
+        using var bitmap = SKBitmap.Decode(bytes);
         return bitmap is null ? (null, null) : (bitmap.Width, bitmap.Height);
     }
 
     private async Task<string?> GenerateAndSaveThumbnailAsync(Stream imageStream, string thumbPath, CancellationToken ct)
     {
-        using var original = SKBitmap.Decode(imageStream);
+        var bytes = ReadAllBytes(imageStream);
+        using var original = SKBitmap.Decode(bytes);
         if (original is null) return null;
 
         var scale = Math.Min((float)ThumbnailMaxSize / original.Width, (float)ThumbnailMaxSize / original.Height);

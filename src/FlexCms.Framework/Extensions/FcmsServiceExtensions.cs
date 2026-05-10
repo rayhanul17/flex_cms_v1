@@ -182,7 +182,11 @@ public static class FcmsServiceExtensions
         services.AddScoped<IOtpChallengeService, OtpChallengeService>();
 
         // Health checks — built-ins. Modules add more via AddSingleton<IFcmsHealthCheck, ...>().
-        services.AddScoped<IFcmsHealthCheck, EfDatabaseHealthCheck>();
+        // EfDatabaseHealthCheck depends on FcmsDbContext which is only registered when
+        // a relational provider is configured — MongoDB-only deployments would fail to
+        // construct the service provider with strict validation.
+        if (options.UsesRelationalDb)
+            services.AddScoped<IFcmsHealthCheck, EfDatabaseHealthCheck>();
         services.AddSingleton<IFcmsHealthCheck>(sp => new BackgroundQueueHealthCheck(
             sp.GetRequiredService<IFcmsBackgroundQueue>(),
             sp.GetRequiredService<FcmsBackgroundQueueOptions>()));
@@ -490,7 +494,14 @@ public static class FcmsServiceExtensions
             {
                 MongoDbSerializerSetup.Register();
 
-                services.AddSingleton<IMongoClient>(_ => new MongoClient(options.MongoConnectionString));
+                services.AddSingleton<IMongoClient>(_ =>
+                {
+                    var settings = MongoClientSettings.FromConnectionString(options.MongoConnectionString);
+                    // Fail fast on bad connection (default is 30s, blocks startup forever).
+                    settings.ServerSelectionTimeout = TimeSpan.FromSeconds(10);
+                    settings.ConnectTimeout = TimeSpan.FromSeconds(10);
+                    return new MongoClient(settings);
+                });
                 services.AddSingleton<IMongoDatabase>(sp =>
                 {
                     var client = sp.GetRequiredService<IMongoClient>();
@@ -509,7 +520,7 @@ public static class FcmsServiceExtensions
                             sp.GetRequiredService<IMongoDatabase>(),
                             sp.GetService<Microsoft.AspNetCore.Http.IHttpContextAccessor>(),
                             sp.GetService<Microsoft.Extensions.Logging.ILogger<MongoUnitOfWork>>(),
-                            sp.GetService<IFcmsLogService>()));
+                            sp));
 
                     identityBuilder.AddUserStore<MongoUserStore>();
                     identityBuilder.AddRoleStore<MongoRoleStore>();

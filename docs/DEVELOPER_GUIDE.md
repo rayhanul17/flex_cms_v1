@@ -1381,6 +1381,50 @@ find . -type d \( -name bin -o -name obj \) -exec rm -rf {} +
 
 Then `dotnet restore && dotnet build`.
 
+### App starts but never responds (port not bound, no error)
+
+Production-mode startup runs `IHostedService.StartAsync` for all hosted services
+**before** Kestrel binds the HTTP port. If any of them blocks (DI cycle, slow DB,
+deadlock), the app appears alive but never serves requests.
+
+To pinpoint where it stopped, tail the Serilog file (auto-flushed every 1s):
+
+```bash
+tail -f src/FlexCms.Host/App_Data/logs/flexcms-<today>.log
+```
+
+Then start the app. The last `[BOOT]` or `[SEED]` marker tells you the failing
+phase:
+
+| Last marker shown | Where it stopped — what to check |
+|---|---|
+| `[BOOT] Production mode entered` | `AddControllersWithViews` / Razor configuration |
+| `[BOOT] Configuring MVC + Razor` | `AddFlexCms` — DI registration in `FcmsServiceExtensions` |
+| `[BOOT] AddFlexCms — provider=...` | `builder.Build()` — DI service descriptor validation failed (mismatched lifetime, missing dependency for the chosen provider) |
+| `[BOOT] builder.Build()` | Container building (rare — usually a slow constructor) |
+| `[BOOT] Build complete — wiring middleware` | `UseMiddleware<>` registration (a middleware ctor blocking) |
+| `[BOOT] app.Run() — IHostedServices starting next, then Kestrel binds port` | A hosted service's `StartAsync` is hanging — see `[SEED]` rows below or check other `IHostedService` implementations (`MongoIndexService`, `ModuleActivationService`, custom module services) |
+| `[SEED] StartAsync entered` | `SeedModuleRecordsAsync` — usually a DI cycle in `IRepository<>` resolution (e.g. UnitOfWork eagerly resolves a logging service that itself depends on UnitOfWork) |
+| `[SEED] modules` | `IRepository<FcmsModuleRecord>.GetAllAsync` — DB unreachable or unauthenticated |
+| `[SEED] permissions` | `IPermissionService` resolution — common cycle: `FcmsAuditInterceptor` injecting `ISettingsService` directly (use `IServiceProvider` lazy lookup instead) |
+| `[SEED] menu items` | `MenuService` query against `fcms_menu_items` |
+| `[SEED] visitor role` | `RoleManager.CreateAsync` — Identity store unreachable |
+| `[SEED] sample content` | Demo content insert (Pages/Posts) — schema mismatch |
+| `[SEED] admin user (if needed)` (no `complete` after) | `UserManager.CreateAsync` or `AddToRoleAsync` — Identity store hang |
+
+**To break a DI cycle**: convert the offending direct dependency to an
+`IServiceProvider` field and resolve lazily inside the method that needs it.
+Example fix already in the codebase: [FcmsAuditInterceptor.cs](../src/FlexCms.Framework/Cms/FcmsAuditInterceptor.cs)
+and [MongoUnitOfWork.cs](../src/FlexCms.Framework/Db/MongoDb/MongoUnitOfWork.cs)
+both use this pattern to break their cycles with `ISettingsService` /
+`IFcmsLogService`.
+
+**Why the log file appeared empty in the past**: Serilog file sink defaults to
+buffered writes. Without `flushToDiskInterval`, a hung process never reaches the
+periodic flush, so the file stays empty even though log entries were emitted.
+The file sink in `Program.cs` now passes `flushToDiskInterval: TimeSpan.FromSeconds(1)`
+to guarantee writes reach disk during a hang.
+
 ### Database connection fails
 
 1. Is the DB container running? `docker ps`

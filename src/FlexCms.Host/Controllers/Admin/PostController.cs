@@ -160,8 +160,10 @@ public class PostController : BaseAdminController
             .ToList();
     }
 
-    private static IEnumerable<string> ParseTags(string raw)
-        => raw.Split([',', ' '], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-              .Select(t => t.ToLowerInvariant())
-              .Distinct();
+    private static IEnumerable<string> ParseTags(string? raw)
+        => string.IsNullOrWhiteSpace(raw)
+            ? []
+            : raw.Split([',', ' '], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                 .Select(t => t.ToLowerInvariant())
+                 .Distinct();
 }

@@ -1,5 +1,6 @@
 using FlexCms.Framework.Cms;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using MongoDB.Driver;
 
@@ -29,6 +30,8 @@ public class MongoUnitOfWork : IFcmsUnitOfWork
     private static bool? _transactionsSupported;
     private readonly Dictionary<Type, object> _repositories = new();
 
+    private readonly IServiceProvider? _sp;
+
     public MongoUnitOfWork(
         IMongoClient client,
         IMongoDatabase database,
@@ -43,6 +46,22 @@ public class MongoUnitOfWork : IFcmsUnitOfWork
         _audit = audit;
     }
 
+    // Overload used by the DI factory — lazy IFcmsLogService lookup avoids the cycle:
+    // IFcmsUnitOfWork → IFcmsLogService → IFcmsUnitOfWork (FcmsLogService injects IFcmsUnitOfWork).
+    public MongoUnitOfWork(
+        IMongoClient client,
+        IMongoDatabase database,
+        IHttpContextAccessor? httpContextAccessor,
+        ILogger<MongoUnitOfWork>? logger,
+        IServiceProvider sp)
+    {
+        _client = client;
+        _database = database;
+        _httpContextAccessor = httpContextAccessor;
+        _logger = logger;
+        _sp = sp;
+    }
+
     public IRepository<T> Repository<T>() where T : class, IBaseEntity
     {
         var type = typeof(T);
@@ -55,8 +74,11 @@ public class MongoUnitOfWork : IFcmsUnitOfWork
             var inner = (IRepository<T>)Activator.CreateInstance(repoType, _database, _httpContextAccessor)!;
 
             // Wrap with auditing decorator unless the entity opts out.
-            repo = ShouldAudit<T>() && _audit is not null
-                ? new AuditingRepository<T>(inner, _audit)
+            // Resolve _audit lazily from _sp when constructed via the DI factory
+            // (avoids the IFcmsUnitOfWork → IFcmsLogService → IFcmsUnitOfWork cycle).
+            var audit = _audit ?? _sp?.GetService<IFcmsLogService>();
+            repo = ShouldAudit<T>() && audit is not null
+                ? new AuditingRepository<T>(inner, audit)
                 : inner;
             _repositories[type] = repo;
 

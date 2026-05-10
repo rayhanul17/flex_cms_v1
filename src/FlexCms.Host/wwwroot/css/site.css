@@ -8,6 +8,20 @@ html {
   }
 }
 
+/* Widen Bootstrap's .container cap on large screens — default xxl=1320px
+   leaves visible empty gutters on 1600px+ displays. 1600px keeps text
+   readable on widescreens while filling the viewport. */
+@media (min-width: 1600px) {
+  .container,
+  .container-sm,
+  .container-md,
+  .container-lg,
+  .container-xl,
+  .container-xxl {
+    max-width: 1560px;
+  }
+}
+
 .btn:focus, .btn:active:focus, .btn-link.nav-link:focus, .form-control:focus, .form-check-input:focus {
   box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem #258cfb;
 }

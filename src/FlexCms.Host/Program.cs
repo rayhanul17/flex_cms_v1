@@ -22,6 +22,11 @@ var logConfig = new LoggerConfiguration()
         rollingInterval: RollingInterval.Day,
         retainedFileCountLimit: 30,
         shared: true,   // allow multiple processes (setup → production handoff)
+        // flushToDiskInterval: 1s ensures logs reach disk even if the process
+        // hangs in startup (e.g. IHostedService deadlock) — without this the
+        // file write buffer never flushes and the log appears empty when
+        // diagnosing the hang.
+        flushToDiskInterval: TimeSpan.FromSeconds(1),
         outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss} [{Level:u3}] {Message:lj}{NewLine}{Exception}");
 
 if (builder.Environment.IsDevelopment())
@@ -79,8 +84,15 @@ if (!SetupHelper.IsSetupComplete(appDataPath))
 // DB config comes from setup.json (written by setup wizard).
 // appsettings.json values are used as fallback for non-DB options (IP filter, etc.)
 // and for developer overrides during local development.
+//
+// Boot-stage logging — these markers tell you exactly which startup phase
+// failed/hung in case the app never finishes booting. Each Log.Information
+// call is auto-flushed within 1s by the file sink (flushToDiskInterval).
+// Tail App_Data/logs/flexcms-<date>.log to see them in real time.
+Log.Information("[BOOT] Production mode entered");
 try
 {
+Log.Information("[BOOT] Configuring MVC + Razor");
 builder.Services.AddControllersWithViews(mvc =>
     {
         // Custom binder for jQuery DataTables 2.x bracket-notation form data
@@ -110,6 +122,7 @@ builder.Services.AddSignalR();
 
 var setup = SetupHelper.ReadStatic(appDataPath);
 var cfg = builder.Configuration;
+Log.Information("[BOOT] AddFlexCms — provider={Provider}", setup?.DbProvider);
 
 builder.Services.AddFlexCms(new FlexCmsOptions
 {
@@ -135,7 +148,9 @@ builder.Services.AddFlexCms(new FlexCmsOptions
     AllowedIps = cfg.GetSection("FlexCms:AllowedIps").Get<string[]>() ?? []
 });
 
+Log.Information("[BOOT] builder.Build()");
 var app = builder.Build();
+Log.Information("[BOOT] Build complete — wiring middleware");
 
 if (app.Environment.IsDevelopment())
     app.UseDeveloperExceptionPage();   // full stack trace in browser
@@ -199,6 +214,7 @@ app.MapControllerRoute(
     pattern: "{slug}",
     defaults: new { controller = "Frontend", action = "Page" });
 
+Log.Information("[BOOT] app.Run() — IHostedServices starting next, then Kestrel binds port");
 app.Run();
 }
 catch (Exception ex)

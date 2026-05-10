@@ -15,6 +15,17 @@ public class SettingsViewModel
     [Display(Name = "Site Base URL")]
     public string? SiteBaseUrl { get; set; }
 
+    [Display(Name = "Logo")]
+    public Guid? LogoMediaId { get; set; }
+
+    [Display(Name = "Favicon")]
+    public Guid? FaviconMediaId { get; set; }
+
+    // Resolved URLs for the picker preview — populated by SettingsController
+    // when loading the form; ignored on POST.
+    [ValidateNever] public string? LogoUrl { get; set; }
+    [ValidateNever] public string? FaviconUrl { get; set; }
+
     [Display(Name = "Default Language")]
     public string DefaultLanguage { get; set; } = "en";
 

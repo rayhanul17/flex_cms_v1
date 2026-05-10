@@ -14,10 +14,12 @@ public class SettingsController : BaseAdminController
     private const string SiteSettingsKey = "site:general";
 
     private readonly ISettingsService _settings;
+    private readonly IMediaService _media;
 
-    public SettingsController(ISettingsService settings)
+    public SettingsController(ISettingsService settings, IMediaService media)
     {
         _settings = settings;
+        _media = media;
     }
 
     [HttpGet("")]
@@ -27,7 +29,7 @@ public class SettingsController : BaseAdminController
         var site = await _settings.GetAsync<SiteSettings>(SiteSettingsKey, ct: ct);
         var audit = await _settings.GetAsync<AuditEnabledDto>(AuditLogSettings.Key, ct: ct);
         var theme = await _settings.GetAsync<ThemeSettings>(ThemeSettings.Key, ct: ct);
-        return View(BuildVm(site, audit.Enabled, theme));
+        return View(await BuildVmAsync(site, audit.Enabled, theme, ct));
     }
 
     [HttpPost("")]
@@ -44,6 +46,8 @@ public class SettingsController : BaseAdminController
         site.SiteName = vm.SiteName?.Trim() ?? "";
         site.Tagline = vm.SiteTagline?.Trim() ?? "";
         site.BaseUrl = vm.SiteBaseUrl?.Trim() ?? "";
+        site.LogoMediaId = vm.LogoMediaId;
+        site.FaviconMediaId = vm.FaviconMediaId;
         site.DefaultLanguage = vm.DefaultLanguage ?? "en";
         site.LanguageMode = (vm.LanguageMode ?? "cookie").ToLowerInvariant();
         site.TimeZone = vm.TimeZoneId ?? site.TimeZone;
@@ -74,13 +78,15 @@ public class SettingsController : BaseAdminController
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    private SettingsViewModel BuildVm(SiteSettings site, bool auditEnabled, ThemeSettings theme)
+    private async Task<SettingsViewModel> BuildVmAsync(SiteSettings site, bool auditEnabled, ThemeSettings theme, CancellationToken ct)
     {
         var vm = new SettingsViewModel
         {
             SiteName = site.SiteName,
             SiteTagline = site.Tagline,
             SiteBaseUrl = site.BaseUrl,
+            LogoMediaId = site.LogoMediaId,
+            FaviconMediaId = site.FaviconMediaId,
             DefaultLanguage = site.DefaultLanguage,
             LanguageMode = site.LanguageMode,
             TimeZoneId = site.TimeZone,
@@ -89,6 +95,10 @@ public class SettingsController : BaseAdminController
             AuditEnabled = auditEnabled,
             Theme = theme,
         };
+        if (site.LogoMediaId.HasValue)
+            vm.LogoUrl = (await _media.GetByIdAsync(site.LogoMediaId.Value, ct))?.Url;
+        if (site.FaviconMediaId.HasValue)
+            vm.FaviconUrl = (await _media.GetByIdAsync(site.FaviconMediaId.Value, ct))?.Url;
         PopulateAvailable(vm);
         try { vm.SampleFormatted = FcmsTime.Format(FcmsTime.Now, vm.DateTimeFormat); }
         catch { vm.SampleFormatted = "(invalid format)"; }

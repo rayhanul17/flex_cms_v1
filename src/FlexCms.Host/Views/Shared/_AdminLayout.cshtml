@@ -1,10 +1,45 @@
 @using FlexCms.Framework.Cms
+@using FlexCms.Framework.Services
 @using FlexCms.Framework.Themes
 @inject IMenuService MenuService
+@inject ISettingsService SettingsService
+@inject IMediaService MediaService
 @inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
 @{
     var menuItems = await MenuService.GetMenuAsync("AdminSidebar");
     var currentPath = Context.Request.Path.Value ?? "";
+
+    // Site identity — pulled from SiteSettings with safe fallbacks so admin
+    // never breaks when settings are unavailable (fresh install, DB hiccup).
+    string adminBrand = "FlexCMS";
+    string? logoUrl = null;
+    string? faviconUrl = null;
+    try
+    {
+        var snap = await SettingsService.GetAsync<SiteIdentitySnapshot>("site:general");
+        if (!string.IsNullOrWhiteSpace(snap.SiteName)) adminBrand = snap.SiteName;
+        if (snap.LogoMediaId.HasValue)
+        {
+            var m = await MediaService.GetByIdAsync(snap.LogoMediaId.Value);
+            if (m is not null) logoUrl = m.Url;
+        }
+        if (snap.FaviconMediaId.HasValue)
+        {
+            var m = await MediaService.GetByIdAsync(snap.FaviconMediaId.Value);
+            if (m is not null) faviconUrl = m.Url;
+        }
+    }
+    catch { /* settings unavailable on early boot — fall through to defaults */ }
+}
+@functions {
+    sealed class SiteIdentitySnapshot
+    {
+        public string SiteName { get; set; } = "";
+        public Guid? LogoMediaId { get; set; }
+        public Guid? FaviconMediaId { get; set; }
+    }
+}
+@{
 
     bool IsActive(FcmsMenuItem item) =>
         currentPath.Equals(item.Url, StringComparison.OrdinalIgnoreCase)
@@ -27,7 +62,15 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="csrf-token" content="@Antiforgery.GetAndStoreTokens(Context).RequestToken" />
-    <title>@ViewData["Title"] — FlexCMS Admin</title>
+    <title>@ViewData["Title"] — @adminBrand Admin</title>
+    @if (!string.IsNullOrEmpty(faviconUrl))
+    {
+        <link rel="icon" href="@faviconUrl" />
+    }
+    else
+    {
+        <link rel="icon" href="~/favicon.ico" />
+    }
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="~/lib/bootstrap-icons/font/bootstrap-icons.min.css" />
     <link rel="stylesheet" href="~/lib/datatables.net-bs5/css/dataTables.bootstrap5.min.css" />
@@ -46,7 +89,15 @@
 <nav id="sidebar">
     <div class="sidebar-header">
         <a class="sidebar-brand" asp-controller="Dashboard" asp-action="Index">
-            <i class="bi bi-grid-3x3-gap me-2"></i><span>FlexCMS</span>
+            @if (!string.IsNullOrEmpty(logoUrl))
+            {
+                <img src="@logoUrl" alt="@adminBrand" class="me-2" style="height:1.5rem;width:auto;object-fit:contain" />
+            }
+            else
+            {
+                <i class="bi bi-grid-3x3-gap me-2"></i>
+            }
+            <span>@adminBrand</span>
         </a>
         <!-- Toggle lives in the topbar (`#sidebar-toggle`) — single source
              of truth for both desktop collapse + mobile drawer. Removing

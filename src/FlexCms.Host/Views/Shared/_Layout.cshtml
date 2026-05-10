@@ -1,23 +1,45 @@
+@using FlexCms.Framework.Cms
 @using FlexCms.Framework.Services
 @using FlexCms.Framework.Themes
 @inject IFcmsContextService FcmsContext
 @inject ISettingsService SettingsService
+@inject IMediaService MediaService
 @{
-    // Resolve the public-facing site name from settings; fall back to a
-    // generic label if settings haven't been seeded yet (fresh install /
-    // setup-mode bypass).
+    // Resolve site identity from settings; fall back to safe defaults so the
+    // public site never breaks when settings are unavailable (fresh install,
+    // setup-mode bypass, or transient DB hiccup).
     string siteName = "FlexCMS";
+    string tagline = "";
+    string? logoUrl = null;
+    string? faviconUrl = null;
     try
     {
-        var snap = await SettingsService.GetAsync<SiteNameSnapshot>("site:general");
+        var snap = await SettingsService.GetAsync<SiteIdentitySnapshot>("site:general");
         if (!string.IsNullOrWhiteSpace(snap.SiteName)) siteName = snap.SiteName;
+        tagline = snap.Tagline ?? "";
+        if (snap.LogoMediaId.HasValue)
+        {
+            var m = await MediaService.GetByIdAsync(snap.LogoMediaId.Value);
+            if (m is not null) logoUrl = m.Url;
+        }
+        if (snap.FaviconMediaId.HasValue)
+        {
+            var m = await MediaService.GetByIdAsync(snap.FaviconMediaId.Value);
+            if (m is not null) faviconUrl = m.Url;
+        }
     }
     catch { /* settings service unavailable on very early boot */ }
     var themeMode = ThemeMode.Resolve(Context);
     var bsTheme = themeMode == ThemeMode.Dark ? "dark" : "light";
 }
 @functions {
-    sealed class SiteNameSnapshot { public string SiteName { get; set; } = ""; }
+    sealed class SiteIdentitySnapshot
+    {
+        public string SiteName { get; set; } = "";
+        public string? Tagline { get; set; }
+        public Guid? LogoMediaId { get; set; }
+        public Guid? FaviconMediaId { get; set; }
+    }
 }
 <!DOCTYPE html>
 <html lang="en" data-bs-theme="@bsTheme" data-theme-mode="@themeMode.ToString().ToLowerInvariant()">
@@ -25,6 +47,18 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>@ViewData["Title"] · @siteName</title>
+    @if (!string.IsNullOrEmpty(faviconUrl))
+    {
+        <link rel="icon" href="@faviconUrl" />
+    }
+    else
+    {
+        <link rel="icon" href="~/favicon.ico" />
+    }
+    @if (!string.IsNullOrEmpty(tagline))
+    {
+        <meta name="description" content="@tagline" />
+    }
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="~/lib/bootstrap-icons/font/bootstrap-icons.min.css" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
@@ -37,7 +71,15 @@
         <nav class="navbar navbar-expand-md bg-body border-bottom shadow-sm">
             <div class="container">
                 <a class="navbar-brand fw-semibold" asp-controller="Home" asp-action="Index">
-                    <i class="bi bi-grid-3x3-gap me-1"></i>@siteName
+                    @if (!string.IsNullOrEmpty(logoUrl))
+                    {
+                        <img src="@logoUrl" alt="@siteName" class="me-1" style="height:1.5rem;width:auto;object-fit:contain" />
+                    }
+                    else
+                    {
+                        <i class="bi bi-grid-3x3-gap me-1"></i>
+                    }
+                    @siteName
                 </a>
                 <!-- Bootstrap's default navbar-toggler-icon is a background-
                      image SVG that renders invisibly when the navbar isn't

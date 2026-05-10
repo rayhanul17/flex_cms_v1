@@ -29,6 +29,46 @@
                     <label asp-for="SiteBaseUrl" class="form-label"></label>
                     <input asp-for="SiteBaseUrl" class="form-control" placeholder="https://example.com" />
                 </div>
+                <div class="col-md-6">
+                    <label asp-for="LogoMediaId" class="form-label"></label>
+                    <div class="input-group">
+                        <input asp-for="LogoMediaId" class="form-control" readonly placeholder="No logo selected" />
+                        <button type="button" class="btn btn-outline-secondary"
+                                data-fcms-pick-image="#LogoMediaId" data-fcms-id-mode="1">
+                            <i class="bi bi-images"></i> Pick
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary"
+                                data-fcms-clear-image="#LogoMediaId" data-fcms-id-mode="1" title="Clear">
+                            <i class="bi bi-x-lg"></i>
+                        </button>
+                    </div>
+                    <small class="text-muted">Shown next to the site name in the public navbar and admin sidebar.</small>
+                    <div class="mt-2" data-fcms-image-preview-for="#LogoMediaId"
+                         style="@(string.IsNullOrEmpty(Model.LogoUrl) ? "display:none" : "")">
+                        <img src="@Model.LogoUrl" alt="Logo preview"
+                             style="max-height:48px; border-radius:.25rem; border:1px solid var(--bs-border-color); padding:.25rem; background:var(--bs-body-bg);" />
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <label asp-for="FaviconMediaId" class="form-label"></label>
+                    <div class="input-group">
+                        <input asp-for="FaviconMediaId" class="form-control" readonly placeholder="No favicon selected" />
+                        <button type="button" class="btn btn-outline-secondary"
+                                data-fcms-pick-image="#FaviconMediaId" data-fcms-id-mode="1">
+                            <i class="bi bi-images"></i> Pick
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary"
+                                data-fcms-clear-image="#FaviconMediaId" data-fcms-id-mode="1" title="Clear">
+                            <i class="bi bi-x-lg"></i>
+                        </button>
+                    </div>
+                    <small class="text-muted">Shown in browser tabs / bookmarks. Use a square image; ICO / PNG 32×32+ recommended.</small>
+                    <div class="mt-2" data-fcms-image-preview-for="#FaviconMediaId"
+                         style="@(string.IsNullOrEmpty(Model.FaviconUrl) ? "display:none" : "")">
+                        <img src="@Model.FaviconUrl" alt="Favicon preview"
+                             style="height:32px;width:32px; border-radius:.25rem; border:1px solid var(--bs-border-color); padding:.25rem; background:var(--bs-body-bg);" />
+                    </div>
+                </div>
                 <div class="col-md-3">
                     <label asp-for="DefaultLanguage" class="form-label"></label>
                     <select asp-for="DefaultLanguage" class="form-select">
@@ -106,6 +146,7 @@
 </form>
 
 @section Scripts {
+@await Html.PartialAsync("_MediaPicker")
 <script>
     // Live preview of the date-format input — pure JS approximation; server is canonical
     const tokens = {

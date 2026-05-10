@@ -56,20 +56,24 @@
     const upload = document.getElementById('fcmsMediaPickerUpload');
     const tok    = '@antiTok';
     let activeTargetSelector = null;   // which input is currently being filled
+    let activeIdMode         = false;  // true → write media GUID; false → write media URL
 
     // ── Helpers ──────────────────────────────────────────────────────
     function thumbForInput(selector) {
         return document.querySelector(`[data-fcms-image-preview-for="${CSS.escape(selector)}"]`);
     }
-    function setValue(selector, url) {
+    function setValue(selector, media) {
+        // media = { id, url } when called from picker; { url } from upload;
+        // empty string '' from the Clear button.
         const input = document.querySelector(selector);
         if (!input) return;
-        input.value = url || '';
+        const isEmpty = !media || media === '';
+        input.value = isEmpty ? '' : (activeIdMode ? media.id : media.url);
         input.dispatchEvent(new Event('change', { bubbles: true }));
         const preview = thumbForInput(selector);
         if (preview) {
-            if (url) {
-                preview.querySelector('img').src = url;
+            if (!isEmpty && media.url) {
+                preview.querySelector('img').src = media.url;
                 preview.style.display = '';
             } else {
                 preview.style.display = 'none';
@@ -88,14 +92,14 @@
             }
             grid.innerHTML = items.map(m => `
                 <div class="col-6 col-sm-4 col-md-3 col-lg-2">
-                    <button type="button" class="btn p-0 border w-100 h-100 fcms-pick-tile" data-url="${m.url}" title="${m.name}">
+                    <button type="button" class="btn p-0 border w-100 h-100 fcms-pick-tile" data-id="${m.id}" data-url="${m.url}" title="${m.name}">
                         <img src="${m.thumb}" class="w-100" style="aspect-ratio:1/1; object-fit:cover; border-radius:.25rem;" alt="${m.name}" />
                     </button>
                 </div>
             `).join('');
             grid.querySelectorAll('.fcms-pick-tile').forEach(btn => {
                 btn.addEventListener('click', () => {
-                    setValue(activeTargetSelector, btn.dataset.url);
+                    setValue(activeTargetSelector, { id: btn.dataset.id, url: btn.dataset.url });
                     modal.hide();
                 });
             });
@@ -119,7 +123,7 @@
             });
             const data = await r.json();
             if (data.isSuccess && data.data?.url) {
-                setValue(activeTargetSelector, data.data.url);
+                setValue(activeTargetSelector, { id: data.data.id, url: data.data.url });
                 status.textContent = 'Uploaded.';
                 modal.hide();
             } else {
@@ -133,9 +137,13 @@
     });
 
     // ── Wire all "Pick image" + "Clear" buttons on the page ──────────
+    // The button can opt into ID mode by adding data-fcms-id-mode="1" — used
+    // when the bound input holds a media GUID (e.g. SiteSettings.LogoMediaId)
+    // instead of a URL. Default is URL mode for backward compatibility.
     document.querySelectorAll('[data-fcms-pick-image]').forEach(btn => {
         btn.addEventListener('click', () => {
             activeTargetSelector = btn.getAttribute('data-fcms-pick-image');
+            activeIdMode         = btn.getAttribute('data-fcms-id-mode') === '1';
             status.textContent = 'Showing recent images.';
             loadGrid();
             modal.show();
@@ -143,6 +151,8 @@
     });
     document.querySelectorAll('[data-fcms-clear-image]').forEach(btn => {
         btn.addEventListener('click', () => {
+            // Honor the same id-mode flag so the right field type is cleared.
+            activeIdMode = btn.getAttribute('data-fcms-id-mode') === '1';
             setValue(btn.getAttribute('data-fcms-clear-image'), '');
         });
     });

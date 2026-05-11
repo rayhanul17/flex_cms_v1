@@ -27,24 +27,31 @@
            additional stylesheet edit needed for the public landing. */
         .home-hero {
             background:
-                radial-gradient(ellipse at 80% -10%, rgba(13, 110, 253, .18), transparent 50%),
+                radial-gradient(ellipse at 80% -10%, rgba(var(--bs-primary-rgb), .18), transparent 50%),
                 radial-gradient(ellipse at 0% 100%, rgba(111, 66, 193, .12), transparent 55%),
-                linear-gradient(180deg, #f8f9fc 0%, #ffffff 100%);
-            border-bottom: 1px solid #e9ecef;
+                var(--bs-body-bg);
+            border-bottom: 1px solid var(--bs-border-color);
         }
         .home-hero h1 {
-            background: linear-gradient(135deg, #0d6efd, #6f42c1);
+            background: linear-gradient(135deg, rgb(var(--bs-primary-rgb)), #6f42c1);
             -webkit-background-clip: text;
             background-clip: text;
             -webkit-text-fill-color: transparent;
+        }
+        /* Subtitle / tagline beneath the FlexCMS wordmark — text-muted from
+           Bootstrap is intentionally low-contrast for ancillary text, but the
+           hero subtitle is content. Force a more readable token. */
+        .home-hero .lead {
+            color: var(--bs-body-color) !important;
+            opacity: .85;
         }
         .home-hero .badge-pill {
             display: inline-flex;
             align-items: center;
             gap: .35rem;
-            background: rgba(13, 110, 253, .08);
-            color: #0d6efd;
-            border: 1px solid rgba(13, 110, 253, .2);
+            background: rgba(var(--bs-primary-rgb), .08);
+            color: rgb(var(--bs-primary-rgb));
+            border: 1px solid rgba(var(--bs-primary-rgb), .2);
             padding: .25rem .65rem;
             border-radius: 999px;
             font-size: .75rem;
@@ -111,18 +118,22 @@
             color: var(--card-accent, #0d6efd);
         }
 
-        /* Stats strip — full-bleed dark bar between sections. */
-        /* Stats strip — always-dark band by design (gives the page a
-           rhythm break between two light sections in light mode). Stays
-           dark in dark mode too; only the boundary borders flip. */
+        /* Stats strip — soft tinted band, follows the active theme.
+           Uses --bs-tertiary-bg for subtle separation from the body
+           sections above and below, with a faint primary-color overlay
+           for visual interest. Inverts naturally in dark mode. */
         .stats-strip {
-            background: linear-gradient(135deg, #1e2a3a, #0d1620);
-            color: #e7ecf1;
+            background:
+                linear-gradient(135deg, rgba(var(--bs-primary-rgb), .06), rgba(var(--bs-primary-rgb), .02)),
+                var(--bs-tertiary-bg);
+            color: var(--bs-body-color);
+            border-top: 1px solid var(--bs-border-color);
+            border-bottom: 1px solid var(--bs-border-color);
         }
         .stats-strip .stat-num {
             font-size: 2.25rem;
             font-weight: 700;
-            background: linear-gradient(135deg, #4dabf7, #b197fc);
+            background: linear-gradient(135deg, rgb(var(--bs-primary-rgb)), #6f42c1);
             -webkit-background-clip: text;
             background-clip: text;
             -webkit-text-fill-color: transparent;
@@ -131,7 +142,7 @@
             font-size: .8rem;
             text-transform: uppercase;
             letter-spacing: 1px;
-            color: #8a9bb1;
+            color: var(--bs-secondary-color);
         }
 
         /* Tech-stack chips — soft pill that adapts to theme. Hardcoded

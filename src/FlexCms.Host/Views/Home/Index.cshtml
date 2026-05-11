@@ -112,6 +112,9 @@
         }
 
         /* Stats strip — full-bleed dark bar between sections. */
+        /* Stats strip — always-dark band by design (gives the page a
+           rhythm break between two light sections in light mode). Stays
+           dark in dark mode too; only the boundary borders flip. */
         .stats-strip {
             background: linear-gradient(135deg, #1e2a3a, #0d1620);
             color: #e7ecf1;
@@ -131,26 +134,36 @@
             color: #8a9bb1;
         }
 
-        /* Tech-stack chips */
+        /* Tech-stack chips — soft pill that adapts to theme. Hardcoded
+           #f1f3f7 looked alien on dark mode (white pills on dark bg). */
         .tech-chip {
             display: inline-flex;
             align-items: center;
             gap: .35rem;
             padding: .35rem .75rem;
             border-radius: 999px;
-            background: #f1f3f7;
-            color: #495057;
+            background: var(--bs-tertiary-bg);
+            color: var(--bs-secondary-color);
             font-size: .8rem;
             font-weight: 500;
-            border: 1px solid #e3e7ed;
+            border: 1px solid var(--bs-border-color);
         }
 
-        /* Final CTA */
+        /* Final CTA — soft accent panel. Use Bootstrap theme tokens so
+           it inverts correctly in dark mode. The radial-gradient overlay
+           still picks up the primary tint via rgb(var(--bs-primary-rgb)). */
         .final-cta {
             background:
-                radial-gradient(ellipse at 50% 0%, rgba(13, 110, 253, .15), transparent 60%),
-                #f8f9fc;
-            border-top: 1px solid #e9ecef;
+                radial-gradient(ellipse at 50% 0%, rgba(var(--bs-primary-rgb), .15), transparent 60%),
+                var(--bs-tertiary-bg);
+            border-top: 1px solid var(--bs-border-color);
+        }
+
+        /* Feature grid section — explicit theme-aware bg so the
+           `bg-white` literal on the <section> doesn't fight dark mode.
+           The class is removed below; this rule is the replacement. */
+        .features-grid {
+            background: var(--bs-body-bg);
         }
     </style>
 }
@@ -370,7 +383,7 @@
 </section>
 
 <!-- ── Feature grid (6 small) ──────────────────────────────────────── -->
-<section class="py-5 bg-white">
+<section class="py-5 features-grid">
     <div class="container">
         <div class="text-center mb-5">
             <h2 class="fw-bold">More inside</h2>

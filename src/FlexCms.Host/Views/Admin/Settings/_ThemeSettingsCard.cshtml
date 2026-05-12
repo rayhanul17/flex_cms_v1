@@ -3,11 +3,15 @@
 <div class="card shadow-sm mb-3">
     <div class="card-header fw-semibold d-flex justify-content-between align-items-center">
         <span>Appearance</span>
-        <div class="d-flex gap-2">
+        <div class="d-flex flex-wrap gap-2">
             <button type="button" class="btn btn-sm btn-outline-secondary" onclick="applyPreset('default')">Default</button>
             <button type="button" class="btn btn-sm btn-outline-dark" onclick="applyPreset('dark-pro')">Dark Pro</button>
             <button type="button" class="btn btn-sm btn-outline-primary" onclick="applyPreset('corporate')">Corporate</button>
             <button type="button" class="btn btn-sm btn-outline-secondary" style="color:#6366f1;border-color:#6366f1" onclick="applyPreset('modern')">Modern</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" style="color:#ec4899;border-color:#ec4899" onclick="applyPreset('pinky')">Pinky</button>
+            <button type="button" class="btn btn-sm btn-outline-success" onclick="applyPreset('nature')">Nature</button>
+            <button type="button" class="btn btn-sm btn-outline-info" onclick="applyPreset('smooth')">Smooth</button>
+            <button type="button" class="btn btn-sm btn-outline-danger" onclick="applyPreset('angry')">Angry</button>
         </div>
     </div>
     <div class="card-body">
@@ -15,7 +19,6 @@
             <div class="col-md-6">
                 <h6 class="fw-semibold mb-3">Light Mode</h6>
                 <div class="row g-2">
-                    @{ void ColorInput(string fieldName, string label, string value) { }  }
                     <div class="col-6"><label class="form-label small">Primary</label><input type="color" name="Theme.Primary" value="@Model.Primary" class="form-control form-control-color w-100" /></div>
                     <div class="col-6"><label class="form-label small">Secondary</label><input type="color" name="Theme.Secondary" value="@Model.Secondary" class="form-control form-control-color w-100" /></div>
                     <div class="col-6"><label class="form-label small">Success</label><input type="color" name="Theme.Success" value="@Model.Success" class="form-control form-control-color w-100" /></div>
@@ -103,6 +106,46 @@ const PRESETS = {
         DarkBodyBg:'#0f0e2a',DarkBodyColor:'#e5e7eb',DarkBorderColor:'#312e81',DarkLinkColor:'#818cf8',
         DarkCardBg:'#1e1b4b',DarkNavbarBg:'#0f0e2a',DarkFooterBg:'#06050f',DarkFooterColor:'#6b7280',
         DarkSidebarBg:'#06050f',DarkSidebarColor:'#a5b4fc'
+    },
+    'pinky': {
+        Primary:'#ec4899',Secondary:'#9d174d',Success:'#10b981',Danger:'#dc2626',Warning:'#fbbf24',Info:'#06b6d4',
+        BodyBg:'#fdf2f8',BodyColor:'#500724',BorderColor:'#fbcfe8',LinkColor:'#db2777',
+        CardBg:'#ffffff',NavbarBg:'#ffffff',FooterBg:'#fce7f3',FooterColor:'#9d174d',
+        SidebarBg:'#831843',SidebarColor:'#fbcfe8',
+        DarkPrimary:'#f472b6',DarkSecondary:'#fb7185',DarkSuccess:'#34d399',DarkDanger:'#f87171',DarkWarning:'#fde047',DarkInfo:'#22d3ee',
+        DarkBodyBg:'#1f0a16',DarkBodyColor:'#fce7f3',DarkBorderColor:'#581c33',DarkLinkColor:'#f472b6',
+        DarkCardBg:'#39131f',DarkNavbarBg:'#1f0a16',DarkFooterBg:'#150709',DarkFooterColor:'#be185d',
+        DarkSidebarBg:'#150709',DarkSidebarColor:'#fbcfe8'
+    },
+    'nature': {
+        Primary:'#16a34a',Secondary:'#65a30d',Success:'#22c55e',Danger:'#b91c1c',Warning:'#ca8a04',Info:'#0891b2',
+        BodyBg:'#f0fdf4',BodyColor:'#14532d',BorderColor:'#bbf7d0',LinkColor:'#15803d',
+        CardBg:'#ffffff',NavbarBg:'#ffffff',FooterBg:'#dcfce7',FooterColor:'#166534',
+        SidebarBg:'#14532d',SidebarColor:'#bbf7d0',
+        DarkPrimary:'#4ade80',DarkSecondary:'#a3e635',DarkSuccess:'#86efac',DarkDanger:'#fca5a5',DarkWarning:'#facc15',DarkInfo:'#67e8f9',
+        DarkBodyBg:'#052e16',DarkBodyColor:'#dcfce7',DarkBorderColor:'#14532d',DarkLinkColor:'#4ade80',
+        DarkCardBg:'#0a3d1f',DarkNavbarBg:'#052e16',DarkFooterBg:'#031a0c',DarkFooterColor:'#86efac',
+        DarkSidebarBg:'#031a0c',DarkSidebarColor:'#86efac'
+    },
+    'smooth': {
+        Primary:'#0ea5e9',Secondary:'#94a3b8',Success:'#14b8a6',Danger:'#f43f5e',Warning:'#eab308',Info:'#3b82f6',
+        BodyBg:'#f8fafc',BodyColor:'#334155',BorderColor:'#e2e8f0',LinkColor:'#0284c7',
+        CardBg:'#ffffff',NavbarBg:'#ffffff',FooterBg:'#f1f5f9',FooterColor:'#64748b',
+        SidebarBg:'#334155',SidebarColor:'#cbd5e1',
+        DarkPrimary:'#38bdf8',DarkSecondary:'#cbd5e1',DarkSuccess:'#2dd4bf',DarkDanger:'#fb7185',DarkWarning:'#facc15',DarkInfo:'#60a5fa',
+        DarkBodyBg:'#0f172a',DarkBodyColor:'#e2e8f0',DarkBorderColor:'#1e293b',DarkLinkColor:'#38bdf8',
+        DarkCardBg:'#1e293b',DarkNavbarBg:'#0f172a',DarkFooterBg:'#020617',DarkFooterColor:'#94a3b8',
+        DarkSidebarBg:'#020617',DarkSidebarColor:'#94a3b8'
+    },
+    'angry': {
+        Primary:'#dc2626',Secondary:'#525252',Success:'#16a34a',Danger:'#991b1b',Warning:'#ea580c',Info:'#7c3aed',
+        BodyBg:'#fef2f2',BodyColor:'#1f0808',BorderColor:'#fecaca',LinkColor:'#b91c1c',
+        CardBg:'#ffffff',NavbarBg:'#7f1d1d',FooterBg:'#450a0a',FooterColor:'#fca5a5',
+        SidebarBg:'#450a0a',SidebarColor:'#fecaca',
+        DarkPrimary:'#ef4444',DarkSecondary:'#a3a3a3',DarkSuccess:'#22c55e',DarkDanger:'#dc2626',DarkWarning:'#f97316',DarkInfo:'#a78bfa',
+        DarkBodyBg:'#1f0808',DarkBodyColor:'#fecaca',DarkBorderColor:'#450a0a',DarkLinkColor:'#fb7185',
+        DarkCardBg:'#3d0a0a',DarkNavbarBg:'#1f0808',DarkFooterBg:'#0a0202',DarkFooterColor:'#dc2626',
+        DarkSidebarBg:'#0a0202',DarkSidebarColor:'#fecaca'
     }
 };
 

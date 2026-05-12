@@ -106,8 +106,19 @@ body {
     min-height: 44px;
 }
 
-#sidebar .nav-link:hover { color: #fff; background: #2d3f53; }
-#sidebar .nav-link.active { color: #fff; background: var(--bs-primary, #0d6efd); }
+/* Hover / active backgrounds derive from --fcms-sidebar-bg via color-mix
+   so when the admin changes the sidebar colour, hover and child states
+   shift in lock-step. Falls back to fixed dark-blue tints in browsers
+   without color-mix support (Safari < 16.4 / Edge < 111). */
+#sidebar .nav-link:hover {
+    color: #fff;
+    background: #2d3f53;
+    background: color-mix(in srgb, var(--fcms-sidebar-bg, #1e2a3a) 78%, #ffffff 22%);
+}
+#sidebar .nav-link.active {
+    color: #fff;
+    background: var(--bs-primary, #0d6efd);
+}
 
 #sidebar .nav-link i {
     width: 1.1rem;
@@ -130,7 +141,12 @@ body {
     transform: rotate(90deg);
 }
 
-#sidebar .nav-children { background: #17222f; padding: 0; }
+/* Children panel: a touch darker than parent. Same color-mix dance. */
+#sidebar .nav-children {
+    background: #17222f;
+    background: color-mix(in srgb, var(--fcms-sidebar-bg, #1e2a3a) 88%, #000000 12%);
+    padding: 0;
+}
 
 #sidebar .nav-children .nav-link {
     padding-left: 2.75rem;
@@ -138,7 +154,10 @@ body {
     color: #9aa9bd;
 }
 
-#sidebar .nav-children .nav-link:hover { background: #243443; }
+#sidebar .nav-children .nav-link:hover {
+    background: #243443;
+    background: color-mix(in srgb, var(--fcms-sidebar-bg, #1e2a3a) 70%, #ffffff 30%);
+}
 #sidebar .nav-children .nav-link.active { background: var(--bs-primary, #0d6efd); color: #fff; }
 
 /* ── Sidebar footer (notifications + user menu) ──────────────────────── */

@@ -307,6 +307,7 @@ public class SeedService : IHostedService
         new() { DefaultName = "Blog",       Icon = "bi bi-journal-richtext", Url = "#blog",   Order = 10 },
         new() { DefaultName = "Posts",      Icon = "bi bi-newspaper",   Url = "/admin/posts",      Order = 11, ParentDefaultName = "Blog", RequiredPermission = FcmsPermissions.PostsEdit },
         new() { DefaultName = "Categories", Icon = "bi bi-folder",      Url = "/admin/categories", Order = 12, ParentDefaultName = "Blog", RequiredPermission = FcmsPermissions.CategoriesEdit },
+        new() { DefaultName = "Comments",   Icon = "bi bi-chat-left-text", Url = "/admin/comments", Order = 13, ParentDefaultName = "Blog", RequiredPermission = FcmsPermissions.CommentsModerate },
 
         // Standalone content
         new() { DefaultName = "Pages",      Icon = "bi bi-file-earmark", Url = "/admin/pages",     Order = 20, RequiredPermission = FcmsPermissions.PagesEdit },

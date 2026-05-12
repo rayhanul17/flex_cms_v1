@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace FlexCms.Host.Controllers.Admin;
 
-[FcmsAuthorize]
+[FcmsAuthorize(FcmsPermissions.PostsEdit)]
 [Route("admin/trash")]
 public class TrashController : BaseAdminController
 {

@@ -43,10 +43,10 @@ public class CommentController : BaseAdminController
         ViewBag.SelectedStatus = requestedStatus;
         ViewBag.Counts = new Dictionary<CommentStatus, int>
         {
-            [CommentStatus.Pending]  = all.Count(c => c.CommentStatus == CommentStatus.Pending),
+            [CommentStatus.Pending] = all.Count(c => c.CommentStatus == CommentStatus.Pending),
             [CommentStatus.Approved] = all.Count(c => c.CommentStatus == CommentStatus.Approved),
-            [CommentStatus.Spam]     = all.Count(c => c.CommentStatus == CommentStatus.Spam),
-            [CommentStatus.Trashed]  = all.Count(c => c.CommentStatus == CommentStatus.Trashed),
+            [CommentStatus.Spam] = all.Count(c => c.CommentStatus == CommentStatus.Spam),
+            [CommentStatus.Trashed] = all.Count(c => c.CommentStatus == CommentStatus.Trashed),
         };
         return View(rows);
     }

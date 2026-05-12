@@ -18,11 +18,12 @@
             confirm-name-field="title"
             edit-permission="@FcmsPermissions.PagesEdit"
             delete-permission="@FcmsPermissions.PagesDelete">
-            <fcms-data-column field="title"       header="Title"     sortable="true" />
-            <fcms-data-column field="slug"        header="Slug"      type="code" sortable="true" />
-            <fcms-data-column field="isPublished" header="Published" type="bool" sortable="true" />
-            <fcms-data-column field="status"      header="Status"    type="status" sortable="true" />
-            <fcms-data-column field="updatedAt"   header="Updated"   type="date" sortable="true" default-sort="desc" />
+            <fcms-data-column field="title"       header="Title"      sortable="true" />
+            <fcms-data-column field="slug"        header="Slug"       type="code" sortable="true" />
+            <fcms-data-column field="publicUrl"   header="Public URL" type="link" sortable="false" searchable="false" />
+            <fcms-data-column field="isPublished" header="Published"  type="bool" sortable="true" />
+            <fcms-data-column field="status"      header="Status"     type="status" sortable="true" />
+            <fcms-data-column field="updatedAt"   header="Updated"    type="date" sortable="true" default-sort="desc" />
         </fcms-data-table>
     </div>
 </div>

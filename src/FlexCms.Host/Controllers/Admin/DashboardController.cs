@@ -10,6 +10,7 @@ using Microsoft.Extensions.Caching.Memory;
 namespace FlexCms.Host.Controllers.Admin;
 
 [Route("admin")]
+[FcmsAuthorize(FcmsPermissions.SettingsView)]
 public class DashboardController : BaseAdminController
 {
     private readonly IRepository<FcmsPage> _pages;

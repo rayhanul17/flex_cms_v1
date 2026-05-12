@@ -65,6 +65,16 @@
                     : '<i class="bi bi-x-lg text-muted"></i>';
             case 'code':
                 return `<code class="small">${escapeHtml(value)}</code>`;
+            case 'link': {
+                // Renders an external link with copy + open buttons.
+                // Useful for "Public URL" columns on Page / Post listings.
+                const url = String(value);
+                const safe = escapeHtml(url);
+                return `<span class="d-inline-flex align-items-center gap-1">
+                    <a href="${safe}" target="_blank" rel="noopener" class="text-truncate" style="max-width:280px" title="${safe}">${safe}</a>
+                    <button type="button" class="btn btn-sm btn-link p-0" title="Copy" onclick="navigator.clipboard.writeText('${safe.replace(/'/g, "\\'")}').then(() => fcms.toast?.success('URL copied.'))"><i class="bi bi-clipboard"></i></button>
+                </span>`;
+            }
             default:
                 return escapeHtml(value);
         }

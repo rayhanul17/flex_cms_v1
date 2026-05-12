@@ -1,9 +1,11 @@
 using System.Linq.Expressions;
+using FlexCms.Core.Models.Settings;
 using FlexCms.Framework.Auth;
 using FlexCms.Framework.Clock;
 using FlexCms.Framework.Cms;
 using FlexCms.Framework.Db;
 using FlexCms.Framework.Models;
+using FlexCms.Framework.Services;
 using FlexCms.Host.Models.Admin;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
@@ -33,7 +35,7 @@ public class PostController : BaseAdminController
 
     [HttpPost("datatable")]
     [ValidateAntiForgeryToken]
-    public Task<IActionResult> DataTable(DataTablesRequest req, CancellationToken ct)
+    public async Task<IActionResult> DataTable(DataTablesRequest req, CancellationToken ct)
     {
         var orderColumns = new Expression<Func<FcmsPost, object>>[]
         {
@@ -43,7 +45,22 @@ public class PostController : BaseAdminController
             p => p.ViewCount,
             p => p.CreatedAt
         };
-        return DataTableResult(
+
+        var settings = HttpContext.RequestServices.GetService<ISettingsService>();
+        var baseUrl = "";
+        if (settings is not null)
+        {
+            try
+            {
+                var s = await settings.GetAsync<SiteSettings>("site:general", ct: ct);
+                baseUrl = (s?.BaseUrl ?? "").TrimEnd('/');
+            }
+            catch { /* ignored */ }
+        }
+        if (string.IsNullOrEmpty(baseUrl))
+            baseUrl = $"{Request.Scheme}://{Request.Host}";
+
+        return await DataTableResult(
             _postRepo.Query(),
             req,
             select: p => new
@@ -51,6 +68,7 @@ public class PostController : BaseAdminController
                 Id = p.Id,
                 Title = p.Title,
                 Slug = p.Slug,
+                PublicUrl = $"{baseUrl}/blog/{p.Slug}",
                 IsPublished = p.IsPublished,
                 ViewCount = p.ViewCount,
                 CreatedAt = p.CreatedAt,

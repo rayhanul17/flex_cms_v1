@@ -12,7 +12,7 @@ using Microsoft.Extensions.Logging;
 
 namespace FlexCms.Host.Controllers.Admin;
 
-[FcmsAuthorize]
+[FcmsAuthorize(FcmsPermissions.SystemManage)]
 [Route("admin/modules")]
 public class ModulesController : BaseAdminController
 {

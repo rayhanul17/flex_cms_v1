@@ -1,10 +1,12 @@
 using System.Linq.Expressions;
+using FlexCms.Core.Models.Settings;
 using FlexCms.Framework.Auth;
 using FlexCms.Framework.Clock;
 using FlexCms.Framework.Cms;
 using FlexCms.Framework.Db;
 using FlexCms.Framework.Helpers;
 using FlexCms.Framework.Models;
+using FlexCms.Framework.Services;
 using FlexCms.Host.Models.Admin;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
@@ -32,7 +34,7 @@ public class PageController : BaseAdminController
 
     [HttpPost("datatable")]
     [ValidateAntiForgeryToken]
-    public Task<IActionResult> DataTable(DataTablesRequest req, CancellationToken ct)
+    public async Task<IActionResult> DataTable(DataTablesRequest req, CancellationToken ct)
     {
         var orderColumns = new Expression<Func<FcmsPage, object>>[]
         {
@@ -42,7 +44,24 @@ public class PageController : BaseAdminController
             p => p.Status,
             p => p.UpdatedAt
         };
-        return DataTableResult(
+        // Resolve site BaseUrl once per request so the DataTables payload can
+        // include each page's full public URL (admin can click it / copy).
+        // Fallback to current request scheme+host when BaseUrl is empty.
+        var settings = HttpContext.RequestServices.GetService<ISettingsService>();
+        var baseUrl = "";
+        if (settings is not null)
+        {
+            try
+            {
+                var s = await settings.GetAsync<SiteSettings>("site:general", ct: ct);
+                baseUrl = (s?.BaseUrl ?? "").TrimEnd('/');
+            }
+            catch { /* ignored */ }
+        }
+        if (string.IsNullOrEmpty(baseUrl))
+            baseUrl = $"{Request.Scheme}://{Request.Host}";
+
+        return await DataTableResult(
             _pageRepo.Query(),
             req,
             select: p => new
@@ -50,6 +69,7 @@ public class PageController : BaseAdminController
                 Id = p.Id,
                 Title = p.Title,
                 Slug = p.Slug,
+                PublicUrl = $"{baseUrl}/{p.Slug}",
                 IsPublished = p.IsPublished,
                 Status = (int)p.Status,
                 UpdatedAt = p.UpdatedAt

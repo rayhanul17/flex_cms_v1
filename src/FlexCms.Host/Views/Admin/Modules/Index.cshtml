@@ -3,12 +3,42 @@
     ViewData["Title"] = "Modules";
 }
 
+<form id="csrf" style="display:none">@Html.AntiForgeryToken()</form>
+
 <div class="d-flex justify-content-between align-items-center mb-3">
     <h4 class="mb-0">Installed Modules</h4>
-    @if (ViewBag.IsDevelopment == true)
-    {
-        <a asp-action="Scaffold" class="btn btn-sm btn-outline-secondary">+ Create New Module</a>
-    }
+    <div class="d-flex gap-2">
+        <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#uploadModuleModal">
+            <i class="bi bi-upload"></i> Upload Module
+        </button>
+        @if (ViewBag.IsDevelopment == true)
+        {
+            <a asp-action="Scaffold" class="btn btn-sm btn-outline-secondary">+ Create New Module</a>
+        }
+    </div>
+</div>
+
+<div class="modal fade" id="uploadModuleModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Upload Module</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="small text-muted">Upload a packaged module <code>.zip</code>. The archive root must contain (or contain a single folder containing) the module DLL plus <code>module.json</code>.</p>
+                <input type="file" id="moduleZipInput" class="form-control" accept=".zip" />
+                <div class="form-check mt-3">
+                    <input type="checkbox" id="moduleOverwrite" class="form-check-input" />
+                    <label for="moduleOverwrite" class="form-check-label small">Overwrite if a module folder with the same ID already exists.</label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="moduleUploadBtn">Upload</button>
+            </div>
+        </div>
+    </div>
 </div>
 
 @if (!Model.Modules.Any())
@@ -200,6 +230,41 @@ else
         document.getElementById('restartBanner').innerHTML =
             '<strong>Restarting…</strong> The page will be available again in a moment.';
         setTimeout(() => location.reload(), 5000);
+    });
+
+    // ── Upload module ZIP ─────────────────────────────────────────────────
+    const uploadBtn = document.getElementById('moduleUploadBtn');
+    if (uploadBtn) uploadBtn.addEventListener('click', async () => {
+        const fileInput = document.getElementById('moduleZipInput');
+        const overwrite = document.getElementById('moduleOverwrite').checked;
+        if (!fileInput.files.length) {
+            fcms.toast.warning('Pick a .zip file first.');
+            return;
+        }
+        const fd = new FormData();
+        fd.append('file', fileInput.files[0]);
+        fd.append('overwrite', overwrite);
+        uploadBtn.disabled = true;
+        try {
+            const csrfToken = document.querySelector('#csrf input[name=__RequestVerificationToken]').value;
+            const r = await fetch('/admin/modules/upload', {
+                method: 'POST',
+                headers: { 'X-FlexCms-Csrf': csrfToken },
+                body: fd
+            });
+            const json = await r.json();
+            if (json.isSuccess) {
+                fcms.toast.success(json.message);
+                bootstrap.Modal.getInstance(document.getElementById('uploadModuleModal'))?.hide();
+                document.getElementById('restartBanner').classList.remove('d-none');
+            } else {
+                fcms.toast.danger(json.message || 'Upload failed.');
+            }
+        } catch {
+            fcms.toast.danger('Network error.');
+        } finally {
+            uploadBtn.disabled = false;
+        }
     });
 })();
 </script>

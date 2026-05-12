@@ -1,3 +1,4 @@
+using System.IO.Compression;
 using FlexCms.Framework.Auth;
 using FlexCms.Framework.Cms;
 using FlexCms.Framework.Db;
@@ -165,6 +166,109 @@ public class ModulesController : BaseAdminController
             return Task.CompletedTask;
         });
         return FcmsOk("Restart triggered.");
+    }
+
+    // ── Upload a module ZIP ───────────────────────────────────────────────────
+    // Accepts a ZIP whose root contains the module DLL + module.json (or a
+    // single top-level folder containing them). Extracts under the solution's
+    // modules/ directory; the module is loaded on the next app restart.
+    //
+    // Security: rejects path-traversal entries (anything with .. or absolute
+    // paths) and refuses to overwrite an existing module folder unless the
+    // caller passes overwrite=true.
+
+    [HttpPost("upload")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Upload(IFormFile? file, bool overwrite = false, CancellationToken ct = default)
+    {
+        if (file is null || file.Length == 0) return FcmsFail("No file uploaded.");
+        if (!file.FileName.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
+            return FcmsFail("Module package must be a .zip file.");
+
+        var solutionRoot = FindSolutionRoot(_env.ContentRootPath);
+        if (solutionRoot is null) return FcmsFail("Could not locate the solution root.");
+
+        var modulesRoot = Path.Combine(solutionRoot, "modules");
+        Directory.CreateDirectory(modulesRoot);
+
+        // Stage to a temp folder first so a malformed ZIP doesn't pollute
+        // modules/ with a half-extracted directory.
+        var stagingDir = Path.Combine(Path.GetTempPath(), "fcms_module_upload_" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(stagingDir);
+
+        try
+        {
+            await using (var fs = System.IO.File.Create(Path.Combine(stagingDir, file.FileName), 81920, FileOptions.Asynchronous))
+                await file.CopyToAsync(fs, ct);
+
+            using var archive = System.IO.Compression.ZipFile.OpenRead(Path.Combine(stagingDir, file.FileName));
+            var extractDir = Path.Combine(stagingDir, "extracted");
+            Directory.CreateDirectory(extractDir);
+
+            foreach (var entry in archive.Entries)
+            {
+                // Path-traversal guard
+                if (entry.FullName.Contains("..") || Path.IsPathRooted(entry.FullName))
+                    return FcmsFail($"Refusing unsafe path in archive: {entry.FullName}");
+
+                var dest = Path.GetFullPath(Path.Combine(extractDir, entry.FullName));
+                if (!dest.StartsWith(Path.GetFullPath(extractDir) + Path.DirectorySeparatorChar, StringComparison.Ordinal))
+                    return FcmsFail($"Refusing escape from extract dir: {entry.FullName}");
+
+                if (string.IsNullOrEmpty(entry.Name)) { Directory.CreateDirectory(dest); continue; }
+                Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
+                ZipFileExtensions.ExtractToFile(entry, dest, overwrite: true);
+            }
+
+            // Find module.json — either at extract root or one folder deep
+            var manifestPath = Directory.GetFiles(extractDir, "module.json", SearchOption.AllDirectories)
+                .OrderBy(p => p.Length).FirstOrDefault();
+            if (manifestPath is null) return FcmsFail("Archive does not contain module.json.");
+
+            var moduleSrcDir = Path.GetDirectoryName(manifestPath)!;
+            var manifestJson = await System.IO.File.ReadAllTextAsync(manifestPath, ct);
+            string? moduleId;
+            try
+            {
+                using var doc = System.Text.Json.JsonDocument.Parse(manifestJson);
+                moduleId = doc.RootElement.TryGetProperty("ModuleId", out var v) ? v.GetString() : null;
+            }
+            catch (Exception ex) { return FcmsFail($"module.json is invalid JSON: {ex.Message}"); }
+
+            if (string.IsNullOrWhiteSpace(moduleId))
+                return FcmsFail("module.json is missing the ModuleId property.");
+            if (moduleId.Contains('/') || moduleId.Contains('\\') || moduleId.Contains(".."))
+                return FcmsFail($"ModuleId contains invalid characters: {moduleId}");
+
+            var dest2 = Path.Combine(modulesRoot, moduleId);
+            if (Directory.Exists(dest2) && !overwrite)
+                return FcmsFail($"A module folder named \"{moduleId}\" already exists. Re-upload with the overwrite option to replace it.");
+            if (Directory.Exists(dest2)) Directory.Delete(dest2, recursive: true);
+
+            CopyDirectory(moduleSrcDir, dest2);
+            return FcmsOk($"Module \"{moduleId}\" uploaded. Restart the app to load it.", new { moduleId });
+        }
+        catch (InvalidDataException)
+        {
+            return FcmsFail("File is not a valid ZIP archive.");
+        }
+        catch (Exception ex)
+        {
+            return FcmsFail($"Upload failed: {ex.Message}");
+        }
+        finally
+        {
+            try { Directory.Delete(stagingDir, recursive: true); } catch { /* best effort */ }
+        }
+    }
+
+    private static void CopyDirectory(string src, string dest)
+    {
+        Directory.CreateDirectory(dest);
+        foreach (var dir in Directory.GetDirectories(src, "*", SearchOption.AllDirectories))
+            Directory.CreateDirectory(dir.Replace(src, dest, StringComparison.Ordinal));
+        foreach (var file in Directory.GetFiles(src, "*", SearchOption.AllDirectories))
+            System.IO.File.Copy(file, file.Replace(src, dest, StringComparison.Ordinal), overwrite: true);
     }
 
     // ── Dev-mode scaffold ─────────────────────────────────────────────────────

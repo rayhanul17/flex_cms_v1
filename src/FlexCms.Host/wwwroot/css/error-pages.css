@@ -1,8 +1,54 @@
-/* Shared styles for the four full-screen error pages (401/403/404/500). */
+/* Shared styles for the four full-screen error pages (401/403/404/500).
+   Theme-aware: light gradient defaults; dark variant kicks in via
+   [data-bs-theme="dark"]. Each status code keeps its accent hue but the
+   surface adapts so the page reads well in both modes. */
+
+:root {
+    --fcms-err-bg-from:   #f0f4ff;
+    --fcms-err-bg-via:    #e8eeff;
+    --fcms-err-bg-to:     #f8f9fc;
+    --fcms-err-text:      #1f2937;
+    --fcms-err-text-soft: rgba(31, 41, 55, .65);
+    --fcms-err-card-bg:   rgba(255, 255, 255, .65);
+    --fcms-err-card-bd:   rgba(15, 23, 42, .12);
+    --fcms-err-shadow:    0 25px 50px -12px rgba(15, 23, 42, .2);
+    --fcms-err-h1-from:   #2563eb;
+    --fcms-err-h1-to:     #06b6d4;
+    --fcms-err-icon:      #2563eb;
+    --fcms-err-icon-glow: rgba(37, 99, 235, .35);
+    --fcms-err-status:    rgba(15, 23, 42, .05);
+    --fcms-err-btn-from:  #2563eb;
+    --fcms-err-btn-to:    #0ea5e9;
+    --fcms-err-outline-bd:rgba(15, 23, 42, .25);
+    --fcms-err-outline-bg-hover: rgba(15, 23, 42, .06);
+}
+
+[data-bs-theme="dark"] {
+    --fcms-err-bg-from:   #0f0c29;
+    --fcms-err-bg-via:    #302b63;
+    --fcms-err-bg-to:     #24243e;
+    --fcms-err-text:      #f3f4f6;
+    --fcms-err-text-soft: rgba(255, 255, 255, .75);
+    --fcms-err-card-bg:   rgba(255, 255, 255, .05);
+    --fcms-err-card-bd:   rgba(255, 255, 255, .1);
+    --fcms-err-shadow:    0 25px 50px -12px rgba(0, 0, 0, .5);
+    --fcms-err-h1-from:   #00f2fe;
+    --fcms-err-h1-to:     #4facfe;
+    --fcms-err-icon:      #4facfe;
+    --fcms-err-icon-glow: rgba(79, 172, 254, .5);
+    --fcms-err-status:    rgba(255, 255, 255, .04);
+    --fcms-err-btn-from:  #00c6ff;
+    --fcms-err-btn-to:    #0072ff;
+    --fcms-err-outline-bd:rgba(255, 255, 255, .2);
+    --fcms-err-outline-bg-hover: rgba(255, 255, 255, .1);
+}
 
 .fcms-error-page {
-    background: radial-gradient(circle at center, #0f0c29 0%, #302b63 50%, #24243e 100%);
-    color: #fff;
+    background: radial-gradient(circle at center,
+                var(--fcms-err-bg-from) 0%,
+                var(--fcms-err-bg-via) 50%,
+                var(--fcms-err-bg-to) 100%);
+    color: var(--fcms-err-text);
     height: 100vh;
     display: flex;
     align-items: center;
@@ -12,20 +58,25 @@
     margin: 0;
 }
 
-.fcms-error-page.fcms-error-401 { background: radial-gradient(circle at center, #1f3a5f 0%, #0d1b2a 100%); }
-.fcms-error-page.fcms-error-403 { background: radial-gradient(circle at center, #5f1f1f 0%, #2a0d0d 100%); }
-.fcms-error-page.fcms-error-500 { background: radial-gradient(circle at center, #5f3f1f 0%, #2a1d0d 100%); }
+/* Per-status accent shifts (subtle in light, more dramatic in dark). */
+[data-bs-theme="light"] .fcms-error-page.fcms-error-401 { background: radial-gradient(circle at center, #dbeafe 0%, #f0f7ff 100%); }
+[data-bs-theme="light"] .fcms-error-page.fcms-error-403 { background: radial-gradient(circle at center, #fee2e2 0%, #fff5f5 100%); }
+[data-bs-theme="light"] .fcms-error-page.fcms-error-500 { background: radial-gradient(circle at center, #fef3c7 0%, #fffbf0 100%); }
+
+[data-bs-theme="dark"] .fcms-error-page.fcms-error-401 { background: radial-gradient(circle at center, #1f3a5f 0%, #0d1b2a 100%); }
+[data-bs-theme="dark"] .fcms-error-page.fcms-error-403 { background: radial-gradient(circle at center, #5f1f1f 0%, #2a0d0d 100%); }
+[data-bs-theme="dark"] .fcms-error-page.fcms-error-500 { background: radial-gradient(circle at center, #5f3f1f 0%, #2a1d0d 100%); }
 
 .fcms-error-page .glass-card {
-    background: rgba(255, 255, 255, 0.05);
+    background: var(--fcms-err-card-bg);
     backdrop-filter: blur(15px);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    border: 1px solid var(--fcms-err-card-bd);
     border-radius: 24px;
     padding: 3rem;
     max-width: 600px;
     width: 90%;
     text-align: center;
-    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    box-shadow: var(--fcms-err-shadow);
     animation: fcms-error-fade-in 0.6s ease-out;
 }
 
@@ -38,22 +89,24 @@
     font-weight: 800;
     font-size: 2.5rem;
     margin-bottom: 1rem;
-    background: linear-gradient(45deg, #00f2fe, #4facfe);
+    background: linear-gradient(45deg, var(--fcms-err-h1-from), var(--fcms-err-h1-to));
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
+    background-clip: text;
+    color: transparent;
 }
 
 .fcms-error-page p {
-    color: rgba(255, 255, 255, 0.75);
+    color: var(--fcms-err-text-soft);
     font-size: 1.05rem;
     line-height: 1.6;
     margin-bottom: 2rem;
 }
 
 .fcms-error-page .btn-premium {
-    background: linear-gradient(45deg, #00c6ff, #0072ff);
+    background: linear-gradient(45deg, var(--fcms-err-btn-from), var(--fcms-err-btn-to));
     border: none;
-    color: white;
+    color: #fff;
     padding: 0.7rem 1.6rem;
     border-radius: 12px;
     font-weight: 600;
@@ -65,14 +118,14 @@
 
 .fcms-error-page .btn-premium:hover {
     transform: translateY(-2px);
-    box-shadow: 0 10px 20px rgba(0, 198, 255, 0.4);
+    box-shadow: 0 10px 20px var(--fcms-err-icon-glow);
     color: #fff;
 }
 
 .fcms-error-page .btn-outline {
     background: transparent;
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    color: #fff;
+    border: 1px solid var(--fcms-err-outline-bd);
+    color: var(--fcms-err-text);
     padding: 0.7rem 1.6rem;
     border-radius: 12px;
     font-weight: 600;
@@ -83,16 +136,15 @@
 }
 
 .fcms-error-page .btn-outline:hover {
-    background: rgba(255, 255, 255, 0.1);
-    border-color: rgba(255, 255, 255, 0.4);
-    color: #fff;
+    background: var(--fcms-err-outline-bg-hover);
+    color: var(--fcms-err-text);
 }
 
 .fcms-error-page .error-image-fallback {
     font-size: 6rem;
-    color: #4facfe;
+    color: var(--fcms-err-icon);
     margin-bottom: 1.5rem;
-    filter: drop-shadow(0 0 20px rgba(79, 172, 254, 0.5));
+    filter: drop-shadow(0 0 20px var(--fcms-err-icon-glow));
 }
 
 .fcms-error-page .status-code {
@@ -101,13 +153,12 @@
     right: 2rem;
     font-weight: 900;
     font-size: 8rem;
-    color: rgba(255, 255, 255, 0.04);
+    color: var(--fcms-err-status);
     user-select: none;
     z-index: 0;
     pointer-events: none;
 }
 
-/* Mobile: stack action buttons full-width with 44px tap targets. */
 @media (max-width: 575.98px) {
     .fcms-error-page .glass-card { padding: 2rem 1.25rem; border-radius: 16px; }
     .fcms-error-page h1 { font-size: 1.75rem; }

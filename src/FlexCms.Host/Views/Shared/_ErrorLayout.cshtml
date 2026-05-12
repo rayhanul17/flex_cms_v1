@@ -1,0 +1,40 @@
+@using FlexCms.Framework.Themes
+@{
+    Layout = null;
+    var themeMode = ThemeMode.Resolve(Context);
+    var bsTheme = themeMode == ThemeMode.Dark ? "dark" : "light";
+    var bodyClass = (string?)ViewData["BodyClass"] ?? "fcms-error-page";
+    var statusCode = (string?)ViewData["StatusCode"];
+}
+<!DOCTYPE html>
+<html lang="en" data-theme-mode="@themeMode" data-bs-theme="@bsTheme">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>@ViewData["Title"] · FlexCms</title>
+    @* Auto theme: server can't see prefers-color-scheme, so resolve client-side
+       BEFORE Bootstrap CSS loads to avoid flash-of-wrong-theme. *@
+    <script>
+        (function () {
+            var html = document.documentElement;
+            if (html.dataset.themeMode === 'auto' && window.matchMedia) {
+                var mq = window.matchMedia('(prefers-color-scheme: dark)');
+                var apply = function () { html.setAttribute('data-bs-theme', mq.matches ? 'dark' : 'light'); };
+                apply();
+                mq.addEventListener ? mq.addEventListener('change', apply) : mq.addListener(apply);
+            }
+        })();
+    </script>
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/lib/bootstrap-icons/font/bootstrap-icons.min.css" />
+    <link rel="stylesheet" href="~/css/error-pages.css" asp-append-version="true" />
+</head>
+<body class="@bodyClass">
+    @if (!string.IsNullOrEmpty(statusCode))
+    {
+        <div class="status-code">@statusCode</div>
+    }
+    @RenderBody()
+</body>
+</html>

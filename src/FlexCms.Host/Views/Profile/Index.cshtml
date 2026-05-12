@@ -1,0 +1,54 @@
+@{
+    ViewData["Title"] = "My Profile";
+    var fullName    = (string?)ViewData["FullName"] ?? "";
+    var displayName = (string?)ViewData["DisplayName"];
+    var email       = (string?)ViewData["Email"];
+    var phone       = (string?)ViewData["PhoneNumber"];
+    var twoFactor   = (bool)(ViewData["TwoFactorEnabled"] ?? false);
+    var ok  = TempData["Ok"]  as string;
+    var err = TempData["Err"] as string;
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="mb-0">My Profile</h4>
+</div>
+
+@if (!string.IsNullOrEmpty(ok)) { <div class="alert alert-success">@ok</div> }
+@if (!string.IsNullOrEmpty(err)) { <div class="alert alert-danger">@err</div> }
+
+<ul class="nav nav-tabs mb-3">
+    <li class="nav-item"><a class="nav-link active" href="@Url.Action("Index")">Profile</a></li>
+    <li class="nav-item"><a class="nav-link" href="@Url.Action("Password")">Password</a></li>
+    <li class="nav-item">
+        <a class="nav-link" href="@Url.Action("TwoFactor")">
+            Two-factor @if (twoFactor) { <span class="badge bg-success ms-1">On</span> } else { <span class="badge bg-secondary ms-1">Off</span> }
+        </a>
+    </li>
+</ul>
+
+<div class="card shadow-sm">
+    <div class="card-body">
+        <form asp-action="Update" method="post" class="row g-3">
+            @Html.AntiForgeryToken()
+            <div class="col-md-6">
+                <label for="fullName" class="form-label">Full name <span class="text-danger">*</span></label>
+                <input id="fullName" name="fullName" value="@fullName" class="form-control" required />
+            </div>
+            <div class="col-md-6">
+                <label for="displayName" class="form-label">Display name <span class="text-muted small">(optional)</span></label>
+                <input id="displayName" name="displayName" value="@displayName" class="form-control" placeholder="Falls back to full name" />
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Email <span class="text-muted small">(read-only — change via support)</span></label>
+                <input value="@email" class="form-control" disabled />
+            </div>
+            <div class="col-md-6">
+                <label for="phoneNumber" class="form-label">Phone <span class="text-muted small">(BD format: +8801XXXXXXXXX)</span></label>
+                <input id="phoneNumber" name="phoneNumber" value="@phone" class="form-control" />
+            </div>
+            <div class="col-12">
+                <button type="submit" class="btn btn-primary">Save</button>
+            </div>
+        </form>
+    </div>
+</div>

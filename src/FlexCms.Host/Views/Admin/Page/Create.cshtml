@@ -61,6 +61,8 @@
             </div>
 </form>
 
+@await Html.PartialAsync("_MediaPicker")
+
 @section Scripts {
     @await Html.PartialAsync("_ValidationScriptsPartial")
     @await Html.PartialAsync("_RichTextEditor")

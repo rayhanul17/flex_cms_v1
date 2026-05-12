@@ -71,6 +71,19 @@
     {
         <link rel="icon" href="~/favicon.ico" />
     }
+    @* Auto theme: server can't see prefers-color-scheme, so resolve client-side
+       BEFORE Bootstrap CSS loads to avoid flash-of-wrong-theme. *@
+    <script>
+        (function () {
+            var html = document.documentElement;
+            if (html.dataset.themeMode === 'auto' && window.matchMedia) {
+                var mq = window.matchMedia('(prefers-color-scheme: dark)');
+                var apply = function () { html.setAttribute('data-bs-theme', mq.matches ? 'dark' : 'light'); };
+                apply();
+                mq.addEventListener ? mq.addEventListener('change', apply) : mq.addListener(apply);
+            }
+        })();
+    </script>
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="~/lib/bootstrap-icons/font/bootstrap-icons.min.css" />
     <link rel="stylesheet" href="~/lib/datatables.net-bs5/css/dataTables.bootstrap5.min.css" />

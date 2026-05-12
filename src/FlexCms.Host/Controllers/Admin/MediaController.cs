@@ -97,16 +97,16 @@ public class MediaController : BaseAdminController
 
         try
         {
-            await _uow.BeginTransactionAsync();
             var folder = await _folders.CreateAsync(name, parentId);
-            await _uow.SaveChangesAsync();
-            await _uow.CommitAsync();
             return FcmsOk("Folder created.", new { id = folder.Id, name = folder.Name });
         }
-        catch
+        catch (InvalidOperationException ex)
         {
-            await _uow.RollbackAsync();
-            return FcmsFail("Failed to create folder.");
+            return FcmsFail(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            return FcmsFail($"Failed to create folder: {ex.Message}");
         }
     }
 
@@ -120,21 +120,16 @@ public class MediaController : BaseAdminController
 
         try
         {
-            await _uow.BeginTransactionAsync();
             var folder = await _folders.RenameAsync(id, name);
-            await _uow.SaveChangesAsync();
-            await _uow.CommitAsync();
             return FcmsOk("Renamed.", new { name = folder.Name });
         }
         catch (InvalidOperationException ex)
         {
-            await _uow.RollbackAsync();
             return FcmsFail(ex.Message);
         }
-        catch
+        catch (Exception ex)
         {
-            await _uow.RollbackAsync();
-            return FcmsFail("Failed to rename folder.");
+            return FcmsFail($"Failed to rename folder: {ex.Message}");
         }
     }
 
@@ -145,21 +140,16 @@ public class MediaController : BaseAdminController
     {
         try
         {
-            await _uow.BeginTransactionAsync();
             await _folders.DeleteAsync(id);
-            await _uow.SaveChangesAsync();
-            await _uow.CommitAsync();
             return FcmsOk("Folder deleted.");
         }
         catch (InvalidOperationException ex)
         {
-            await _uow.RollbackAsync();
             return FcmsFail(ex.Message);
         }
-        catch
+        catch (Exception ex)
         {
-            await _uow.RollbackAsync();
-            return FcmsFail("Failed to delete folder.");
+            return FcmsFail($"Failed to delete folder: {ex.Message}");
         }
     }
 
@@ -170,21 +160,16 @@ public class MediaController : BaseAdminController
     {
         try
         {
-            await _uow.BeginTransactionAsync();
             await _media.MoveToFolderAsync(id, targetFolderId);
-            await _uow.SaveChangesAsync();
-            await _uow.CommitAsync();
             return FcmsOk("Moved.");
         }
         catch (InvalidOperationException ex)
         {
-            await _uow.RollbackAsync();
             return FcmsFail(ex.Message);
         }
-        catch
+        catch (Exception ex)
         {
-            await _uow.RollbackAsync();
-            return FcmsFail("Failed to move media.");
+            return FcmsFail($"Failed to move media: {ex.Message}");
         }
     }
 

@@ -31,6 +31,13 @@
     catch { /* settings service unavailable on very early boot */ }
     var themeMode = ThemeMode.Resolve(Context);
     var bsTheme = themeMode == ThemeMode.Dark ? "dark" : "light";
+
+    // Active-link helpers — match current path against a fixed prefix or
+    // controller/action so Bootstrap's .active class shows the right tab.
+    var path = Context.Request.Path.Value ?? "/";
+    var ctrl = (string?)ViewContext.RouteData.Values["controller"];
+    var action = (string?)ViewContext.RouteData.Values["action"];
+    string ActiveIf(bool match) => match ? "active" : "";
 }
 @functions {
     sealed class SiteIdentitySnapshot
@@ -59,6 +66,19 @@
     {
         <meta name="description" content="@tagline" />
     }
+    @* Auto theme: server can't see prefers-color-scheme, so resolve client-side
+       BEFORE Bootstrap CSS loads to avoid flash-of-wrong-theme. *@
+    <script>
+        (function () {
+            var html = document.documentElement;
+            if (html.dataset.themeMode === 'auto' && window.matchMedia) {
+                var mq = window.matchMedia('(prefers-color-scheme: dark)');
+                var apply = function () { html.setAttribute('data-bs-theme', mq.matches ? 'dark' : 'light'); };
+                apply();
+                mq.addEventListener ? mq.addEventListener('change', apply) : mq.addListener(apply);
+            }
+        })();
+    </script>
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="~/lib/bootstrap-icons/font/bootstrap-icons.min.css" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
@@ -93,13 +113,16 @@
                 <div class="navbar-collapse collapse" id="publicNav">
                     <ul class="navbar-nav me-auto">
                         <li class="nav-item">
-                            <a class="nav-link" asp-controller="Home" asp-action="Index">@Html.T("nav.home")</a>
+                            <a class="nav-link @ActiveIf(ctrl == "Home" && action == "Index")"
+                               asp-controller="Home" asp-action="Index">@Html.T("nav.home")</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="/blog">@Html.T("nav.blog")</a>
+                            <a class="nav-link @ActiveIf(path.StartsWith("/blog", StringComparison.OrdinalIgnoreCase))"
+                               href="/blog">@Html.T("nav.blog")</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" asp-controller="Home" asp-action="Privacy">@Html.T("nav.privacy")</a>
+                            <a class="nav-link @ActiveIf(ctrl == "Home" && action == "Privacy")"
+                               asp-controller="Home" asp-action="Privacy">@Html.T("nav.privacy")</a>
                         </li>
                     </ul>
                     <ul class="navbar-nav">

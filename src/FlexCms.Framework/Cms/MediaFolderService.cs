@@ -23,9 +23,19 @@ public class MediaFolderService : IMediaFolderService
 
     public async Task<FcmsMediaFolder> CreateAsync(string name, Guid? parentId, CancellationToken ct = default)
     {
-        var folder = new FcmsMediaFolder { Name = name.Trim(), ParentId = parentId };
+        var trimmed = name.Trim();
+        if (string.IsNullOrEmpty(trimmed))
+            throw new InvalidOperationException("Folder name is required.");
+
+        var siblings = await _folderRepo.FindAsync(f => f.ParentId == parentId, ct);
+        if (siblings.Any(f => string.Equals(f.Name, trimmed, StringComparison.OrdinalIgnoreCase)))
+            throw new InvalidOperationException($"A folder named \"{trimmed}\" already exists here.");
+
+        var folder = new FcmsMediaFolder { Name = trimmed, ParentId = parentId };
         await _folderRepo.AddAsync(folder, ct);
         await _uow.SaveChangesAsync(ct);
+        await _audit.LogAsync(FcmsAuditActions.FolderCreated, nameof(FcmsMediaFolder), folder.Id.ToString(),
+            new { folder.Name, folder.ParentId }, ct: ct);
         return folder;
     }
 
@@ -33,8 +43,17 @@ public class MediaFolderService : IMediaFolderService
     {
         var folder = await _folderRepo.GetByIdAsync(id, ct)
             ?? throw new InvalidOperationException("Folder not found.");
+
+        var trimmed = newName.Trim();
+        if (string.IsNullOrEmpty(trimmed))
+            throw new InvalidOperationException("Folder name is required.");
+
+        var siblings = await _folderRepo.FindAsync(f => f.ParentId == folder.ParentId && f.Id != id, ct);
+        if (siblings.Any(f => string.Equals(f.Name, trimmed, StringComparison.OrdinalIgnoreCase)))
+            throw new InvalidOperationException($"A folder named \"{trimmed}\" already exists here.");
+
         var oldName = folder.Name;
-        folder.Name = newName.Trim();
+        folder.Name = trimmed;
         await _folderRepo.UpdateAsync(folder, ct);
         await _uow.SaveChangesAsync(ct);
         await _audit.LogAsync(FcmsAuditActions.FolderRenamed, nameof(FcmsMediaFolder), id.ToString(),

@@ -13,6 +13,12 @@
 
 <h4 class="mb-3">Two-factor authentication</h4>
 
+<ul class="nav nav-tabs mb-3">
+    <li class="nav-item"><a class="nav-link" href="@Url.Action("Index")">Profile</a></li>
+    <li class="nav-item"><a class="nav-link" href="@Url.Action("Password")">Password</a></li>
+    <li class="nav-item"><a class="nav-link active" href="@Url.Action("TwoFactor")">Two-factor</a></li>
+</ul>
+
 @if (!string.IsNullOrEmpty(ok))
 {
     <div class="alert alert-success">@ok</div>

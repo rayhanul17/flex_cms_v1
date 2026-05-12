@@ -203,21 +203,49 @@
         });
 
         // Create folder
-        document.getElementById('createFolderBtn').addEventListener('click', async () => {
-            const name = document.getElementById('folderName').value.trim();
-            if (!name) return;
+        const createBtn = document.getElementById('createFolderBtn');
+        const folderInput = document.getElementById('folderName');
+
+        async function submitCreateFolder() {
+            const name = folderInput.value.trim();
+            if (!name) {
+                fcms.toast.warning('Folder name is required.');
+                folderInput.focus();
+                return;
+            }
 
             const fd = new FormData();
             fd.append('name', name);
             if (currentFolderId) fd.append('parentId', currentFolderId);
 
-            const r = await fetch('@Url.Action("CreateFolder")', {
-                method: 'POST',
-                headers: { 'X-FlexCms-Csrf': csrf() },
-                body: fd
-            });
-            const json = await r.json();
-            if (json.isSuccess) location.reload();
+            createBtn.disabled = true;
+            try {
+                const r = await fetch('@Url.Action("CreateFolder")', {
+                    method: 'POST',
+                    headers: { 'X-FlexCms-Csrf': csrf() },
+                    body: fd
+                });
+                const json = await r.json();
+                if (json.isSuccess) {
+                    fcms.toast.success(json.message || 'Folder created.');
+                    location.reload();
+                } else {
+                    fcms.toast.danger(json.message || 'Failed to create folder.');
+                }
+            } catch {
+                fcms.toast.danger('Network error — failed to create folder.');
+            } finally {
+                createBtn.disabled = false;
+            }
+        }
+
+        createBtn.addEventListener('click', submitCreateFolder);
+        folderInput.addEventListener('keydown', e => { if (e.key === 'Enter') submitCreateFolder(); });
+
+        // Reset input + focus when the modal opens
+        document.getElementById('newFolderModal').addEventListener('shown.bs.modal', () => {
+            folderInput.value = '';
+            folderInput.focus();
         });
 
         // Delete folder

@@ -16,6 +16,56 @@
         relative_urls: false,
         setup: function (editor) {
             editor.on('change', function () { editor.save(); });
+        },
+
+        // ── Media picker integration for the image dialog ─────────────────────
+        // The image dialog renders a URL textbox with a folder icon. Clicking
+        // it triggers this callback. We open the global FlexCMS media picker
+        // (_MediaPicker.cshtml must be rendered on the page) and feed the
+        // chosen URL back to TinyMCE via meta.callback.
+        file_picker_types: 'image',
+        file_picker_callback: function (cb, value, meta) {
+            if (meta.filetype !== 'image') return;
+            var modalEl = document.getElementById('fcmsMediaPickerModal');
+            if (!modalEl) {
+                console.warn('TinyMCE picker: _MediaPicker partial not on this page — falling back to URL input.');
+                return;
+            }
+
+            // Reuse the picker's existing wiring by simulating a click on a
+            // hidden trigger. We can't bind directly to a real input — TinyMCE
+            // wants the URL via callback — so we attach a one-shot listener
+            // for the picker's tile click and pass the selected URL back.
+            var grid = document.getElementById('fcmsMediaPickerGrid');
+            var status = document.getElementById('fcmsMediaPickerStatus');
+            var modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+
+            // Manually trigger the picker's grid load (since we are not going
+            // through a [data-fcms-pick-image] button).
+            fetch('/admin/media/picker-list?kind=image', { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+                .then(function (r) { return r.json(); })
+                .then(function (items) {
+                    if (!items.length) {
+                        grid.innerHTML = '<div class="col-12 text-center text-muted py-5">No images yet \u2014 upload one above.</div>';
+                    } else {
+                        grid.innerHTML = items.map(function (m) {
+                            return '<div class="col-6 col-sm-4 col-md-3 col-lg-2">'
+                                 + '<button type="button" class="btn p-0 border w-100 h-100 fcms-pick-tile" data-url="' + m.url + '" title="' + m.name + '">'
+                                 + '<img src="' + m.thumb + '" class="w-100" style="aspect-ratio:1/1; object-fit:cover; border-radius:.25rem;" alt="' + m.name + '" />'
+                                 + '</button></div>';
+                        }).join('');
+                    }
+                    status.textContent = 'Pick an image to insert.';
+
+                    grid.querySelectorAll('.fcms-pick-tile').forEach(function (btn) {
+                        btn.addEventListener('click', function () {
+                            cb(btn.dataset.url, { alt: btn.title });
+                            modal.hide();
+                        }, { once: true });
+                    });
+
+                    modal.show();
+                });
         }
     });
 })();

@@ -300,7 +300,7 @@ public class SeedService : IHostedService
 
     private static readonly List<FcmsMenuItemDef> CoreMenuItems =
     [
-        new() { DefaultName = "Dashboard",  Icon = "bi bi-speedometer2", Url = "/admin",       Order = 0 },
+        new() { DefaultName = "Dashboard",  Icon = "bi bi-speedometer2", Url = "/admin",       Order = 0, RequiredPermission = FcmsPermissions.SettingsView },
 
         // Blog group
         new() { DefaultName = "Blog",       Icon = "bi bi-journal-richtext", Url = "#blog",   Order = 10 },
@@ -310,7 +310,7 @@ public class SeedService : IHostedService
         // Standalone content
         new() { DefaultName = "Pages",      Icon = "bi bi-file-earmark", Url = "/admin/pages",     Order = 20, RequiredPermission = FcmsPermissions.PagesEdit },
         new() { DefaultName = "Media",      Icon = "bi bi-images",       Url = "/admin/media",     Order = 30, RequiredPermission = FcmsPermissions.MediaView },
-        new() { DefaultName = "Trash",      Icon = "bi bi-trash",        Url = "/admin/trash",     Order = 35 },
+        new() { DefaultName = "Trash",      Icon = "bi bi-trash",        Url = "/admin/trash",     Order = 35, RequiredPermission = FcmsPermissions.PostsEdit },
 
         // People group
         new() { DefaultName = "People",     Icon = "bi bi-people-fill",  Url = "#people",          Order = 40 },
@@ -320,7 +320,7 @@ public class SeedService : IHostedService
 
         // System group
         new() { DefaultName = "System",         Icon = "bi bi-sliders",             Url = "#system",                    Order = 80 },
-        new() { DefaultName = "Modules",        Icon = "bi bi-puzzle",              Url = "/admin/modules",             Order = 81, ParentDefaultName = "System" },
+        new() { DefaultName = "Modules",        Icon = "bi bi-puzzle",              Url = "/admin/modules",             Order = 81, ParentDefaultName = "System", RequiredPermission = FcmsPermissions.SystemManage },
         new() { DefaultName = "Menu",           Icon = "bi bi-list-ul",             Url = "/admin/menu",                Order = 82, ParentDefaultName = "System", RequiredPermission = FcmsPermissions.SettingsManage },
         new() { DefaultName = "Redirects",      Icon = "bi bi-sign-turn-right",     Url = "/admin/redirects",           Order = 83, ParentDefaultName = "System", RequiredPermission = FcmsPermissions.RedirectsEdit },
         new() { DefaultName = "Audit Log",      Icon = "bi bi-journal-text",        Url = "/admin/audit-log",           Order = 84, ParentDefaultName = "System", RequiredPermission = FcmsPermissions.AuditView },

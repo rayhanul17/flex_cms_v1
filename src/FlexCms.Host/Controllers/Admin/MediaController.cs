@@ -52,7 +52,8 @@ public class MediaController : BaseAdminController
         return Json(items
             .OrderByDescending(m => m.CreatedAt)
             .Take(100)
-            .Select(m => new {
+            .Select(m => new
+            {
                 id = m.Id,
                 url = m.Url,
                 thumb = m.ThumbnailUrl ?? m.Url,

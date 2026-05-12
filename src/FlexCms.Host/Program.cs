@@ -22,10 +22,10 @@ var logConfig = new LoggerConfiguration()
         rollingInterval: RollingInterval.Day,
         retainedFileCountLimit: 30,
         shared: true,   // allow multiple processes (setup → production handoff)
-        // flushToDiskInterval: 1s ensures logs reach disk even if the process
-        // hangs in startup (e.g. IHostedService deadlock) — without this the
-        // file write buffer never flushes and the log appears empty when
-        // diagnosing the hang.
+                        // flushToDiskInterval: 1s ensures logs reach disk even if the process
+                        // hangs in startup (e.g. IHostedService deadlock) — without this the
+                        // file write buffer never flushes and the log appears empty when
+                        // diagnosing the hang.
         flushToDiskInterval: TimeSpan.FromSeconds(1),
         outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss} [{Level:u3}] {Message:lj}{NewLine}{Exception}");
 
@@ -92,130 +92,135 @@ if (!SetupHelper.IsSetupComplete(appDataPath))
 Log.Information("[BOOT] Production mode entered");
 try
 {
-Log.Information("[BOOT] Configuring MVC + Razor");
-builder.Services.AddControllersWithViews(mvc =>
+    Log.Information("[BOOT] Configuring MVC + Razor");
+    builder.Services.AddControllersWithViews(mvc =>
+        {
+            // Custom binder for jQuery DataTables 2.x bracket-notation form data
+            mvc.ModelBinderProviders.Insert(0, new FlexCms.Framework.Models.DataTablesRequestModelBinderProvider());
+
+            // .NET 6+ defaults to treating non-nullable reference types as
+            // implicitly required, which makes optional form fields (e.g.
+            // SiteTagline = "" with placeholder="Optional") silently fail
+            // ModelState validation when the user posts an empty value. Disable
+            // that — controllers must use [Required] explicitly when they really
+            // need a value. (Found via Settings page: empty Tagline / BaseUrl
+            // failed silently with no toast and no field error.)
+            mvc.SuppressImplicitRequiredAttributeForNonNullableReferenceTypes = true;
+        })
+        .AddRazorOptions(o =>
+        {
+            // Admin controllers live under Controllers/Admin/ but Razor only looks
+            // at /Views/{Controller}/{Action} by default. Add /Views/Admin/{...}
+            // so admin views can be grouped alongside their controllers.
+            o.ViewLocationFormats.Add("/Views/Admin/{1}/{0}.cshtml");
+        })
+        .AddRazorRuntimeCompilation();
+
+    // SignalR (Phase 10 — chat). Default in-memory backplane is fine for
+    // single-instance deploys; multi-node would swap in Redis backplane here.
+    builder.Services.AddSignalR();
+
+    var setup = SetupHelper.ReadStatic(appDataPath);
+    var cfg = builder.Configuration;
+    Log.Information("[BOOT] AddFlexCms — provider={Provider}", setup?.DbProvider);
+
+    builder.Services.AddFlexCms(new FlexCmsOptions
     {
-        // Custom binder for jQuery DataTables 2.x bracket-notation form data
-        mvc.ModelBinderProviders.Insert(0, new FlexCms.Framework.Models.DataTablesRequestModelBinderProvider());
+        AppDataPath = appDataPath,
 
-        // .NET 6+ defaults to treating non-nullable reference types as
-        // implicitly required, which makes optional form fields (e.g.
-        // SiteTagline = "" with placeholder="Optional") silently fail
-        // ModelState validation when the user posts an empty value. Disable
-        // that — controllers must use [Required] explicitly when they really
-        // need a value. (Found via Settings page: empty Tagline / BaseUrl
-        // failed silently with no toast and no field error.)
-        mvc.SuppressImplicitRequiredAttributeForNonNullableReferenceTypes = true;
-    })
-    .AddRazorOptions(o =>
+        // Relational provider — setup.json is authoritative; appsettings.json as dev fallback
+        UseMySQL = setup?.DbProvider == "mysql" || cfg.GetValue<bool>("FlexCms:UseMySQL"),
+        UseMsSql = setup?.DbProvider == "mssql" || cfg.GetValue<bool>("FlexCms:UseMsSql"),
+        UsePostgreSQL = setup?.DbProvider == "postgresql" || cfg.GetValue<bool>("FlexCms:UsePostgreSQL"),
+
+        MySqlConnectionString = setup?.DbProvider == "mysql" ? (setup.DbConnectionString) : cfg.GetConnectionString("MySQL") ?? string.Empty,
+        MsSqlConnectionString = setup?.DbProvider == "mssql" ? (setup.DbConnectionString) : cfg.GetConnectionString("MsSQL") ?? string.Empty,
+        PostgreSqlConnectionString = setup?.DbProvider == "postgresql" ? (setup.DbConnectionString) : cfg.GetConnectionString("PostgreSQL") ?? string.Empty,
+
+        // MongoDB
+        UseMongoDB = setup?.DbProvider == "mongodb" || cfg.GetValue<bool>("FlexCms:UseMongoDB"),
+        MongoConnectionString = setup?.DbProvider == "mongodb" ? (setup.MongoConnectionString) : cfg.GetConnectionString("MongoDB") ?? "mongodb://localhost:27017",
+        MongoDatabaseName = setup?.DbProvider == "mongodb" ? (setup.MongoDatabase ?? "flexcms") : cfg.GetValue<string>("FlexCms:MongoDatabaseName") ?? "flexcms",
+
+        // Site options — setup.json first, appsettings.json fallback
+        TimeZoneId = setup?.TimeZoneId ?? cfg.GetValue<string>("FlexCms:TimeZoneId") ?? "Asia/Dhaka",
+        EnforceIpFilter = cfg.GetValue<bool>("FlexCms:EnforceIpFilter"),
+        AllowedIps = cfg.GetSection("FlexCms:AllowedIps").Get<string[]>() ?? []
+    });
+
+    // One-shot IHostedService that copies wizard-collected values from setup.json
+    // into the persisted SiteSettings on first boot — so the Settings page never
+    // shows defaults for fields the admin already filled in.
+    builder.Services.AddHostedService<FlexCms.Host.Hosting.SiteSettingsBootstrapService>();
+
+    Log.Information("[BOOT] builder.Build()");
+    var app = builder.Build();
+    Log.Information("[BOOT] Build complete — wiring middleware");
+
+    if (app.Environment.IsDevelopment())
+        app.UseDeveloperExceptionPage();   // full stack trace in browser
+
+    app.UseForwardedHeaders(new ForwardedHeadersOptions
     {
-        // Admin controllers live under Controllers/Admin/ but Razor only looks
-        // at /Views/{Controller}/{Action} by default. Add /Views/Admin/{...}
-        // so admin views can be grouped alongside their controllers.
-        o.ViewLocationFormats.Add("/Views/Admin/{1}/{0}.cshtml");
-    })
-    .AddRazorRuntimeCompilation();
+        ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
+    });
 
-// SignalR (Phase 10 — chat). Default in-memory backplane is fine for
-// single-instance deploys; multi-node would swap in Redis backplane here.
-builder.Services.AddSignalR();
+    app.UseMiddleware<FcmsExceptionMiddleware>();   // logs + generic page in production
+    app.UseMiddleware<SecurityHeadersMiddleware>();
+    app.UseMiddleware<IpFilterMiddleware>();
 
-var setup = SetupHelper.ReadStatic(appDataPath);
-var cfg = builder.Configuration;
-Log.Information("[BOOT] AddFlexCms — provider={Provider}", setup?.DbProvider);
+    if (!app.Environment.IsDevelopment())
+    {
+        app.UseExceptionHandler("/Home/Error");
+        app.UseHsts();
+    }
 
-builder.Services.AddFlexCms(new FlexCmsOptions
-{
-    AppDataPath = appDataPath,
+    app.UseStatusCodePagesWithReExecute("/Home/Error/{0}");
 
-    // Relational provider — setup.json is authoritative; appsettings.json as dev fallback
-    UseMySQL = setup?.DbProvider == "mysql" || cfg.GetValue<bool>("FlexCms:UseMySQL"),
-    UseMsSql = setup?.DbProvider == "mssql" || cfg.GetValue<bool>("FlexCms:UseMsSql"),
-    UsePostgreSQL = setup?.DbProvider == "postgresql" || cfg.GetValue<bool>("FlexCms:UsePostgreSQL"),
+    app.UseHttpsRedirection();
+    // Hotlink protection runs BEFORE static files — otherwise the static-file
+    // middleware would serve /uploads/* and we'd never see the request.
+    app.UseMiddleware<FlexCms.Framework.Middleware.HotlinkProtectionMiddleware>();
+    app.UseStaticFiles();
+    // CORS runs before routing + auth so preflight OPTIONS replies fast even
+    // when the eventual endpoint requires authentication.
+    app.UseMiddleware<FlexCms.Framework.Middleware.CorsFromSettingsMiddleware>();
+    app.UseMiddleware<RedirectMiddleware>();   // after static files — no DB hit per asset
+    app.UseMiddleware<FlexCms.Framework.I18n.LanguageMiddleware>();   // sets culture + strips /{lang}/ prefix BEFORE routing
+    app.UseRouting();
+    app.UseSession();
+    app.UseRateLimiter();
+    app.UseAuthentication();
+    // Session-revocation enforcement runs between authentication (so we have a
+    // principal) and authorization (so a revoked session is treated as anonymous
+    // before [Authorize] checks fire). Bearer-token requests skip naturally —
+    // they don't carry the fcms.session_id claim.
+    app.UseMiddleware<FlexCms.Framework.Sessions.FcmsSessionValidationMiddleware>();
+    // Maintenance mode: must run AFTER authentication (so role-based bypass
+    // works) but BEFORE authorization (so the maintenance page renders for
+    // non-bypassed users without going through [Authorize] checks).
+    app.UseMiddleware<FlexCms.Framework.Maintenance.MaintenanceModeMiddleware>();
+    app.UseAuthorization();
+    app.UseMiddleware<ForcePasswordChangeMiddleware>();
 
-    MySqlConnectionString = setup?.DbProvider == "mysql" ? (setup.DbConnectionString) : cfg.GetConnectionString("MySQL") ?? string.Empty,
-    MsSqlConnectionString = setup?.DbProvider == "mssql" ? (setup.DbConnectionString) : cfg.GetConnectionString("MsSQL") ?? string.Empty,
-    PostgreSqlConnectionString = setup?.DbProvider == "postgresql" ? (setup.DbConnectionString) : cfg.GetConnectionString("PostgreSQL") ?? string.Empty,
+    app.MapControllerRoute(
+        name: "default",
+        pattern: "{controller=Home}/{action=Index}/{id?}");
 
-    // MongoDB
-    UseMongoDB = setup?.DbProvider == "mongodb" || cfg.GetValue<bool>("FlexCms:UseMongoDB"),
-    MongoConnectionString = setup?.DbProvider == "mongodb" ? (setup.MongoConnectionString) : cfg.GetConnectionString("MongoDB") ?? "mongodb://localhost:27017",
-    MongoDatabaseName = setup?.DbProvider == "mongodb" ? (setup.MongoDatabase ?? "flexcms") : cfg.GetValue<string>("FlexCms:MongoDatabaseName") ?? "flexcms",
+    // Phase 10 — chat hub
+    app.MapHub<FlexCms.Framework.Chat.ChatHub>("/hubs/chat");
+    // Phase 16 — admin notification hub (real-time bell push, replaces 60s polling).
+    app.MapHub<FlexCms.Framework.Notifications.AdminNotificationHub>("/hubs/admin-notifications");
 
-    // Site options — setup.json first, appsettings.json fallback
-    TimeZoneId = setup?.TimeZoneId ?? cfg.GetValue<string>("FlexCms:TimeZoneId") ?? "Asia/Dhaka",
-    EnforceIpFilter = cfg.GetValue<bool>("FlexCms:EnforceIpFilter"),
-    AllowedIps = cfg.GetSection("FlexCms:AllowedIps").Get<string[]>() ?? []
-});
+    // CMS page slug catch-all — must come after all other conventional routes
+    // so attribute-routed controllers (admin, auth, blog) take priority.
+    app.MapControllerRoute(
+        name: "cms-page",
+        pattern: "{slug}",
+        defaults: new { controller = "Frontend", action = "Page" });
 
-Log.Information("[BOOT] builder.Build()");
-var app = builder.Build();
-Log.Information("[BOOT] Build complete — wiring middleware");
-
-if (app.Environment.IsDevelopment())
-    app.UseDeveloperExceptionPage();   // full stack trace in browser
-
-app.UseForwardedHeaders(new ForwardedHeadersOptions
-{
-    ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
-});
-
-app.UseMiddleware<FcmsExceptionMiddleware>();   // logs + generic page in production
-app.UseMiddleware<SecurityHeadersMiddleware>();
-app.UseMiddleware<IpFilterMiddleware>();
-
-if (!app.Environment.IsDevelopment())
-{
-    app.UseExceptionHandler("/Home/Error");
-    app.UseHsts();
-}
-
-app.UseStatusCodePagesWithReExecute("/Home/Error/{0}");
-
-app.UseHttpsRedirection();
-// Hotlink protection runs BEFORE static files — otherwise the static-file
-// middleware would serve /uploads/* and we'd never see the request.
-app.UseMiddleware<FlexCms.Framework.Middleware.HotlinkProtectionMiddleware>();
-app.UseStaticFiles();
-// CORS runs before routing + auth so preflight OPTIONS replies fast even
-// when the eventual endpoint requires authentication.
-app.UseMiddleware<FlexCms.Framework.Middleware.CorsFromSettingsMiddleware>();
-app.UseMiddleware<RedirectMiddleware>();   // after static files — no DB hit per asset
-app.UseMiddleware<FlexCms.Framework.I18n.LanguageMiddleware>();   // sets culture + strips /{lang}/ prefix BEFORE routing
-app.UseRouting();
-app.UseSession();
-app.UseRateLimiter();
-app.UseAuthentication();
-// Session-revocation enforcement runs between authentication (so we have a
-// principal) and authorization (so a revoked session is treated as anonymous
-// before [Authorize] checks fire). Bearer-token requests skip naturally —
-// they don't carry the fcms.session_id claim.
-app.UseMiddleware<FlexCms.Framework.Sessions.FcmsSessionValidationMiddleware>();
-// Maintenance mode: must run AFTER authentication (so role-based bypass
-// works) but BEFORE authorization (so the maintenance page renders for
-// non-bypassed users without going through [Authorize] checks).
-app.UseMiddleware<FlexCms.Framework.Maintenance.MaintenanceModeMiddleware>();
-app.UseAuthorization();
-app.UseMiddleware<ForcePasswordChangeMiddleware>();
-
-app.MapControllerRoute(
-    name: "default",
-    pattern: "{controller=Home}/{action=Index}/{id?}");
-
-// Phase 10 — chat hub
-app.MapHub<FlexCms.Framework.Chat.ChatHub>("/hubs/chat");
-// Phase 16 — admin notification hub (real-time bell push, replaces 60s polling).
-app.MapHub<FlexCms.Framework.Notifications.AdminNotificationHub>("/hubs/admin-notifications");
-
-// CMS page slug catch-all — must come after all other conventional routes
-// so attribute-routed controllers (admin, auth, blog) take priority.
-app.MapControllerRoute(
-    name: "cms-page",
-    pattern: "{slug}",
-    defaults: new { controller = "Frontend", action = "Page" });
-
-Log.Information("[BOOT] app.Run() — IHostedServices starting next, then Kestrel binds port");
-app.Run();
+    Log.Information("[BOOT] app.Run() — IHostedServices starting next, then Kestrel binds port");
+    app.Run();
 }
 catch (Exception ex)
 {

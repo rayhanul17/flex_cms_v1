@@ -126,20 +126,20 @@ public class BlogController : Controller
             if (currentUser is not null)
             {
                 authorUserId = currentUser.Id;
-                authorName   = DisplayName(currentUser);
-                authorEmail  = currentUser.Email ?? "";
+                authorName = DisplayName(currentUser);
+                authorEmail = currentUser.Email ?? "";
             }
         }
 
         var comment = new FcmsComment
         {
-            EntityType   = nameof(FcmsPost),
-            EntityId     = post.Id,
-            Body         = body.Trim(),
+            EntityType = nameof(FcmsPost),
+            EntityId = post.Id,
+            Body = body.Trim(),
             AuthorUserId = authorUserId,
-            AuthorName   = string.IsNullOrWhiteSpace(authorName) ? "Anonymous" : authorName.Trim(),
-            AuthorEmail  = authorEmail?.Trim() ?? "",
-            IpAddress    = ip ?? "",
+            AuthorName = string.IsNullOrWhiteSpace(authorName) ? "Anonymous" : authorName.Trim(),
+            AuthorEmail = authorEmail?.Trim() ?? "",
+            IpAddress = ip ?? "",
         };
 
         await _comments.SubmitAsync(comment, ct);

@@ -47,9 +47,9 @@ public sealed class FcmsSlugInputTagHelper : TagHelper
 
     public override void Process(TagHelperContext context, TagHelperOutput output)
     {
-        var fieldId   = For.Name.Replace('.', '_');
+        var fieldId = For.Name.Replace('.', '_');
         var fieldName = For.Name;
-        var value     = For.Model?.ToString() ?? "";
+        var value = For.Model?.ToString() ?? "";
 
         // Wrap in input-group when a prefix is supplied
         if (!string.IsNullOrEmpty(Prefix))

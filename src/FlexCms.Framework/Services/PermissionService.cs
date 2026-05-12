@@ -125,13 +125,13 @@ public class PermissionService : IPermissionService
 
         if (_audit is not null)
             await _audit.LogAsync(
-                action:     "Permission.Assigned",
+                action: "Permission.Assigned",
                 entityType: nameof(FcmsRolePermission),
-                entityId:   roleId.ToString(),
-                value:      new { roleId, permissionKey },
-                module:     "auth",
-                severity:   FcmsLogSeverity.Info,
-                ct:         ct);
+                entityId: roleId.ToString(),
+                value: new { roleId, permissionKey },
+                module: "auth",
+                severity: FcmsLogSeverity.Info,
+                ct: ct);
     }
 
     public async Task RevokeAsync(Guid roleId, string permissionKey, CancellationToken ct = default)
@@ -147,13 +147,13 @@ public class PermissionService : IPermissionService
 
         if (_audit is not null)
             await _audit.LogAsync(
-                action:     "Permission.Revoked",
+                action: "Permission.Revoked",
                 entityType: nameof(FcmsRolePermission),
-                entityId:   roleId.ToString(),
-                value:      new { roleId, permissionKey },
-                module:     "auth",
-                severity:   FcmsLogSeverity.Warning,
-                ct:         ct);
+                entityId: roleId.ToString(),
+                value: new { roleId, permissionKey },
+                module: "auth",
+                severity: FcmsLogSeverity.Warning,
+                ct: ct);
     }
 
     public async Task SeedPermissionsAsync(IEnumerable<FcmsPermission> permissions, CancellationToken ct = default)

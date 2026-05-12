@@ -330,6 +330,23 @@
 
         return { toggle: handleToggle, openMobile, closeMobile, toggleDesktop };
     })();
+
+    // ── Account popup: close on page-body scroll ──────────────────────────
+    // The sidebar user menu is anchored to a position:fixed trigger inside
+    // the sidebar. When the user scrolls #page-body, Popper does NOT
+    // reposition (good) but the open menu sits on top of the now-scrolled
+    // content which feels disconnected. Closing on scroll matches the
+    // pattern most editor / admin shells use (Linear, Plane, Notion).
+    (function () {
+        var trigger = document.querySelector('#sidebarUser .sidebar-user-trigger');
+        var pageBody = document.getElementById('page-body');
+        if (!trigger || !pageBody) return;
+        pageBody.addEventListener('scroll', function () {
+            if (trigger.getAttribute('aria-expanded') !== 'true') return;
+            var dd = bootstrap.Dropdown.getInstance(trigger);
+            if (dd) dd.hide();
+        }, { passive: true });
+    })();
 </script>
 @await RenderSectionAsync("Scripts", required: false)
 </body>

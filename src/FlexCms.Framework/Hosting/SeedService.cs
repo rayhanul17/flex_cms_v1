@@ -88,6 +88,7 @@ public class SeedService : IHostedService
             _logger.LogError(ex, "SeedService: failed to seed sample content.");
         }
 
+
         _logger.LogInformation("[SEED] admin user (if needed)");
         var config = _setupHelper.Read();
         if (config is null || !config.IsSetupComplete || config.AdminSeeded)
@@ -389,9 +390,9 @@ public class SeedService : IHostedService
     private async Task SeedVisitorRoleAsync(CancellationToken ct)
     {
         await using var scope = _scopeFactory.CreateAsyncScope();
-        var userManager  = scope.ServiceProvider.GetRequiredService<UserManager<FcmsUser>>();
-        var roleManager  = scope.ServiceProvider.GetRequiredService<RoleManager<FcmsRole>>();
-        var permService  = scope.ServiceProvider.GetRequiredService<IPermissionService>();
+        var userManager = scope.ServiceProvider.GetRequiredService<UserManager<FcmsUser>>();
+        var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<FcmsRole>>();
+        var permService = scope.ServiceProvider.GetRequiredService<IPermissionService>();
 
         // Ensure Visitor role exists
         if (!await roleManager.RoleExistsAsync(VisitorRoleName))
@@ -406,7 +407,7 @@ public class SeedService : IHostedService
 
         // Ensure demo visitor account exists
         const string visitorEmail = "visitor@flexcms.local";
-        const string visitorPass  = "Visitor@123";
+        const string visitorPass = "Visitor@123";
         var visitor = await userManager.FindByEmailAsync(visitorEmail);
         if (visitor is null)
         {
@@ -431,7 +432,7 @@ public class SeedService : IHostedService
     {
         await using var scope = _scopeFactory.CreateAsyncScope();
         var repo = scope.ServiceProvider.GetService<IRepository<FcmsPost>>();
-        var uow  = scope.ServiceProvider.GetService<IFcmsUnitOfWork>();
+        var uow = scope.ServiceProvider.GetService<IFcmsUnitOfWork>();
         if (repo is null || uow is null) return;
 
         // Only seed if no posts exist yet (fresh install)
@@ -440,10 +441,10 @@ public class SeedService : IHostedService
 
         var post = new FcmsPost
         {
-            Title       = "ইসলামের মহত্ত্ব ও তাৎপর্য",
-            Slug        = "islamer-mohotto-o-tatporjo",
-            Excerpt     = "ইসলাম একটি পূর্ণাঙ্গ জীবনব্যবস্থা। এই পোস্টে ইসলামের মূল্যবোধ, নৈতিকতা এবং মানবজীবনে তার গভীর প্রভাব নিয়ে আলোচনা করা হয়েছে।",
-            Content     = """
+            Title = "ইসলামের মহত্ত্ব ও তাৎপর্য",
+            Slug = "islamer-mohotto-o-tatporjo",
+            Excerpt = "ইসলাম একটি পূর্ণাঙ্গ জীবনব্যবস্থা। এই পোস্টে ইসলামের মূল্যবোধ, নৈতিকতা এবং মানবজীবনে তার গভীর প্রভাব নিয়ে আলোচনা করা হয়েছে।",
+            Content = """
 <h2>ভূমিকা</h2>
 <p>ইসলাম শুধু একটি ধর্ম নয় — এটি একটি সম্পূর্ণ জীবনব্যবস্থা যা মানুষের ব্যক্তিগত, সামাজিক, অর্থনৈতিক ও আধ্যাত্মিক জীবনকে পরিচালিত করে। আরবি শব্দ "ইসলাম"-এর অর্থ হলো আত্মসমর্পণ — আল্লাহর ইচ্ছার কাছে নিজেকে সমর্পণ করা।</p>
 
@@ -478,7 +479,7 @@ public class SeedService : IHostedService
             IsPublished = true,
             PublishedAt = FcmsTime.Now,
             FeaturedImageUrl = "/images/seed/sample-post-hero.svg",
-            MetaTitle       = "ইসলামের মহত্ত্ব ও তাৎপর্য | FlexCMS Blog",
+            MetaTitle = "ইসলামের মহত্ত্ব ও তাৎপর্য | FlexCMS Blog",
             MetaDescription = "ইসলামের মূল স্তম্ভ, নৈতিক মূল্যবোধ এবং মানবসভ্যতায় ইসলামের অবদান নিয়ে একটি বিস্তারিত আলোচনা।",
         };
 

@@ -37,9 +37,9 @@ public static class FcmsAuditActions
     public const string FolderDeleted = "MediaFolder.Deleted";
 
     // ── OTP / 2FA ─────────────────────────────────────────────────────────────
-    public const string OtpIssued       = "Otp.Issued";        // code generated + sent successfully
-    public const string OtpSendFailed   = "Otp.SendFailed";    // transport error (SMTP/SMS) — code cleared
-    public const string OtpVerified     = "Otp.Verified";      // correct code entered
-    public const string OtpFailed       = "Otp.Failed";        // wrong/expired/too-many-attempts
+    public const string OtpIssued = "Otp.Issued";        // code generated + sent successfully
+    public const string OtpSendFailed = "Otp.SendFailed";    // transport error (SMTP/SMS) — code cleared
+    public const string OtpVerified = "Otp.Verified";      // correct code entered
+    public const string OtpFailed = "Otp.Failed";        // wrong/expired/too-many-attempts
     public const string RecoveryCodeUsed = "Otp.RecoveryCodeUsed"; // backup code consumed
 }

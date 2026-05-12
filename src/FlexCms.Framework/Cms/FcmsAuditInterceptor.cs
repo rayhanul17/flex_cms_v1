@@ -195,12 +195,12 @@ public sealed class FcmsAuditInterceptor : SaveChangesInterceptor
     {
         return entry.State switch
         {
-            EntityState.Added    => ("Created",     FcmsLogSeverity.Info),
+            EntityState.Added => ("Created", FcmsLogSeverity.Info),
             EntityState.Modified when entry.Entity.Status == EntityStatus.Deleted
-                                 => ("Deleted",     FcmsLogSeverity.Info),
-            EntityState.Modified => ("Updated",     FcmsLogSeverity.Info),
-            EntityState.Deleted  => ("HardDeleted", FcmsLogSeverity.Warning),
-            _                    => (null,           FcmsLogSeverity.Info),
+                                 => ("Deleted", FcmsLogSeverity.Info),
+            EntityState.Modified => ("Updated", FcmsLogSeverity.Info),
+            EntityState.Deleted => ("HardDeleted", FcmsLogSeverity.Warning),
+            _ => (null, FcmsLogSeverity.Info),
         };
     }
 

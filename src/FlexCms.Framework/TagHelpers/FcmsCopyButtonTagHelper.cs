@@ -49,7 +49,7 @@ public sealed class FcmsCopyButtonTagHelper : TagHelper
     public override void Process(TagHelperContext context, TagHelperOutput output)
     {
         var hasFrom = !string.IsNullOrWhiteSpace(From);
-        var btnId   = "fcms-cpy-" + Guid.NewGuid().ToString("N")[..8];
+        var btnId = "fcms-cpy-" + Guid.NewGuid().ToString("N")[..8];
         var labelHtml = string.IsNullOrEmpty(Label)
             ? ""
             : $" <span class=\"fcms-cpy-label\">{System.Net.WebUtility.HtmlEncode(Label)}</span>";

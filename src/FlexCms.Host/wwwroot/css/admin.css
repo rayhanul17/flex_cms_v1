@@ -48,6 +48,28 @@ body {
     flex: 1;
     overflow-y: auto;
     min-height: 0; /* without this, flex children with overflow ignore the cap */
+
+    /* Subtle custom scrollbar — barely visible until hover, then a thin
+       light track on the dark sidebar background. Default browser scrollbar
+       is too prominent against the dark sidebar. */
+    scrollbar-width: thin;                                /* Firefox */
+    scrollbar-color: rgba(255, 255, 255, .15) transparent;
+}
+#sidebar .sidebar-scroll::-webkit-scrollbar {
+    width: 6px;
+}
+#sidebar .sidebar-scroll::-webkit-scrollbar-track {
+    background: transparent;
+}
+#sidebar .sidebar-scroll::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, .12);
+    border-radius: 3px;
+}
+#sidebar .sidebar-scroll:hover::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, .25);
+}
+#sidebar .sidebar-scroll::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, .4);
 }
 
 /* Sidebar header — brand only now (toggle lives in the topbar). */

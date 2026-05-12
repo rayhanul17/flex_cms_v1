@@ -1,5 +1,8 @@
+using System.Linq.Expressions;
 using FlexCms.Framework.Auth;
 using FlexCms.Framework.Cms;
+using FlexCms.Framework.Db;
+using FlexCms.Framework.Models;
 using FlexCms.Host.Models.Admin;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
@@ -10,27 +13,52 @@ namespace FlexCms.Host.Controllers.Admin;
 public class CategoryController : BaseAdminController
 {
     private readonly ICategoryService _categories;
+    private readonly IRepository<FcmsCategory> _categoryRepo;
 
-    public CategoryController(ICategoryService categories) => _categories = categories;
+    public CategoryController(ICategoryService categories, IRepository<FcmsCategory> categoryRepo)
+    {
+        _categories = categories;
+        _categoryRepo = categoryRepo;
+    }
 
     // ── List ──────────────────────────────────────────────────────────────────
 
     [HttpGet("")]
-    public async Task<IActionResult> Index(CancellationToken ct)
-    {
-        var all = await _categories.GetAllAsync(ct);
-        var counts = await Task.WhenAll(all.Select(c => _categories.GetPostCountAsync(c.Id, ct)));
-        var vm = all.Select((c, i) => new CategoryListItemViewModel
-        {
-            Id = c.Id,
-            Name = c.Name,
-            Slug = c.Slug,
-            Description = c.Description,
-            PostCount = counts[i],
-            Status = c.Status
-        }).ToList();
+    public IActionResult Index() => View();
 
-        return View(vm);
+    // ── DataTable AJAX endpoint (server-side processing) ─────────────────────
+
+    [HttpPost("datatable")]
+    [ValidateAntiForgeryToken]
+    public Task<IActionResult> DataTable(DataTablesRequest req, CancellationToken ct)
+    {
+        var orderColumns = new Expression<Func<FcmsCategory, object>>[]
+        {
+            c => c.Name,
+            c => c.Slug,
+            c => c.SortOrder,
+            c => c.Status
+        };
+        return DataTableResult(
+            _categoryRepo.Query(),
+            req,
+            select: c => new
+            {
+                Id = c.Id,
+                Name = c.Name,
+                Slug = c.Slug,
+                Description = c.Description,
+                SortOrder = c.SortOrder,
+                Status = (int)c.Status
+            },
+            orderColumns: orderColumns,
+            globalSearch: q => c => c.Name.Contains(q) || c.Slug.Contains(q),
+            permissions: new()
+            {
+                ["edit"] = FcmsPermissions.CategoriesEdit,
+                ["delete"] = FcmsPermissions.CategoriesDelete
+            },
+            ct: ct);
     }
 
     // ── Create ────────────────────────────────────────────────────────────────

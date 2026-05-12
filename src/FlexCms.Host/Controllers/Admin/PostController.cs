@@ -1,6 +1,9 @@
+using System.Linq.Expressions;
 using FlexCms.Framework.Auth;
 using FlexCms.Framework.Clock;
 using FlexCms.Framework.Cms;
+using FlexCms.Framework.Db;
+using FlexCms.Framework.Models;
 using FlexCms.Host.Models.Admin;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
@@ -12,31 +15,55 @@ public class PostController : BaseAdminController
 {
     private readonly IPostService _posts;
     private readonly ICategoryService _categories;
+    private readonly IRepository<FcmsPost> _postRepo;
 
-    public PostController(IPostService posts, ICategoryService categories)
+    public PostController(IPostService posts, ICategoryService categories, IRepository<FcmsPost> postRepo)
     {
         _posts = posts;
         _categories = categories;
+        _postRepo = postRepo;
     }
 
     // ── List ──────────────────────────────────────────────────────────────────
 
     [HttpGet("")]
-    public async Task<IActionResult> Index(CancellationToken ct)
-    {
-        var all = await _posts.GetAllAsync(ct);
-        var vm = all.Select(p => new PostListItemViewModel
-        {
-            Id = p.Id,
-            Title = p.Title,
-            Slug = p.Slug,
-            IsPublished = p.IsPublished,
-            CategoryName = p.Category?.Name,
-            CreatedAt = p.CreatedAt,
-            ViewCount = p.ViewCount
-        }).ToList();
+    public IActionResult Index() => View();
 
-        return View(vm);
+    // ── DataTable AJAX endpoint (server-side processing) ─────────────────────
+
+    [HttpPost("datatable")]
+    [ValidateAntiForgeryToken]
+    public Task<IActionResult> DataTable(DataTablesRequest req, CancellationToken ct)
+    {
+        var orderColumns = new Expression<Func<FcmsPost, object>>[]
+        {
+            p => p.Title,
+            p => p.Slug,
+            p => p.IsPublished,
+            p => p.ViewCount,
+            p => p.CreatedAt
+        };
+        return DataTableResult(
+            _postRepo.Query(),
+            req,
+            select: p => new
+            {
+                Id = p.Id,
+                Title = p.Title,
+                Slug = p.Slug,
+                IsPublished = p.IsPublished,
+                ViewCount = p.ViewCount,
+                CreatedAt = p.CreatedAt,
+                Status = (int)p.Status
+            },
+            orderColumns: orderColumns,
+            globalSearch: q => p => p.Title.Contains(q) || p.Slug.Contains(q),
+            permissions: new()
+            {
+                ["edit"] = FcmsPermissions.PostsEdit,
+                ["delete"] = FcmsPermissions.PostsDelete
+            },
+            ct: ct);
     }
 
     // ── Create ────────────────────────────────────────────────────────────────

@@ -174,9 +174,11 @@
             ajax: {
                 url: opts.url,
                 type: 'POST',
-                headers: { 'X-FlexCms-Csrf': csrf, 'X-Requested-With': 'XMLHttpRequest' },
-                beforeSend: () => fcms.loader && fcms.loader.show(),
-                complete:   () => fcms.loader && fcms.loader.hide()
+                headers: { 'X-FlexCms-Csrf': csrf, 'X-Requested-With': 'XMLHttpRequest' }
+                // Loader intentionally NOT hooked here — DataTables already shows
+                // its own "Processing…" indicator (processing: true). Doubling up
+                // with fcms.loader caused the topbar progress bar to blink on
+                // every page/size/sort change.
             },
             columns: cols,
             order: defaultSort,

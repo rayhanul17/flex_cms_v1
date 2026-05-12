@@ -1,4 +1,3 @@
-@model List<FlexCms.Host.Models.Admin.PostListItemViewModel>
 @{
     ViewData["Title"] = "Posts";
 }
@@ -11,68 +10,20 @@
 </div>
 
 <div class="card shadow-sm">
-    <div class="card-body p-0">
-        <div class="table-responsive">
-        <table class="table table-hover mb-0">
-            <thead class="table-light">
-                <tr>
-                    <th>Title</th>
-                    <th>Slug</th>
-                    <th>Category</th>
-                    <th>Status</th>
-                    <th>Views</th>
-                    <th>Created</th>
-                    <th class="text-end">Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var p in Model)
-                {
-                    <tr data-id="@p.Id">
-                        <td>@p.Title</td>
-                        <td><code>@p.Slug</code></td>
-                        <td>@(p.CategoryName ?? "—")</td>
-                        <td>
-                            @if (p.IsPublished)
-                            {
-                                <span class="badge text-bg-success">Published</span>
-                            }
-                            else
-                            {
-                                <span class="badge text-bg-secondary">Draft</span>
-                            }
-                        </td>
-                        <td>@p.ViewCount</td>
-                        <td>@p.CreatedAt.ToString("yyyy-MM-dd")</td>
-                        <td class="text-end">
-                            <a asp-action="Edit" asp-route-id="@p.Id" class="btn btn-sm btn-outline-secondary" fcms-authorize="@FcmsPermissions.PostsEdit">Edit</a>
-                            <button class="btn btn-sm btn-outline-danger btn-delete" data-id="@p.Id" fcms-authorize="@FcmsPermissions.PostsDelete">Delete</button>
-                        </td>
-                    </tr>
-                }
-                @if (!Model.Any())
-                {
-                    <tr><td colspan="7" class="text-center text-muted py-4">No posts yet.</td></tr>
-                }
-            </tbody>
-        </table>
-        </div>
+    <div class="card-body">
+        <fcms-data-table
+            id="postTable"
+            url="/admin/posts/datatable"
+            base-url="/admin/posts"
+            confirm-name-field="title"
+            edit-permission="@FcmsPermissions.PostsEdit"
+            delete-permission="@FcmsPermissions.PostsDelete">
+            <fcms-data-column field="title"       header="Title"     sortable="true" />
+            <fcms-data-column field="slug"        header="Slug"      type="code" sortable="true" />
+            <fcms-data-column field="isPublished" header="Published" type="bool" sortable="true" />
+            <fcms-data-column field="viewCount"   header="Views"     sortable="true" />
+            <fcms-data-column field="status"      header="Status"    type="status" sortable="true" />
+            <fcms-data-column field="createdAt"   header="Created"   type="date" sortable="true" default-sort="desc" />
+        </fcms-data-table>
     </div>
 </div>
-
-@section Scripts {
-<script>
-document.querySelectorAll('.btn-delete').forEach(btn => {
-    btn.addEventListener('click', async () => {
-        if (!confirm('Delete this post?')) return;
-        const id = btn.dataset.id;
-        const res = await fetch(`/admin/posts/${id}/delete`, {
-            method: 'POST',
-            headers: { 'X-FlexCms-Csrf': document.querySelector('input[name="__RequestVerificationToken"]')?.value ?? '' }
-        });
-        if ((await res.json()).isSuccess) location.reload();
-    });
-});
-</script>
-<form style="display:none">@Html.AntiForgeryToken()</form>
-}

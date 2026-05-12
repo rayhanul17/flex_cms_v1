@@ -14,10 +14,12 @@
     string adminBrand = "FlexCMS";
     string? logoUrl = null;
     string? faviconUrl = null;
+    string siteBaseUrl = $"{Context.Request.Scheme}://{Context.Request.Host}";
     try
     {
         var snap = await SettingsService.GetAsync<SiteIdentitySnapshot>("site:general");
         if (!string.IsNullOrWhiteSpace(snap.SiteName)) adminBrand = snap.SiteName;
+        if (!string.IsNullOrWhiteSpace(snap.BaseUrl)) siteBaseUrl = snap.BaseUrl.TrimEnd('/');
         if (snap.LogoMediaId.HasValue)
         {
             var m = await MediaService.GetByIdAsync(snap.LogoMediaId.Value);
@@ -35,6 +37,7 @@
     sealed class SiteIdentitySnapshot
     {
         public string SiteName { get; set; } = "";
+        public string? BaseUrl { get; set; }
         public Guid? LogoMediaId { get; set; }
         public Guid? FaviconMediaId { get; set; }
     }
@@ -74,6 +77,7 @@
     @* Auto theme: server can't see prefers-color-scheme, so resolve client-side
        BEFORE Bootstrap CSS loads to avoid flash-of-wrong-theme. *@
     <script>
+        window.fcmsBaseUrl = '@siteBaseUrl';
         (function () {
             var html = document.documentElement;
             if (html.dataset.themeMode === 'auto' && window.matchMedia) {

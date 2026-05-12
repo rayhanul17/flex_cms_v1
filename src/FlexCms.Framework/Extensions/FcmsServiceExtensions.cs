@@ -325,6 +325,12 @@ public static class FcmsServiceExtensions
                 opts.ExpireTimeSpan = TimeSpan.FromHours(8);
                 opts.LoginPath = "/auth/login";
                 opts.LogoutPath = "/auth/logout";
+                // Forbid-on-authenticated-but-no-perm → render the 403 page
+                // we already ship instead of the default /Account/AccessDenied
+                // (which 404s — controller doesn't exist). UseStatusCodePages
+                // would also catch 403 returned directly from FcmsAuthorizeFilter,
+                // but the cookie middleware short-circuits with this redirect first.
+                opts.AccessDeniedPath = "/Home/Error/403";
             });
 
         services.AddAuthorization();

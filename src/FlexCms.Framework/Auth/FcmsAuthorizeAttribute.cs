@@ -52,8 +52,15 @@ internal sealed class FcmsAuthorizeFilter : IAsyncAuthorizationFilter
 
         if (user.Identity?.IsAuthenticated != true)
         {
+            // HTTP semantics:
+            //   401 = not authenticated (please log in)
+            //   403 = authenticated but no permission
+            // For AJAX/API callers we return 401 so the frontend can prompt
+            // for login; for browser navigation we let the cookie middleware
+            // redirect to LoginPath (better UX than a 401 wall — users get
+            // bounced through login and land back on the original page).
             context.Result = IsAjax(context.HttpContext.Request)
-                ? Forbidden("Authentication required.")
+                ? Unauthorized("Authentication required.")
                 : new ChallengeResult();
             return;
         }
@@ -95,5 +102,11 @@ internal sealed class FcmsAuthorizeFilter : IAsyncAuthorizationFilter
         => new(new { isSuccess = false, message })
         {
             StatusCode = StatusCodes.Status403Forbidden
+        };
+
+    private static JsonResult Unauthorized(string message)
+        => new(new { isSuccess = false, message })
+        {
+            StatusCode = StatusCodes.Status401Unauthorized
         };
 }

@@ -35,7 +35,7 @@ public class PostController : BaseAdminController
 
     [HttpPost("datatable")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> DataTable(DataTablesRequest req, CancellationToken ct)
+    public Task<IActionResult> DataTable(DataTablesRequest req, CancellationToken ct)
     {
         var orderColumns = new Expression<Func<FcmsPost, object>>[]
         {
@@ -46,21 +46,9 @@ public class PostController : BaseAdminController
             p => p.CreatedAt
         };
 
-        var settings = HttpContext.RequestServices.GetService<ISettingsService>();
-        var baseUrl = "";
-        if (settings is not null)
-        {
-            try
-            {
-                var s = await settings.GetAsync<SiteSettings>("site:general", ct: ct);
-                baseUrl = (s?.BaseUrl ?? "").TrimEnd('/');
-            }
-            catch { /* ignored */ }
-        }
-        if (string.IsNullOrEmpty(baseUrl))
-            baseUrl = $"{Request.Scheme}://{Request.Host}";
-
-        return await DataTableResult(
+        // Public URL composed client-side — MongoDB LINQ can't translate
+        // string interpolation inside .Select() projections.
+        return DataTableResult(
             _postRepo.Query(),
             req,
             select: p => new
@@ -68,7 +56,6 @@ public class PostController : BaseAdminController
                 Id = p.Id,
                 Title = p.Title,
                 Slug = p.Slug,
-                PublicUrl = $"{baseUrl}/blog/{p.Slug}",
                 IsPublished = p.IsPublished,
                 ViewCount = p.ViewCount,
                 CreatedAt = p.CreatedAt,

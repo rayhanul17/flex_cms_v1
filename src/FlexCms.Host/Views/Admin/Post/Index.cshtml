@@ -20,7 +20,7 @@
             delete-permission="@FcmsPermissions.PostsDelete">
             <fcms-data-column field="title"       header="Title"      sortable="true" />
             <fcms-data-column field="slug"        header="Slug"       type="code" sortable="true" />
-            <fcms-data-column field="publicUrl"   header="Public URL" type="link" sortable="false" searchable="false" />
+            <fcms-data-column field="publicUrl"   header="Public URL" type="link" sortable="false" searchable="false" url-template="{base}/blog/{slug}" />
             <fcms-data-column field="isPublished" header="Published"  type="bool" sortable="true" />
             <fcms-data-column field="viewCount"   header="Views"      sortable="true" />
             <fcms-data-column field="status"      header="Status"     type="status" sortable="true" />

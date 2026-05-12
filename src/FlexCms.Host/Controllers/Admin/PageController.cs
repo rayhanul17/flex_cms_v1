@@ -34,7 +34,7 @@ public class PageController : BaseAdminController
 
     [HttpPost("datatable")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> DataTable(DataTablesRequest req, CancellationToken ct)
+    public Task<IActionResult> DataTable(DataTablesRequest req, CancellationToken ct)
     {
         var orderColumns = new Expression<Func<FcmsPage, object>>[]
         {
@@ -44,24 +44,12 @@ public class PageController : BaseAdminController
             p => p.Status,
             p => p.UpdatedAt
         };
-        // Resolve site BaseUrl once per request so the DataTables payload can
-        // include each page's full public URL (admin can click it / copy).
-        // Fallback to current request scheme+host when BaseUrl is empty.
-        var settings = HttpContext.RequestServices.GetService<ISettingsService>();
-        var baseUrl = "";
-        if (settings is not null)
-        {
-            try
-            {
-                var s = await settings.GetAsync<SiteSettings>("site:general", ct: ct);
-                baseUrl = (s?.BaseUrl ?? "").TrimEnd('/');
-            }
-            catch { /* ignored */ }
-        }
-        if (string.IsNullOrEmpty(baseUrl))
-            baseUrl = $"{Request.Scheme}://{Request.Host}";
 
-        return await DataTableResult(
+        // Public URL is composed client-side (the View resolves SiteSettings.BaseUrl
+        // and the JS does {base}/{slug} per row). MongoDB LINQ can't translate
+        // string-interpolation inside a .Select() projection — anything that
+        // touches BaseUrl in the IQueryable<> would 500 the request.
+        return DataTableResult(
             _pageRepo.Query(),
             req,
             select: p => new
@@ -69,7 +57,6 @@ public class PageController : BaseAdminController
                 Id = p.Id,
                 Title = p.Title,
                 Slug = p.Slug,
-                PublicUrl = $"{baseUrl}/{p.Slug}",
                 IsPublished = p.IsPublished,
                 Status = (int)p.Status,
                 UpdatedAt = p.UpdatedAt

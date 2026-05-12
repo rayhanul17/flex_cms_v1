@@ -91,7 +91,8 @@ public sealed class FcmsDataTableTagHelper : TagHelper
                 field = c.Field,
                 type = c.Type,
                 sortable = c.Sortable,
-                searchable = c.Searchable
+                searchable = c.Searchable,
+                urlTemplate = c.UrlTemplate
             }).ToArray(),
             actions = hasActionsColumn ? new
             {
@@ -161,10 +162,11 @@ public sealed class FcmsDataTableTagHelper : TagHelper
     public sealed record ColumnData(
         string Field,
         string? Header,
-        string? Type,        // "status", "date", "bool", "code", or null (text)
+        string? Type,        // "status", "date", "bool", "code", "link", or null (text)
         bool Sortable,
         bool Searchable,
-        string? DefaultSort  // "asc" | "desc" | null
+        string? DefaultSort, // "asc" | "desc" | null
+        string? UrlTemplate  // Only for type="link" — e.g. "{base}/blog/{slug}"
     );
 }
 
@@ -177,6 +179,7 @@ public sealed class FcmsDataColumnTagHelper : TagHelper
     [HtmlAttributeName("sortable")] public bool Sortable { get; set; } = true;
     [HtmlAttributeName("searchable")] public bool Searchable { get; set; } = true;
     [HtmlAttributeName("default-sort")] public string? DefaultSort { get; set; }
+    [HtmlAttributeName("url-template")] public string? UrlTemplate { get; set; }
 
     public override void Process(TagHelperContext context, TagHelperOutput output)
     {
@@ -184,7 +187,7 @@ public sealed class FcmsDataColumnTagHelper : TagHelper
             && p is FcmsDataTableTagHelper parent)
         {
             parent.Columns.Add(new FcmsDataTableTagHelper.ColumnData(
-                Field, Header, Type, Sortable, Searchable, DefaultSort));
+                Field, Header, Type, Sortable, Searchable, DefaultSort, UrlTemplate));
         }
         output.SuppressOutput();
     }

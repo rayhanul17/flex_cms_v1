@@ -45,8 +45,12 @@
             .replaceAll("'", '&#39;');
     }
 
-    function renderCell(value, type) {
-        if (value === null || value === undefined) return '<span class="text-muted">—</span>';
+    function renderCell(value, type, row, urlTemplate) {
+        // For link cells with a template, the cell value is irrelevant — the
+        // URL is composed from the row + template. Skip the early-out so a
+        // missing/empty cell still produces a clickable link.
+        if ((value === null || value === undefined) && !(type === 'link' && urlTemplate))
+            return '<span class="text-muted">—</span>';
         switch (type) {
             case 'status': {
                 const name = (typeof value === 'number')
@@ -67,12 +71,23 @@
                 return `<code class="small">${escapeHtml(value)}</code>`;
             case 'link': {
                 // Renders an external link with copy + open buttons.
-                // Useful for "Public URL" columns on Page / Post listings.
-                const url = String(value);
+                // The cell value is treated as the URL unless `url-template`
+                // is set on the column — then the template is interpolated
+                // against the row (e.g. "{base}/blog/{slug}" with base coming
+                // from window.fcmsBaseUrl). Useful for "Public URL" columns.
+                let url = String(value ?? '');
+                if (urlTemplate && row) {
+                    url = urlTemplate.replace(/\{(\w+)\}/g, (_, key) => {
+                        if (key === 'base') return (window.fcmsBaseUrl ?? '').replace(/\/$/, '');
+                        return row[key] ?? '';
+                    });
+                }
+                if (!url) return '<span class="text-muted">—</span>';
                 const safe = escapeHtml(url);
+                const safeAttr = url.replace(/'/g, "\\'");
                 return `<span class="d-inline-flex align-items-center gap-1">
                     <a href="${safe}" target="_blank" rel="noopener" class="text-truncate" style="max-width:280px" title="${safe}">${safe}</a>
-                    <button type="button" class="btn btn-sm btn-link p-0" title="Copy" onclick="navigator.clipboard.writeText('${safe.replace(/'/g, "\\'")}').then(() => fcms.toast?.success('URL copied.'))"><i class="bi bi-clipboard"></i></button>
+                    <button type="button" class="btn btn-sm btn-link p-0" title="Copy" onclick="navigator.clipboard.writeText('${safeAttr}').then(() => fcms.toast?.success('URL copied.'))"><i class="bi bi-clipboard"></i></button>
                 </span>`;
             }
             default:
@@ -155,8 +170,13 @@
             name: c.field,
             orderable: c.sortable !== false,
             searchable: c.searchable !== false,
+            // Avoid DataTables "Requested unknown parameter" warnings when a
+            // column references a derived field that doesn't exist in the
+            // server payload (e.g. type='link' with a urlTemplate composes
+            // the URL from other row fields, so the named field can be absent).
+            defaultContent: '',
             render: (data, type, row) =>
-                type === 'display' ? renderCell(data, c.type) : data
+                type === 'display' ? renderCell(data, c.type, row, c.urlTemplate) : data
         }));
 
         const hasActions = !!opts.actions;
@@ -173,8 +193,12 @@
         const csrf = document.querySelector('meta[name="csrf-token"]')?.content ?? '';
         const defaultSort = opts.defaultSort || [[0, 'asc']];
 
-        // Determine which buttons/extensions are available
+        // Determine which buttons/extensions are available.
+        // colvis lives in a SEPARATE file (buttons.colVis.min.js) which we
+        // do not currently ship — so even though Buttons is loaded, requesting
+        // 'colvis' throws. Detect colvis specifically before enabling it.
         const hasButtons = typeof $.fn.dataTable.Buttons !== 'undefined';
+        const hasColVis  = hasButtons && typeof $.fn.dataTable.ext.buttons?.colvis !== 'undefined';
 
         const dtConfig = {
             processing: true,
@@ -195,7 +219,7 @@
             pageLength: opts.pageLength || 25,
             lengthMenu: opts.lengthMenu || [10, 25, 50, 100],
             language: { search: '', searchPlaceholder: 'Search…' },
-            dom: hasButtons
+            dom: hasColVis
                 ? "<'row align-items-center mb-2'<'col-sm-6 d-flex gap-2'lB><'col-sm-6'f>>" +
                   "<'row'<'col-12'tr>>" +
                   "<'row align-items-center mt-2'<'col-sm-5'i><'col-sm-7'p>>"
@@ -204,8 +228,7 @@
                   "<'row align-items-center mt-2'<'col-sm-5'i><'col-sm-7'p>>"
         };
 
-        // ColVis button if Buttons extension is loaded
-        if (hasButtons) {
+        if (hasColVis) {
             dtConfig.buttons = [
                 {
                     extend: 'colvis',

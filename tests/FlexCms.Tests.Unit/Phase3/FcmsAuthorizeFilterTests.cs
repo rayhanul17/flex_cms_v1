@@ -68,8 +68,11 @@ public class FcmsAuthorizeFilterTests
     }
 
     [Fact]
-    public async Task Unauthenticated_ajax_request_returns_403_json()
+    public async Task Unauthenticated_ajax_request_returns_401_json()
     {
+        // HTTP semantics: 401 = not authenticated (login needed). 403 means
+        // 'authenticated but no permission'. AJAX clients that get 401 can
+        // pop a login modal; 403 would tell them not to bother.
         var attr = new FcmsAuthorizeAttribute();
         var filter = (IAsyncAuthorizationFilter)attr.CreateInstance(
             BuildServiceProvider(permService: null));
@@ -78,7 +81,7 @@ public class FcmsAuthorizeFilterTests
         await filter.OnAuthorizationAsync(ctx);
 
         var result = Assert.IsType<JsonResult>(ctx.Result);
-        Assert.Equal(StatusCodes.Status403Forbidden, result.StatusCode);
+        Assert.Equal(StatusCodes.Status401Unauthorized, result.StatusCode);
     }
 
     // ── SuperAdmin bypass ─────────────────────────────────────────────────────

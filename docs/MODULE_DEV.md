@@ -1,381 +1,544 @@
-# Module Development Guide
+# FlexCMS Module Developer Guide
 
-> Full module spec — see [`plan.md`](plan.md) **Issue 30, 37b, 110** + **PART 0.7** (Ecommerce primitives).
-
----
-
-## 🚀 Quick Start
-
-### Scaffold a new module
-
-```bash
-# Option A — CLI template (install once from repo root):
-dotnet new install ./templates/flexcms-module
-dotnet new flexcms-module -n MyCompany.Blog --TablePrefix blog -o modules/MyCompany.Blog
-
-# Option B — Admin UI (Development env only):
-# http://localhost:5000/admin/modules → [+ Create New Module] → fill form → submit
-# Folder is generated at modules/{ModuleId}/ automatically.
-```
-
-### Internal module (you have repo source access)
-
-```bash
-# Add to solution:
-dotnet sln add modules/MyCompany.Blog/MyCompany.Blog.csproj
-
-# Reference Framework:
-dotnet add modules/MyCompany.Blog/MyCompany.Blog.csproj reference src/FlexCms.Framework
-
-# Run with dotnet watch — auto-reload on code changes:
-cd src/FlexCms.Host
-dotnet watch run
-```
-
-### External module (third-party developer)
-
-```bash
-# Reference framework via NuGet (no source needed):
-dotnet add package FlexCms.Framework
-
-# Build + ship as ZIP:
-dotnet publish -c Release -o publish/
-cd publish && zip -r ../MyCompany.Blog.zip . && cd ..
-# Distribute MyCompany.Blog.zip → admin uploads via /admin/modules
-```
+Build a module once, drop it into any FlexCMS host, restart — that's the contract.
+This guide walks you through the mandatory contract, recommended structure, and
+every helper / hook you can lean on.
 
 ---
 
-## 📁 Module Structure
+## 1. What is a module?
 
-```
-MyCompany.Blog/
-├── MyCompany.Blog.csproj
-├── BlogModule.cs                # IFcmsModule implementation
-├── module.json                   # Manifest (embedded resource)
-├── Permissions/
-│   └── BlogPermissions.cs        # Permission constants
-├── Models/
-│   ├── Entities/                 # IBaseEntity entities
-│   └── Dtos/                     # Form/API DTOs
-├── Services/                     # Business logic ([FcmsScoped])
-├── Controllers/Admin/            # [FcmsAuthorize] admin controllers
-├── Views/Admin/                  # .cshtml views (runtime-compiled)
-├── Migrations/                   # EF Core migrations
-├── wwwroot/
-│   ├── css/blog.css
-│   └── js/blog.js
-└── Resources/
-    ├── Strings.en.resx
-    └── Strings.bn.resx
-```
+A **module** is a single .NET DLL that:
+
+1. Implements `IFcmsModule` (one type per assembly).
+2. Ships a `module.json` manifest embedded as a resource.
+3. Lives in a folder under the host's `modules/` directory.
+
+When the host starts it scans `modules/*/`, loads each DLL, runs migrations,
+seeds permissions + menu items, and adds the assembly as an MVC
+ApplicationPart — so your controllers and Razor views become routable
+without any host-side wiring.
 
 ---
 
-## 📋 module.json
+## 2. Mandatory checklist
 
-```json
+A module **must** provide:
+
+| # | Item | Where |
+|---|------|-------|
+| 1 | `module.json` (embedded) | `<EmbeddedResource Include="module.json" />` in `.csproj` |
+| 2 | One class implementing `IFcmsModule` (or `BaseModule`) | anywhere in the assembly |
+| 3 | A unique `ModuleId` — convention: `Vendor.Domain` (`FlexCms.Investment`, `Acme.Crm`) | manifest + class property |
+| 4 | A `TablePrefix` — short snake-case, used for every table the module owns | manifest + class property |
+| 5 | A SemVer `Version` string | manifest + class property |
+
+Everything else (entities, controllers, permissions, menu items) is optional —
+override the relevant `BaseModule` hook when you need it.
+
+---
+
+## 3. Install / upload
+
+Two supported flows:
+
+### A. Upload via admin UI (production / customer site)
+
+1. Build & publish the module to a folder:
+   ```bash
+   dotnet publish -c Release -o ./publish
+   ```
+2. ZIP **the contents** of `./publish` (DLL + `module.json` + dependencies).
+   The archive root must contain `module.json` (or contain a single folder that
+   does — both are accepted).
+3. Sign in as SuperAdmin → **Modules** → **Upload Module** → pick the `.zip`.
+   Tick *Overwrite* if you're replacing an earlier version.
+4. Click **Restart now** in the banner. The module is loaded on the next boot.
+
+### B. Drop folder during development
+
+```
+modules/
+└── FlexCms.Module.Investment/
+    ├── FlexCms.Module.Investment.dll
+    ├── module.json
+    └── ... (referenced dependencies)
+```
+
+Restart `dotnet watch run` and the module appears under **Admin → Modules**.
+
+> Don't put your `bin/Debug/` output directly under `modules/` — copy the
+> publish output, or use the `+ Create New Module` scaffold which sets the
+> right layout for you.
+
+---
+
+## 4. Scaffold a new module
+
+The fastest path:
+
+1. Sign in as SuperAdmin → **Modules** → **+ Create New Module** (Development
+   environment only).
+2. Fill in:
+   - **ModuleId**: dotted identifier (e.g. `FlexCms.Module.Investment`)
+   - **TablePrefix**: snake-case prefix (e.g. `invest`)
+3. The template emits a runnable project under `modules/<ModuleId>/` with:
+   - Entry-point module class
+   - EF `DbContext` + a sample entity
+   - Admin CRUD controller (DataTables + Create / Edit / Delete)
+   - Razor views (Index / Create / Edit + `_Form` partial)
+   - Permissions, menu items, and `DropTablesAsync()` already wired
+   - i18n JSON stubs (`Resources/i18n/en.json` + `bn.json`)
+4. Add the project to your solution, generate the initial migration:
+   ```bash
+   cd modules/FlexCms.Module.Investment
+   dotnet ef migrations add InitialSchema
+   ```
+5. Build and restart. The framework runs the migration, seeds permissions,
+   adds the menu entry, and your controller is live at `/admin/<TablePrefix>`.
+
+---
+
+## 5. Lifecycle hooks
+
+Every hook on `IFcmsModule` has a no-op default in `BaseModule` — override only
+what your module needs.
+
+| Hook | Called | Purpose |
+|---|---|---|
+| `RegisterServices(services)` | At host startup, once | DI registration that attributes can't express (typed HttpClients, options binding) |
+| `CreateMigrationContext(connStr, provider)` | Each restart | Return your module's EF `DbContext` so the framework runs `MigrateAsync()` |
+| `GetPermissions()` | Each restart | Declare permissions; framework upserts into `fcms_permissions` (prefixed `{moduleId}.`) |
+| `GetMenuItems()` | Each restart | Sidebar entries; framework upserts and soft-deletes on deactivate |
+| `SeedDataAsync(sp, ct)` | Once after first activation | Initial data — guaranteed idempotent by the flag `FcmsModuleRecord.SeedCompleted` |
+| `OnUpgradeAsync(fromVersion, sp, ct)` | When version in DB ≠ manifest version | Data migrations between versions |
+| `DropTablesAsync(connStr, provider, ct)` | On uninstall, if "Drop tables" was ticked | Drop every table this module owns. `EnsureDeletedAsync()` is the easy correct answer for module-owned contexts |
+
+Anything that throws is captured on `FcmsModuleRecord.ActivationError` and
+surfaced as a red "Error" badge with the message in **Admin → Modules** — the
+other modules still finish activating.
+
+---
+
+## 6. Permissions
+
+```csharp
+public override List<FcmsPermissionDef> GetPermissions() =>
+[
+    new(InvestPermissions.ViewKey,   "View Investments",   "Investments"),
+    new(InvestPermissions.CreateKey, "Create Investments", "Investments"),
+    new(InvestPermissions.EditKey,   "Edit Investments",   "Investments"),
+    new(InvestPermissions.DeleteKey, "Delete Investments", "Investments"),
+];
+
+public static class InvestPermissions
 {
-  "ModuleId": "MyCompany.Blog",
-  "ModuleName": "Blog",
-  "Version": "1.0.0",
-  "Author": "Your Name",
-  "Description": "Blog posts + categories",
-  "MinFrameworkVersion": "1.0.0",
-  "TablePrefix": "blog",
-  "DependsOn": [],
-  "RequestedPermissions": ["filesystem.write:uploads/blog", "email.send"],
-  "DockerSupport": {
-    "BakeIn": true,
-    "MinHostImageVersion": "1.0.0"
-  },
-  "ProvidesApis": [
-    { "Interface": "MyCompany.Blog.PublicApi.IBlogPublicApi", "Version": "1.0.0" }
-  ]
+    public const string ViewKey   = "invest.view";
+    public const string CreateKey = "invest.create";
+    public const string EditKey   = "invest.edit";
+    public const string DeleteKey = "invest.delete";
+
+    // Fully-qualified — what [FcmsAuthorize(...)] takes.
+    // Must mirror the {ModuleId}. prefix the framework writes (lowercased).
+    public const string View   = "flexcms.module.investment." + ViewKey;
+    public const string Create = "flexcms.module.investment." + CreateKey;
+    public const string Edit   = "flexcms.module.investment." + EditKey;
+    public const string Delete = "flexcms.module.investment." + DeleteKey;
 }
 ```
 
----
-
-## 🧬 Minimum Module Code
+Use on controllers / actions:
 
 ```csharp
-public class BlogModule : BaseModule
-{
-    public override string ModuleId => "MyCompany.Blog";
-    public override string ModuleName => "Blog";
-    public override string Version => "1.0.0";
+[FcmsAuthorize(InvestPermissions.View)]
+[Route("admin/invest")]
+public class AdminInvestController : BaseFcmsController { ... }
 
-    public override void RegisterServices(IServiceCollection services) {
-        services.AddScoped<PostService>();
-        // ... your services ...
-    }
-
-    public override List<FcmsPermissionDef> GetPermissions() => new() {
-        new(BlogPermissions.PostCreate, "Create Post", group: "Blog"),
-        new(BlogPermissions.PostEdit,   "Edit Post",   group: "Blog"),
-    };
-}
-
-public static class BlogPermissions {
-    public const string PostCreate = "blog.post.create";
-    public const string PostEdit   = "blog.post.edit";
-}
-```
-
----
-
-## 🔑 Module Rules (CRITICAL)
-
-### ✅ Allowed:
-- Inject `IRepository<T>` (provider-agnostic)
-- Inject Framework services (`IFcmsEmailService`, `IFcmsHookManager`, `IFcmsContextService`)
-- Inject Core services (`PermissionService`, `SettingsService`, `MediaService`)
-- Use `BaseAdminController` for admin pages
-- Define entities, services, controllers, views, migrations
-- Subscribe to hooks via `IFcmsHookManager.Register`
-- Expose your own `IFcmsModuleApi` interface for cross-module use (Issue 110)
-
-### ❌ Forbidden:
-- Direct service injection from another custom module
-- DLL/project reference to another custom module
-- Calling `services.AddSingleton<IFcmsAiProvider>(...)` (override Framework defaults — only Framework/Core do this)
-- File system writes outside declared `RequestedPermissions`
-- Modifying Framework or Core source
-
-### 📐 Cross-module communication:
-**Only via hooks** OR module API registry. NO direct dependencies.
-
-```csharp
-// Publish:
-await _hookManager.ExecuteAsync(FcmsHooks.PostPublished, post);
-
-// Consume (decoupled):
-_hookManager.Register(FcmsHooks.PostPublished, async (payload, ct) => {
-    var post = (FcmsPost)payload;
-    await _newsletterService.SendAsync(post, ct);
-});
-
-// Cross-module API call (decoupled, version-aware):
-var blogApi = _moduleApiRegistry.Get<IBlogPublicApi>();   // null if Blog inactive
-if (blogApi != null) {
-    var posts = await blogApi.GetRecentAsync(5, ct);
-}
-```
-
----
-
-## 🗄 Module Migrations
-
-### EF Core (MySQL/Postgres/MSSQL):
-
-```bash
-cd modules/MyCompany.Blog
-dotnet ef migrations add InitialBlogSchema -c BlogMigrationDbContext -o Migrations
-```
-
-Bundle migrations in your DLL — Framework auto-applies on activation.
-
-### MongoDB:
-
-Implement `IFcmsMongoIndexBuilder.BuildAsync()` — Framework calls during activation:
-
-```csharp
-public class BlogMongoIndexBuilder : IFcmsMongoIndexBuilder {
-    public async Task BuildAsync(IMongoDatabase db, CancellationToken ct) {
-        var posts = db.GetCollection<FcmsPost>("fcms_posts");
-        await posts.Indexes.CreateOneAsync(new CreateIndexModel<FcmsPost>(
-            Builders<FcmsPost>.IndexKeys.Ascending(p => p.Slug),
-            new CreateIndexOptions { Unique = true }), cancellationToken: ct);
-    }
-}
-```
-
----
-
-## 🌐 i18n
-
-Bundle `Resources/Strings.en.resx` + `Resources/Strings.bn.resx` in your module. Framework auto-loads.
-
-```razor
-@inject IFcmsTranslator T
-<h1>@T.Get("BlogPosts")</h1>
-```
-
-Lookup chain: Module resx → Core resx fallback → key itself (never blank).
-
----
-
-## 📦 Packaging for Distribution
-
-```bash
-# Build:
-cd modules/MyCompany.Blog
-dotnet publish -c Release -o publish/
-
-# ZIP structure must contain:
-# bin/      — DLL + transitive NuGet deps
-# Views/    — .cshtml files
-# wwwroot/  — static assets
-# module.json — manifest
-cd publish && zip -r ../MyCompany.Blog.zip . && cd ..
-```
-
-Drop ZIP into `/modules/` Docker volume OR upload via Admin UI.
-
----
-
-## 🐳 Docker — Two Strategies
-
-### Strategy A: Bake into image (production, immutable)
-
-```dockerfile
-# Dockerfile.with-modules
-FROM ghcr.io/rayhanul17/flexcms:latest
-COPY modules/MyCompany.Blog /app/modules/MyCompany.Blog
-```
-
-### Strategy B: Volume mount (staging/dev, hot-drop)
-
-```bash
-docker cp MyCompany.Blog.zip flexcms_flexcms_1:/app/modules/
-docker exec flexcms_flexcms_1 unzip /app/modules/MyCompany.Blog.zip -d /app/modules/MyCompany.Blog/
-# Then admin activates → 5-15s container restart → live
-```
-
----
-
-## ✅ Pre-publish Checklist
-
-- [ ] `module.json` complete (ModuleId, Version, MinFrameworkVersion)
-- [ ] `RequestedPermissions` declared honestly
-- [ ] All async methods accept `CancellationToken`
-- [ ] All entities follow `IBaseEntity` (Guid Id, audit fields)
-- [ ] DTOs (NOT entities) used for form/API binding
-- [ ] HTML content sanitized via `HtmlSanitizer.Sanitize()` (in `FlexCms.Framework.Cms`) before save
-- [ ] `SeedDataAsync` is **idempotent** (uses `UpsertAsync`, not `InsertAsync`)
-- [ ] i18n strings in resx files, no hardcoded English/Bangla
-- [ ] Migrations tested on a fresh DB
-- [ ] No reference to other custom modules' DLLs
-- [ ] Cross-module needs go through `IFcmsHookManager` OR module API registry
-- [ ] Tested on both EF (MySQL) AND MongoDB providers (if module is provider-agnostic)
-
----
-
-## Attribute Reference
-
-Quick reference for the attributes module authors are expected to use.
-All defined in `FlexCms.Framework`.
-
-### `[FcmsAuthorize(permission?)]`
-
-Source: `Auth/FcmsAuthorizeAttribute.cs` — applied on a controller or
-action. When omitted, just requires authentication. Permission
-expressions support `&` (AND) and `|` (OR), e.g.
-`[FcmsAuthorize("posts.create&posts.publish")]`. SuperAdmin bypasses
-every check.
-
-```csharp
-[FcmsAuthorize(FcmsPermissions.PostsEdit)]
-public async Task<IActionResult> Edit(Guid id) { ... }
-```
-
-### `[FcmsLog(action, entityType, entityIdParam = "id", module = "core")]`
-
-Source: `Auth/FcmsLogAttribute.cs` — automatic audit-log entry on
-successful 2xx redirect or JSON action result. Reads the entity id
-from the named route/query parameter (default `id`); use
-`FcmsLogContext.SetEntityId(id)` inside the action when the value
-isn't on the URL.
-
-```csharp
 [HttpPost("create")]
-[FcmsLog("post.create", "FcmsPost")]
-[FcmsAuthorize(FcmsPermissions.PostsCreate)]
-public async Task<IActionResult> Create(PostVm vm) { ... }
+[FcmsAuthorize(InvestPermissions.Create)]
+public async Task<IActionResult> Create(...) { ... }
 ```
 
-### `[FcmsLogIgnore]`
+SuperAdmin bypasses every permission check.
 
-Source: `Cms/FcmsLogIgnoreAttribute.cs` — applied on a property.
-Causes `FcmsLogJsonResolver` to strip the property from the audit
-JSON snapshot. Use for sensitive or noisy fields. The framework
-already strips Identity-managed fields (`PasswordHash`,
-`SecurityStamp`, `ConcurrencyStamp`, etc.) and navigation
-collections automatically — `[FcmsLogIgnore]` is for module-defined
-fields the framework can't infer.
+---
+
+## 7. Menu items
 
 ```csharp
-public class CustomerData : BaseEfEntity
+public override List<FcmsMenuItemDef> GetMenuItems() =>
+[
+    new FcmsMenuItemDef
+    {
+        DefaultName = "Investments",
+        Icon = "bi bi-graph-up",
+        Url = "/admin/invest",
+        Order = 500,
+        RequiredPermission = InvestPermissions.View
+    }
+];
+```
+
+Menu items are soft-deleted on `Deactivate` and restored on the next activate.
+
+---
+
+## 8. Controller base class — `BaseFcmsController`
+
+Module controllers inherit `BaseFcmsController` (framework-level) which gives
+you:
+
+```csharp
+// Toast / flash messages (TempData-backed across redirects)
+ShowSuccess("Saved.");
+ShowError("Could not connect.");
+ShowWarning("Low balance.");
+ShowInfo("Heads up.");
+
+// Full-control overload — append to the previous toast, override duration, hide close button
+ShowMessage("Step 1 done", FcmsMessageType.Info, appendMessage: true, durationSeconds: 8);
+
+// AJAX response envelope used by fcms-actions.js
+return FcmsOk("Created.", new { id = item.Id });
+return FcmsFail("Validation failed.");
+
+// Logger scoped to this controller (Serilog category)
+Logger.LogInformation("Created investment {Id}", item.Id);
+
+// Cache + session shorthand
+SetCache("foo", value, TimeSpan.FromMinutes(10));
+SetSession("wizardState", model);
+```
+
+Admin controllers can also inherit `BaseAdminController` (host) which adds the
+global `[FcmsAuthorize]` gate plus a `DataTableResult<>` helper for server-side
+DataTables.
+
+---
+
+## 9. Helpers you can lean on
+
+All under `FlexCms.Framework.Helpers` — pure, static, allocation-light.
+
+| Helper | When to use |
+|---|---|
+| `FcmsHelper` | Table naming, slug, snake-case, pluralize, base64-url, enum to dictionary, page-password hash |
+| `FcmsStringHelper` | Truncate, StripHtml, FirstWords, Capitalize, NormalizeWhitespace, SmartUrlEncode, Mask |
+| `FcmsUrlHelper` | Parse URL paths into `(area, controller, action)`, combine, isAbsolute |
+| `FcmsPhoneHelper` | Country-aware mobile validation (`BD` default, `IN`, `US` built-in, `Register(...)` for more) |
+| `FcmsTypeConverter` | `ParseInt/Long/Decimal/Bool/Guid/DateTime/Enum` + nullable variants — null-safe, invariant culture |
+| `FcmsReflectionHelper` | `GetIdValue<TId>`, `IsBaseEntity`, `CreateList`, nav-property discovery |
+| `FcmsRuntimeHelper` | OS detection, framework description, assembly version |
+| `FcmsEmbeddedResourceHelper` | Read embedded text / JSON resources from a module DLL |
+
+Framework services every module can inject:
+
+| Service | Where | What it does |
+|---|---|---|
+| `IFcmsExcelService` | `FlexCms.Framework.Documents` | Server-side Excel export — ClosedXML 0.105.0 (MIT) backed |
+| `IFcmsPdfService` | `FlexCms.Framework.Documents` | Programmatic PDF — QuestPDF 2026.2.4 (MIT Community, free) |
+| `IMediaService` | `FlexCms.Framework.Cms` | Validated file upload (magic-byte MIME check, thumbnails, DB-tracked) — returns `{Id, Url, ThumbnailUrl}` |
+| `IFcmsFileStorage` | `FlexCms.Framework.Storage` | Raw file I/O abstraction (use when you don't need the media library overhead) |
+| `IFcmsLogService` | `FlexCms.Framework.Cms` | Audit log (`OpLog` on `BaseAdminController`) |
+| `IFcmsTranslator` | `FlexCms.Framework.I18n` | i18n lookup (uses the embedded `Resources/i18n/*.json`) |
+| `ISettingsService` | `FlexCms.Framework.Services` | Per-key settings — auto-encrypts values flagged as sensitive |
+| `IFcmsContextService` | `FlexCms.Framework.Services` | Current user + IP + browser parsed via UAParser |
+
+### Quick examples
+
+**Excel export**
+
+```csharp
+public AdminInvestController(IFcmsExcelService excel, IRepository<Investment> repo) { ... }
+
+[HttpGet("export")]
+public async Task<IActionResult> Export(CancellationToken ct)
 {
-    public string Name { get; set; } = "";
-    [FcmsLogIgnore] public string InternalNotes { get; set; } = "";
+    var rows = await repo.GetAllAsync(ct);
+    var bytes = await excel.RenderTableAsync(
+        sheetName: "Investments",
+        headers: ["Investor", "Amount", "Status", "Created"],
+        rows: rows.Select(r => new object?[] { r.InvestorName, r.Amount, r.Status, r.CreatedAt })
+                  .ToList());
+    return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "investments.xlsx");
 }
 ```
 
-### `[FcmsTable(name)]`
-
-Source: `Helpers/FcmsHelper.cs` — applied on an entity class.
-Overrides the auto-generated table name (`{prefix}_{snake_case_plural}`)
-when you need a specific table name (legacy compat, naming conflicts).
-Use sparingly — the convention is the path of least surprise.
+**PDF receipt**
 
 ```csharp
-[FcmsTable("legacy_users")]
-public class FcmsUser : IdentityUser<Guid> { ... }
+public AdminInvestController(IFcmsPdfService pdf) { ... }
+
+[HttpGet("receipt/{id:guid}")]
+public async Task<IActionResult> Receipt(Guid id, CancellationToken ct)
+{
+    var bytes = await pdf.RenderTextAsync(
+        title: "Investment Receipt",
+        lines: [$"Investor: {item.InvestorName}", $"Amount: {item.Amount:C}", $"Date: {item.CreatedAt:yyyy-MM-dd}"]);
+    return File(bytes, "application/pdf", $"receipt-{id}.pdf");
+}
 ```
 
-### `[FcmsScoped(serviceType?)]` / `[FcmsSingleton(serviceType?)]` / `[FcmsHostedService]`
-
-Source: `Modules/Attributes/FcmsLifetimeAttributes.cs` — applied on a
-service class. The module loader scans the assembly for these and
-registers them automatically with the right lifetime. Pass an
-explicit interface to register against if your class implements
-multiple interfaces.
+**File upload through the Media library**
 
 ```csharp
-[FcmsScoped(typeof(IBlogService))]
-public class BlogService : IBlogService, IDisposable { ... }
+public AdminInvestController(IMediaService media) { ... }
+
+[HttpPost("upload-proof")]
+[ValidateAntiForgeryToken]
+public async Task<IActionResult> UploadProof(IFormFile file, CancellationToken ct)
+{
+    if (file is null || file.Length == 0) return FcmsFail("Pick a file.");
+    var result = await media.UploadAsync(file, folderId: null, ct);
+    // result = { Id, Url, ThumbnailUrl, MimeType, ... } — store result.Id on your entity
+    return FcmsOk("Uploaded.", new { url = result.Url, id = result.Id });
+}
+```
+
+**Excel import (parse uploaded `.xlsx`)**
+
+```csharp
+public AdminInvestController(IFcmsExcelService excel) { ... }
+
+[HttpPost("import")]
+[ValidateAntiForgeryToken]
+public async Task<IActionResult> Import(IFormFile file, CancellationToken ct)
+{
+    if (file is null || file.Length == 0) return FcmsFail("Pick an .xlsx file.");
+
+    // Strongly-typed: ParseAsync<T> maps each row by header name (case-insensitive).
+    // Use [FcmsExcelColumn("Custom Header")] on a property when the workbook
+    // header doesn't match your DTO property name.
+    using var stream = file.OpenReadStream();
+    var rows = await excel.ParseAsync<InvestmentImportRow>(stream, ct: ct);
+
+    foreach (var row in rows)
+        await repo.AddAsync(new Investment { InvestorName = row.Name, Amount = row.Amount });
+    await uow.SaveChangesAsync(ct);
+    return FcmsOk($"{rows.Count} row(s) imported.");
+}
+
+public class InvestmentImportRow
+{
+    [FcmsExcelColumn("Investor Name")] public string Name { get; set; } = "";
+    public decimal Amount { get; set; }
+}
+```
+
+**Raw SQL → DTO (reports & aggregates)**
+
+```csharp
+public AdminInvestController(InvestmentDbContext db) { ... }
+
+[HttpGet("report")]
+public async Task<IActionResult> Report(CancellationToken ct)
+{
+    var summary = await FcmsSqlHelper.QueryAsync<InvestmentSummaryDto>(
+        db,
+        @"SELECT InvestorEmail, COUNT(*) AS InvestmentCount, SUM(Amount) AS TotalAmount
+          FROM investments
+          WHERE Status <> 404
+          GROUP BY InvestorEmail
+          ORDER BY TotalAmount DESC",
+        ct: ct);
+    return Json(summary);
+}
+
+public class InvestmentSummaryDto
+{
+    public string InvestorEmail { get; set; } = "";
+    public int InvestmentCount { get; set; }
+    public decimal TotalAmount { get; set; }
+}
+```
+
+`FcmsSqlHelper` also exposes `ScalarAsync<T>()` for single-value queries and
+`ExecuteAsync()` for non-query (INSERT/UPDATE/DELETE/DDL) statements. All
+parameter-binding goes through `DbParameter` — never string-concatenate user
+input into the SQL.
+
+Enum descriptions:
+
+```csharp
+[Description("Pending review")]
+public enum InvestmentStatus { Pending, Approved, Rejected }
+
+// In a view / controller:
+var label = FcmsHelper.GetEnumDescription(item.Status);          // "Pending review"
+var dropdown = FcmsHelper.EnumToSelectList<InvestmentStatus>();  // for <select>
+```
+
+---
+
+## 9.5 Background services + scheduling
+
+Module-side background work uses the standard ASP.NET Core `BackgroundService`
+type plus the `[FcmsHostedService]` attribute, which the framework's attribute
+scanner picks up automatically. No manual registration — drop the class into
+the assembly and it's wired on activation.
+
+```csharp
+using FlexCms.Framework.Hosting;
+using FlexCms.Framework.Modules.Attributes;
+using Microsoft.Extensions.Hosting;
 
 [FcmsHostedService]
-public class BlogIndexerService : BackgroundService { ... }
+public sealed class InvestmentNightlyReport : BackgroundService
+{
+    // Cron fields: minute hour day-of-month month day-of-week
+    // Cron.* exposes ready-made helpers so you don't have to remember the syntax.
+    private readonly FcmsScheduledTask _schedule = new(Cron.DailyAt(hour: 2, minute: 0));
+
+    private readonly IServiceScopeFactory _scopes;
+    public InvestmentNightlyReport(IServiceScopeFactory scopes) => _scopes = scopes;
+
+    protected override async Task ExecuteAsync(CancellationToken ct)
+    {
+        // One-minute polling — cheap and IIS / Docker friendly. The scheduled
+        // task's ShouldRun() guard ensures we only fire once per matching minute.
+        while (!ct.IsCancellationRequested)
+        {
+            if (_schedule.ShouldRun(DateTime.UtcNow))
+            {
+                await using var scope = _scopes.CreateAsyncScope();
+                // var svc = scope.ServiceProvider.GetRequiredService<IInvestmentReportService>();
+                // await svc.GenerateNightlyReportAsync(ct);
+            }
+
+            try { await Task.Delay(TimeSpan.FromMinutes(1), ct); }
+            catch (TaskCanceledException) { return; }
+        }
+    }
+}
 ```
 
-### `[FcmsModuleApi(version, DisplayName?)]`
+Common ready-made schedules:
 
-Source: `Modules/Api/FcmsModuleApiAttribute.cs` — applied on an
-interface that other modules will resolve through `IFcmsModuleApiRegistry`.
-Version follows SemVer; bump major on breaking changes. Consumers
-specify a constraint when calling `Get<T>(">=1.2.0")`.
+| Helper | Cron expression | Fires |
+|---|---|---|
+| `Cron.EveryMinute`        | `* * * * *`       | every minute (testing only) |
+| `Cron.EveryFiveMin`       | `*/5 * * * *`     | every 5 minutes |
+| `Cron.EveryFifteenMin`    | `*/15 * * * *`    | every 15 minutes |
+| `Cron.Hourly`             | `0 * * * *`       | once per hour at :00 |
+| `Cron.HourlyAtMinute(15)` | `15 * * * *`      | once per hour at :15 |
+| `Cron.DailyAt(2, 30)`     | `30 2 * * *`      | 02:30 every day |
+| `Cron.WeeklyAt(1, 9, 0)`  | `0 9 * * 1`       | Mondays at 09:00 |
+| `Cron.MonthlyAt(1, 0, 0)` | `0 0 1 * *`       | first of the month at 00:00 |
 
-```csharp
-[FcmsModuleApi("1.2.0", DisplayName = "Blog Public API")]
-public interface IBlogPublicApi
-{
-    Task<List<Post>> GetRecentAsync(int n);
-}
-
-// Consumer side (in another module):
-var blog = registry.Get<IBlogPublicApi>(">=1.0.0");
-if (blog is not null)
-{
-    var posts = await blog.GetRecentAsync(5);
-}
-```
+> Multi-node deployments need an outer "did anyone already run this minute?"
+> coordination lock — `FcmsScheduledTask` is intentionally in-process.
 
 ---
 
-## Tag Helper Reference
+## 9.6 Indexing module tables
 
-All tag helpers ship with `FlexCms.Framework`. Add
-`@addTagHelper *, FlexCms.Framework` to `_ViewImports.cshtml` (the
-host already does this).
+Indexes live in the module's own `DbContext.OnModelCreating` and ship as part
+of the same EF migration as the entity:
 
-| Tag | Purpose | Example |
-|---|---|---|
-| `<button fcms-authorize="key">` | Hide element when user lacks permission | `<button fcms-authorize="users.delete">Delete</button>` |
-| `<fcms-honeypot />` | Renders an off-screen honeypot field pair to deter bots | `<form>... <fcms-honeypot /> </form>` |
-| `<fcms-env-banner />` | Colored "DEVELOPMENT" / "STAGING" banner; hidden in Production | Place once in `_AdminLayout.cshtml` |
-| `<fcms-picture src alt widths sizes>` | `<picture>` with WebP + responsive srcset + lazy fallback | `<fcms-picture src="/uploads/hero.jpg" alt="Hero" widths="640,1024,1920" />` |
-| `<fcms-data-table url page-length>` | Server-side jQuery DataTable with permission-filtered actions | See `MediaController.Index` |
-| `<fcms-row-actions entity-id base-url>` | Permission-filtered edit / delete / restore row buttons | Used inside DataTable templates |
+```csharp
+protected override void OnModelCreating(ModelBuilder b)
+{
+    base.OnModelCreating(b);
+
+    b.Entity<Investment>().HasIndex(x => x.InvestorEmail);
+    b.Entity<Investment>().HasIndex(x => new { x.Status, x.CreatedAt });
+    b.Entity<Investment>().HasIndex(x => x.AccountNumber).IsUnique();
+}
+```
+
+Run `dotnet ef migrations add AddInvestmentIndexes` once and commit the
+generated migration files alongside the module's source. `ModuleActivationService`
+applies them on the next host restart.
+
+---
+
+## 10. UI API — toasts, confirms, AJAX actions
+
+The host ships a small JS library available on every page (admin and public):
+
+```js
+// Toasts
+fcms.toast.success("Saved.");
+fcms.toast.danger("Failed.", { duration: 8000, closeButton: false });
+fcms.toast.warning("Low balance.", { appendMessage: true });
+
+// Confirm modal — promise-based
+const ok = await fcms.confirm({
+  title: "Delete investor?",
+  body:  "This cannot be undone.",
+  okText: "Delete",
+  okClass: "btn-danger"
+});
+if (ok) { /* delete */ }
+
+// Async loader / overlay
+fcms.loader.show("Saving…");
+try { await save(); } finally { fcms.loader.hide(); }
+
+// DataTables config wrapper — see fcms-datatable.js
+fcms.datatable.init('#grid', { ajaxUrl: '/admin/invest/datatable', columns: [...] });
+```
+
+`fcms-actions.js` auto-handles `<button data-fcms-action="...">` declarative
+delete / activate / deactivate patterns. The button posts to the configured
+URL, shows a toast from the JSON envelope, and reloads the row.
+
+---
+
+## 11. Audit logging
+
+Inject `IFcmsLogService` or use `BaseAdminController.OpLog`:
+
+```csharp
+await OpLog.LogAsync("invest.create", nameof(Investment), item.Id.ToString(),
+    value: item, module: "FlexCms.Module.Investment", ct: ct);
+```
+
+Module operations (Upload / Activate / Deactivate / Uninstall) are audited
+automatically by the framework — your CRUD logs are additive.
+
+---
+
+## 12. Drop tables (uninstall hygiene)
+
+`EnsureDeletedAsync()` is the simplest correct implementation when your module
+owns its `DbContext`:
+
+```csharp
+public override async Task DropTablesAsync(string connectionString, string provider, CancellationToken ct = default)
+{
+    var ctx = CreateMigrationContext(connectionString, provider);
+    if (ctx is null) return;
+    await using (ctx) await ctx.Database.EnsureDeletedAsync(ct);
+}
+```
+
+This runs **only** when the admin ticks *Drop all database tables* on the
+uninstall dialog — by default uninstall keeps the data so the customer can
+re-install later.
+
+---
+
+## 13. Sample module
+
+A complete, working reference lives under `samples/FlexCms.Sample.Hello/`:
+manifest, entity, DbContext, admin CRUD controller, permissions, menu, drop
+tables, `[FcmsScoped]` attribute-registered service. Copy its layout when in
+doubt.
+
+---
+
+## 14. Common pitfalls
+
+- **Forgot `<EmbeddedResource Include="module.json" />`** → the loader skips
+  your DLL with a "no manifest" log entry. Always check this first.
+- **`ModuleId` casing changes between manifest and class** → registry uses the
+  manifest's `ModuleId`; permission seeding lowercases everything for the
+  prefix. Keep them identical to avoid confusion.
+- **`Permission keys` don't match `[FcmsAuthorize(...)]`** → seeding writes
+  `{moduleId}.{key}` (lowercase); the attribute must use the same string.
+  Encode it as a constant.
+- **EF migration fails because the connection string in `setup.json` is wrong**
+  → `ActivationError` will say so; fix the setting and restart.
+- **Old `bin/Debug/` artefacts left in `modules/<id>/`** → the loader may pick
+  the wrong DLL. Always `dotnet publish` the module folder fresh.

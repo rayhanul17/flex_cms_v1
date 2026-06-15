@@ -5,17 +5,25 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <LangVersion>latest</LangVersion>
-    <!-- Embedded module.json is discovered by ModuleLoader at startup -->
-    <EmbeddedResource Include="module.json" />
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- Reference the host solution's framework project (adjust path as needed) -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- module.json must be embedded so ModuleLoader can find it via GetManifestResourceNames(). -->
+    <EmbeddedResource Include="module.json" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Reference the host solution's framework project (adjust path as needed). -->
     <ProjectReference Include="..\..\src\FlexCms.Framework\FlexCms.Framework.csproj" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.4">
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.15">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>

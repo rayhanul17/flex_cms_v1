@@ -2,31 +2,29 @@ using FlexCms.Framework.Db.Ef;
 using FlexCms.Framework.Helpers;
 using Microsoft.EntityFrameworkCore;
 
-namespace FlexCms.Module.Name;
+namespace FlexCms.Sample.Hello.Data;
 
 /// <summary>
 /// Module-owned DbContext. Only contains this module's entities.
-/// FlexCms calls MigrateAsync() on this context at startup via CreateMigrationContext().
+/// FlexCms calls <c>Database.MigrateAsync()</c> on this context at startup via
+/// <c>CreateMigrationContext()</c>.
 /// </summary>
-public class NameDbContext : DbContext
+public class HelloDbContext : DbContext
 {
-    public const string Prefix = "mod_prefix";
+    public const string Prefix = "hello";
 
-    public NameDbContext(DbContextOptions<NameDbContext> options) : base(options) { }
+    public HelloDbContext(DbContextOptions<HelloDbContext> options) : base(options) { }
 
-    // Add your DbSets here:
-    // public DbSet<NamePost> Posts => Set<NamePost>();
+    public DbSet<HelloGreeting> Greetings => Set<HelloGreeting>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
 
-        // Auto-name tables using FlexCms convention: {prefix}_{entity_snake_plural}
-        // Example: FcmsHelper.GetTableName<NamePost>(Prefix) → "mod_prefix_name_posts"
         foreach (var entityType in modelBuilder.Model.GetEntityTypes())
         {
             if (!typeof(BaseEfEntity).IsAssignableFrom(entityType.ClrType)) continue;
-            var method = typeof(NameDbContext)
+            var method = typeof(HelloDbContext)
                 .GetMethod(nameof(ApplyNaming),
                     System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!
                 .MakeGenericMethod(entityType.ClrType);
@@ -36,4 +34,10 @@ public class NameDbContext : DbContext
 
     private static void ApplyNaming<T>(ModelBuilder builder) where T : BaseEfEntity
         => builder.Entity<T>().ToTable(FcmsHelper.GetTableName<T>(Prefix));
+}
+
+public class HelloGreeting : BaseEfEntity
+{
+    public string Audience { get; set; } = "";
+    public string Message { get; set; } = "";
 }

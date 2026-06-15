@@ -123,3 +123,13 @@ $RECYCLE.BIN/
 *.swo
 *~
 node_modules/
+
+# ──────────────────────────────────────────────────────────────────────
+# Local dev / IDE caches & debugging artefacts
+# ──────────────────────────────────────────────────────────────────────
+.claude/
+.playwright-mcp/
+/login-page.png
+/modules-page.png
+/modules-page-active.png
+/setup-wizard.png

@@ -3,9 +3,18 @@
   "ModuleName": "Hello",
   "Version": "1.0.0",
   "Author": "FlexCms Team",
-  "Description": "Minimal sample module — verifies the Phase 4 lifecycle end-to-end.",
+  "Email": "support@flexcms.local",
+  "Website": "https://github.com/flexcms/sample-hello",
+  "Category": "Sample",
+  "Description": "Minimal sample module — demonstrates the full FlexCms module pattern end-to-end (entity, migrations, permissions, menu, drop).",
   "MinFrameworkVersion": "1.0.0",
   "TablePrefix": "hello",
   "DependsOn": [],
-  "RequestedPermissions": []
+  "RequestedPermissions": [
+    "greeting.view",
+    "greeting.create",
+    "greeting.edit",
+    "greeting.delete"
+  ],
+  "RequestedCapabilities": []
 }

@@ -1,0 +1,71 @@
+@{
+    ViewData["Title"] = "__ShortName__";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="mb-0">__ShortName__</h4>
+    <a asp-action="Create" class="btn btn-primary btn-sm">
+        <i class="bi bi-plus-lg"></i> New __ShortName__
+    </a>
+</div>
+
+<form id="csrf" style="display:none">@Html.AntiForgeryToken()</form>
+
+<table id="grid" class="table table-hover align-middle w-100">
+    <thead class="table-light">
+        <tr>
+            <th>Title</th>
+            <th>Description</th>
+            <th>Status</th>
+            <th>Created</th>
+            <th class="text-end">Actions</th>
+        </tr>
+    </thead>
+</table>
+
+@section Scripts {
+<script>
+(function () {
+    const token = document.querySelector('#csrf input[name=__RequestVerificationToken]').value;
+    $('#grid').DataTable({
+        processing: true,
+        serverSide: true,
+        ajax: {
+            url: '/admin/mod_prefix/datatable',
+            type: 'POST',
+            headers: { 'X-FlexCms-Csrf': token },
+            data: d => ({ ...d, __RequestVerificationToken: token })
+        },
+        order: [[3, 'desc']],
+        columns: [
+            { data: 'title' },
+            { data: 'description', render: d => d?.length > 80 ? d.slice(0, 80) + '…' : d },
+            { data: 'isPublished', render: v => v
+                ? '<span class="badge text-bg-success">Published</span>'
+                : '<span class="badge text-bg-secondary">Draft</span>' },
+            { data: 'createdAt', render: v => v ? new Date(v).toLocaleString() : '' },
+            {
+                data: 'id', orderable: false, searchable: false, className: 'text-end',
+                render: id => `
+                    <a href="/admin/mod_prefix/edit/${id}" class="btn btn-sm btn-outline-secondary">Edit</a>
+                    <button class="btn btn-sm btn-outline-danger js-del" data-id="${id}">Delete</button>`
+            }
+        ]
+    });
+
+    document.addEventListener('click', async e => {
+        const btn = e.target.closest('.js-del');
+        if (!btn) return;
+        if (!confirm('Delete this item?')) return;
+        const r = await fetch(`/admin/mod_prefix/delete/${btn.dataset.id}`, {
+            method: 'POST',
+            headers: { 'X-FlexCms-Csrf': token },
+            body: new URLSearchParams({ __RequestVerificationToken: token })
+        });
+        const json = await r.json();
+        if (json.isSuccess) $('#grid').DataTable().ajax.reload();
+        else alert(json.message || 'Delete failed.');
+    });
+})();
+</script>
+}

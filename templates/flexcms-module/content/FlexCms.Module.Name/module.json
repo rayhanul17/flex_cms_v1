@@ -1,9 +1,15 @@
 {
-  "moduleId": "FlexCms.Module.Name",
-  "moduleName": "Name",
-  "version": "1.0.0",
-  "author": "",
-  "description": "",
-  "tablePrefix": "mod_prefix",
-  "dependsOn": []
+  "ModuleId": "FlexCms.Module.Name",
+  "ModuleName": "Name",
+  "Version": "1.0.0",
+  "Author": "",
+  "Email": "",
+  "Website": "",
+  "Category": "",
+  "Description": "",
+  "MinFrameworkVersion": "1.0.0",
+  "TablePrefix": "mod_prefix",
+  "DependsOn": [],
+  "RequestedPermissions": [],
+  "RequestedCapabilities": []
 }

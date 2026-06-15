@@ -46,22 +46,11 @@ public class SetupController : Controller
     {
         try
         {
-            if (model.DbProvider == "mongodb")
-            {
-                var connStr = model.MongoConnectionString ?? "mongodb://localhost:27017";
-                using var client = new MongoDB.Driver.MongoClient(connStr);
-                var db = client.GetDatabase(model.MongoDatabase ?? "flexcms");
-                await db.RunCommandAsync<MongoDB.Bson.BsonDocument>(
-                    new MongoDB.Bson.BsonDocument("ping", 1), cancellationToken: ct);
-            }
-            else
-            {
-                var optBuilder = new DbContextOptionsBuilder<FcmsDbContext>();
-                ConfigureRelationalProvider(optBuilder, model);
-                await using var ctx = new FcmsDbContext(optBuilder.Options);
-                if (!await ctx.Database.CanConnectAsync(ct))
-                    return Ok(new { ok = false, error = "Cannot connect to the database server." });
-            }
+            var optBuilder = new DbContextOptionsBuilder<FcmsDbContext>();
+            ConfigureRelationalProvider(optBuilder, model);
+            await using var ctx = new FcmsDbContext(optBuilder.Options);
+            if (!await ctx.Database.CanConnectAsync(ct))
+                return Ok(new { ok = false, error = "Cannot connect to the database server." });
 
             return Ok(new { ok = true });
         }
@@ -162,16 +151,6 @@ public class SetupController : Controller
 
     private static async Task MigrateDatabaseAsync(SetupConfig config, CancellationToken ct)
     {
-        if (config.DbProvider == "mongodb")
-        {
-            // MongoDB: just verify the connection; collections are created on first write
-            using var client = new MongoDB.Driver.MongoClient(config.MongoConnectionString);
-            await client.GetDatabase(config.MongoDatabase ?? "flexcms")
-                .RunCommandAsync<MongoDB.Bson.BsonDocument>(
-                    new MongoDB.Bson.BsonDocument("ping", 1), cancellationToken: ct);
-            return;
-        }
-
         var optBuilder = new DbContextOptionsBuilder<FcmsDbContext>();
         switch (config.DbProvider)
         {
@@ -290,10 +269,6 @@ public class SetupController : Controller
             case "postgresql":
                 config.DbConnectionString = BuildPostgreSqlConnectionString(s1);
                 config.DbPasswordEncrypted = s1.PgPassword ?? "";
-                break;
-            case "mongodb":
-                config.MongoConnectionString = s1.MongoConnectionString ?? "mongodb://localhost:27017";
-                config.MongoDatabase = s1.MongoDatabase ?? "flexcms";
                 break;
         }
 

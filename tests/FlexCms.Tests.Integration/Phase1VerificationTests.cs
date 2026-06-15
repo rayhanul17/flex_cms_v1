@@ -1,14 +1,10 @@
 using FlexCms.Framework.Db;
 using FlexCms.Framework.Db.Ef;
-using FlexCms.Framework.Db.MongoDb;
 using FlexCms.Framework.Extensions;
 using FlexCms.Framework.Setup;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using MongoDB.Bson;
-using MongoDB.Driver;
-using Testcontainers.MongoDb;
 using Testcontainers.MySql;
 using Xunit;
 
@@ -17,11 +13,6 @@ namespace FlexCms.Tests.Integration;
 // -- Test entities ----------------------------------------------------------
 
 public class EfTestEntity : BaseEfEntity
-{
-    public string Name { get; set; } = string.Empty;
-}
-
-public class MongoTestEntity : BaseMongoEntity
 {
     public string Name { get; set; } = string.Empty;
 }
@@ -114,124 +105,6 @@ public class EfPhase1Tests : IAsyncLifetime
         var repo2 = new EfRepository<EfTestEntity>(verifyCtx);
         Assert.Null(await repo2.GetByIdAsync(id1));
         Assert.Null(await repo2.GetByIdAsync(id2));
-    }
-}
-
-// ---------------------------------------------------------------------------
-// MongoDB tests
-// ---------------------------------------------------------------------------
-
-public class MongoPhase1Tests : IAsyncLifetime
-{
-    private MongoDbContainer _mongo = null!;
-    private IMongoDatabase _database = null!;
-    private MongoClient _client = null!;
-
-    public async Task InitializeAsync()
-    {
-        _mongo = new MongoDbBuilder("mongo:7").Build();
-        await _mongo.StartAsync();
-
-        MongoDbSerializerSetup.Register();
-
-        _client = new MongoClient(_mongo.GetConnectionString());
-        _database = _client.GetDatabase("flexcms_test");
-    }
-
-    public async Task DisposeAsync()
-    {
-        await _mongo.DisposeAsync();
-    }
-
-    // Helper: binary UUID filter for raw BsonDocument queries
-    private static FilterDefinition<BsonDocument> IdFilter(Guid id)
-    {
-        var bytes = GuidToStandardBytes(id);
-        var bsonId = new BsonBinaryData(bytes, BsonBinarySubType.UuidStandard);
-        return Builders<BsonDocument>.Filter.Eq("_id", bsonId);
-    }
-
-    // GuidRepresentation.Standard uses RFC 4122 byte order (no shuffling)
-    private static byte[] GuidToStandardBytes(Guid id) => id.ToByteArray(bigEndian: true);
-
-    [Fact]
-    public async Task MongoRepository_Insert_DocumentExistsWithGuidSubtype4()
-    {
-        var repo = new MongoRepository<MongoTestEntity>(_database);
-        var entity = new MongoTestEntity { Name = "Hello Mongo" };
-
-        await repo.AddAsync(entity);
-
-        // Verify GUID stored as binary UUID subtype 4 (Standard)
-        var collName = FlexCms.Framework.Helpers.FcmsHelper.GetTableName<MongoTestEntity>("fcms");
-        var collection = _database.GetCollection<BsonDocument>(collName);
-        var doc = await collection.Find(IdFilter(entity.Id)).FirstOrDefaultAsync();
-
-        Assert.NotNull(doc);
-        Assert.Equal(BsonType.Binary, doc["_id"].BsonType);
-        Assert.Equal(BsonBinarySubType.UuidStandard, doc["_id"].AsBsonBinaryData.SubType);
-    }
-
-    [Fact]
-    public async Task MongoRepository_DateTime_StoredAsUnixMilliseconds()
-    {
-        var repo = new MongoRepository<MongoTestEntity>(_database);
-        var entity = new MongoTestEntity { Name = "DateTime Test" };
-
-        await repo.AddAsync(entity);
-
-        var collection = _database.GetCollection<BsonDocument>(FlexCms.Framework.Helpers.FcmsHelper.GetTableName<MongoTestEntity>("fcms"));
-        var doc = await collection.Find(IdFilter(entity.Id)).FirstOrDefaultAsync();
-
-        Assert.NotNull(doc);
-        // createdAt must be stored as Int64 (Unix ms), NOT BsonType.DateTime
-        Assert.Equal(BsonType.Int64, doc["createdAt"].BsonType);
-    }
-
-    [Fact]
-    public async Task MongoRepository_DateTime_StoredAsUtcReadBackAsUtc()
-    {
-        var repo = new MongoRepository<MongoTestEntity>(_database);
-
-        var beforeUtc = DateTime.UtcNow;
-        var entity = new MongoTestEntity { Name = "UTC Roundtrip" };
-        await repo.AddAsync(entity);
-        var afterUtc = DateTime.UtcNow;
-
-        // 1. Raw BSON: Int64 Unix ms (UTC-epoch based)
-        var collection = _database.GetCollection<BsonDocument>(FlexCms.Framework.Helpers.FcmsHelper.GetTableName<MongoTestEntity>("fcms"));
-        var doc = await collection.Find(IdFilter(entity.Id)).FirstOrDefaultAsync();
-        Assert.NotNull(doc);
-        Assert.Equal(BsonType.Int64, doc["createdAt"].BsonType);
-
-        var storedUtc = DateTimeOffset.FromUnixTimeMilliseconds(doc["createdAt"].AsInt64).UtcDateTime;
-        Assert.InRange(storedUtc, beforeUtc.AddSeconds(-1), afterUtc.AddSeconds(1));
-
-        // 2. Read back via repository: Kind must be Utc, ticks must match stored value
-        var found = await repo.GetByIdAsync(entity.Id);
-        Assert.NotNull(found);
-        Assert.Equal(DateTimeKind.Utc, found.CreatedAt.Kind);
-        Assert.Equal(storedUtc.Ticks, found.CreatedAt.Ticks);
-    }
-
-    [Fact]
-    public async Task MongoRepository_SoftDelete_NotReturnedByGetAll()
-    {
-        var repo = new MongoRepository<MongoTestEntity>(_database);
-        var entity = new MongoTestEntity { Name = "To Delete" };
-        await repo.AddAsync(entity);
-
-        await repo.SoftDeleteAsync(entity);
-
-        var all = await repo.GetAllAsync();
-        Assert.DoesNotContain(all, e => e.Id == entity.Id);
-
-        // But document still physically exists in collection (soft-delete only flips status)
-        var collection = _database.GetCollection<BsonDocument>(FlexCms.Framework.Helpers.FcmsHelper.GetTableName<MongoTestEntity>("fcms"));
-        var doc = await collection.Find(IdFilter(entity.Id)).FirstOrDefaultAsync();
-        Assert.NotNull(doc);
-        // EntityStatus.Deleted = 404, registered as Int32 in MongoDbSerializerSetup
-        Assert.Equal(404, doc["status"].AsInt32);
     }
 }
 

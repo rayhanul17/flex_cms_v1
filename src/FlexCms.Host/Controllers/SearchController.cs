@@ -8,9 +8,8 @@ namespace FlexCms.Host.Controllers;
 [Route("search")]
 public class SearchController : Controller
 {
-    // IRepository<> abstraction so this works on EF and Mongo.
-    // string.Contains is translatable by both providers (EF emits LIKE,
-    // Mongo emits $regex), so we don't need EF.Functions.Like.
+    // string.Contains is translated to SQL LIKE by EF Core across providers,
+    // so we don't need EF.Functions.Like here.
     private readonly IRepository<FcmsPage> _pages;
     private readonly IRepository<FcmsPost> _posts;
 

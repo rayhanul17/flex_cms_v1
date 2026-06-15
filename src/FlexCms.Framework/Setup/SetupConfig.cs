@@ -9,9 +9,6 @@ public class SetupConfig
     // Password stored encrypted via DataProtection
     public string DbPasswordEncrypted { get; set; } = string.Empty;
 
-    public string MongoConnectionString { get; set; } = string.Empty;
-    public string MongoDatabase { get; set; } = "flexcms";
-
     // Site info
     public string SiteName { get; set; } = "FlexCms";
     public string SiteTagline { get; set; } = "";

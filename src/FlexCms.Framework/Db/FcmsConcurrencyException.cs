@@ -2,13 +2,8 @@ namespace FlexCms.Framework.Db;
 
 /// <summary>
 /// Thrown when an optimistic-concurrency token (RowVersion) check fails
-/// during an update. Surfaced by both backends:
-/// <list type="bullet">
-///   <item>EF — wrapped from <c>DbUpdateConcurrencyException</c> by callers
-///         that want a backend-neutral catch.</item>
-///   <item>Mongo — thrown directly from <c>MongoRepository.UpdateAsync</c>
-///         when <c>RowVersion</c> doesn't match the stored value.</item>
-/// </list>
+/// during an update. Wrapped from EF's <c>DbUpdateConcurrencyException</c>
+/// by callers that want a backend-neutral catch.
 ///
 /// <para>
 /// Editor controllers should catch this + show "Another editor saved

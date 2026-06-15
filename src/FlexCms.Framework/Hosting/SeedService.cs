@@ -354,19 +354,13 @@ public class SeedService : IHostedService
             ex.Message.Contains("does not exist", StringComparison.OrdinalIgnoreCase) ||
             ex.Message.Contains("Invalid object name", StringComparison.OrdinalIgnoreCase))
         {
-            // RELATIONAL ONLY — fcms_menu_items table missing on an existing
-            // pre-menu install. Try the EF-only auto-create path.
-            // Mongo deployments never hit this branch because collections are
-            // created on first insert; the original SeedAsync would have just
-            // succeeded. If we DO land here without an EF DbContext (Mongo-
-            // only setup mis-throwing a "not found" error), there's nothing
-            // useful to recover so we log + return cleanly.
+            // fcms_menu_items table missing on an existing pre-menu install.
+            // Try the EF auto-create path.
             var ctx = scope.ServiceProvider.GetService<Db.Ef.FcmsDbContext>();
             if (ctx is null)
             {
                 _logger.LogError(ex,
-                    "SeedService: menu seed failed and no EF DbContext available — " +
-                    "if running on Mongo this is unexpected (collections auto-create on insert).");
+                    "SeedService: menu seed failed and no EF DbContext available.");
                 return;
             }
             try

@@ -32,16 +32,6 @@
     <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-cmhx-cq75-c4mj" />
   </ItemGroup>
 
-  <!-- MongoDB.Driver 3.8.0 (the latest stable) transitively pins Snappier 1.0.0
-       which was flagged with GHSA-pggp-6c3x-2xmx (decompression OOB). Snappier
-       handles Snappy decompression for the Mongo wire protocol — the inputs
-       come from our OWN MongoDB instance, not from end users, so an attacker
-       would need control of the DB to exploit. We don't control the version
-       (it's pinned by Driver). Re-evaluate when MongoDB.Driver bumps it. -->
-  <ItemGroup>
-    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-pggp-6c3x-2xmx" />
-  </ItemGroup>
-
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="9.0.15" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.0.15" />
@@ -56,12 +46,8 @@
          Azure.Identity 1.11.x, all flagged "deprecated" by NuGet. The 6.x
          line has fresh Identity packages (7.x) and an unflagged Azure.Identity. -->
     <PackageReference Include="Microsoft.Data.SqlClient" Version="6.1.5" />
-    <PackageReference Include="MongoDB.Driver" Version="3.8.0" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.0.4" />
     <PackageReference Include="Pomelo.EntityFrameworkCore.MySql" Version="9.0.0" />
-    <!-- MongoDB.Driver 3.8.0 transitively pins SharpCompress 0.30.1 (GHSA-6c8g-7p36-r338).
-         Force-upgrade to a clean version; MongoDB.Driver is API-compatible with newer SharpCompress. -->
-    <PackageReference Include="SharpCompress" Version="0.48.0" />
     <PackageReference Include="SkiaSharp" Version="3.119.2" />
     <PackageReference Include="UAParser" Version="3.1.47" />
     <PackageReference Include="MailKit" Version="4.16.0" />

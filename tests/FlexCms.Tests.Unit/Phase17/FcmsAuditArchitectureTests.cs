@@ -106,31 +106,4 @@ public class FcmsAuditArchitectureTests
         Assert.False(usage.AllowMultiple);
     }
 
-    // ── AuditingRepository decorator covers all IRepository write methods ─────
-
-    [Fact]
-    public void AuditingRepository_implements_all_IRepository_write_methods()
-    {
-        var iface = typeof(IRepository<>);
-        var writeMethods = new[]
-        {
-            nameof(IRepository<BaseEfEntity>.AddAsync),
-            nameof(IRepository<BaseEfEntity>.AddRangeAsync),
-            nameof(IRepository<BaseEfEntity>.UpdateAsync),
-            nameof(IRepository<BaseEfEntity>.UpdateRangeAsync),
-            nameof(IRepository<BaseEfEntity>.DeleteAsync),
-            nameof(IRepository<BaseEfEntity>.DeleteRangeAsync),
-            nameof(IRepository<BaseEfEntity>.SoftDeleteAsync),
-            nameof(IRepository<BaseEfEntity>.SoftDeleteRangeAsync),
-        };
-
-        var decoratorType = typeof(FlexCms.Framework.Db.MongoDb.AuditingRepository<>)
-            .MakeGenericType(typeof(BaseEfEntity));
-
-        foreach (var method in writeMethods)
-        {
-            var impl = decoratorType.GetMethod(method);
-            Assert.NotNull(impl);
-        }
-    }
 }

@@ -27,8 +27,4 @@ public class SetupStep1ViewModel
     public string? PgDatabase { get; set; } = "flexcms";
     public string? PgUsername { get; set; } = "postgres";
     public string? PgPassword { get; set; }
-
-    // ── MongoDB ────────────────────────────────────────────────────────────────
-    public string? MongoConnectionString { get; set; } = "mongodb://localhost:27017";
-    public string? MongoDatabase { get; set; } = "flexcms";
 }

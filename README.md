@@ -10,7 +10,7 @@ A modular, plug-and-play CMS built on .NET 10 — designed for Bangladesh market
 
 ## ✨ Features
 
-- 🌐 **Multi-database** — MySQL, PostgreSQL, SQL Server, MongoDB (provider-agnostic via `IRepository<T>`)
+- 🌐 **Multi-database** — MySQL, PostgreSQL, SQL Server (provider-agnostic via `IRepository<T>`)
 - 🧩 **Plug-and-play modules** — drop ZIP into Admin → click activate → done
 - 🎨 **3 themes** — AdminLTE (admin + fallback), Bootstrap 5 (public), Tailwind CSS (public)
 - 🌏 **i18n built-in** — English + Bangla, easy to add more languages (RTL-friendly)
@@ -108,7 +108,7 @@ git push origin v1.0.0
 |---|---|
 | Runtime | .NET 10 (LTS-track) |
 | Web | ASP.NET Core MVC |
-| ORM | EF Core 10 (MySQL / Postgres / MSSQL) + MongoDB.Driver |
+| ORM | EF Core 10 (MySQL / Postgres / MSSQL) |
 | Auth | ASP.NET Core Identity (custom stores — DB-agnostic) |
 | Real-time | SignalR (in-process, no Redis) |
 | Editor | Toast UI Editor (MIT — true free) |

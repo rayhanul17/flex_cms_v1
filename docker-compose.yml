@@ -2,7 +2,7 @@ version: '3.8'
 
 # ─────────────────────────────────────────────────────────────────
 #  Dev Database Stack
-#  MSSQL · MySQL · PostgreSQL · MongoDB (single-node replica set)
+#  MSSQL · MySQL · PostgreSQL
 #
 #  Usage:
 #    docker compose up -d
@@ -16,31 +16,13 @@ version: '3.8'
 #    MSSQL                 : Server=localhost,1433;User Id=sa;Password=Dev@123456;TrustServerCertificate=True;
 #    MySQL                 : Server=localhost;Port=3306;Database=flexcms;User=dev;Password=Dev@123456;
 #    PostgreSQL            : Host=localhost;Port=5432;Database=flexcms;Username=dev;Password=Dev@123456;
-#    MongoDB (from PC)     : mongodb://dev:Dev%40123456@localhost:27017/?authSource=admin&directConnection=true
-#
-#  When the app runs INSIDE docker-compose (same Docker network):
-#    MongoDB (container)   : mongodb://dev:Dev%40123456@mongodb:27017/?authSource=admin&replicaSet=rs0
-#
-#  Why two Mongo strings? The replica-set member is registered as
-#  `mongodb:27017` (Docker hostname). From the PC, that hostname doesn't
-#  resolve, so directConnection=true tells the driver to skip topology
-#  discovery and use the seed host (localhost) directly. Transactions
-#  still work because the underlying server IS a replica-set primary.
-#  See DEVELOPER_GUIDE.md §13 "MongoDB connection strings" for details.
-#
-#  Password URL-encoding: `@` must be `%40` in the URI form. The plain
-#  password is `Dev@123456`; `%40` is its encoded form.
 #
 #  ── PROD connection strings (replace placeholders) ────────────────
 #    MSSQL (Azure SQL)     : Server=tcp:<server>.database.windows.net,1433;Database=<db>;User ID=<user>;Password=<pwd>;Encrypt=true;
 #    MySQL (managed)       : Server=<host>;Port=3306;Database=<db>;User=<user>;Password=<pwd>;SslMode=Required;
 #    PostgreSQL (managed)  : Host=<host>;Port=5432;Database=<db>;Username=<user>;Password=<pwd>;SSL Mode=Require;
-#    MongoDB Atlas         : mongodb+srv://<user>:<pwd>@<cluster>.mongodb.net/?retryWrites=true&w=majority&authSource=admin
-#    MongoDB self-hosted   : mongodb://<user>:<pwd>@<host>:27017/?authSource=admin&replicaSet=rs0
 #  Notes:
 #    • Always URL-encode `@` `:` `/` `+` in passwords (use https://www.urlencoder.org).
-#    • Mongo MUST be a replica set (even single-node) — transactions
-#      silently degrade on standalone. See DEVELOPER_GUIDE §13.
 #    • Don't commit prod strings — pass via env var or setup wizard.
 # ─────────────────────────────────────────────────────────────────
 
@@ -89,62 +71,8 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
-  # ── MongoDB 7 — single-node replica set (WITH KEYFILE FIX) ────
-  mongodb:
-    image: mongo:7
-    container_name: mongodb
-    restart: unless-stopped
-    ports:
-      - "27017:27017"
-    environment:
-      - MONGO_INITDB_ROOT_USERNAME=dev
-      - MONGO_INITDB_ROOT_PASSWORD=Dev@123456
-    volumes:
-      - mongo_data:/data/db
-    entrypoint: >
-      bash -c "
-        if [ ! -f /data/keyfile ]; then
-          openssl rand -base64 756 > /data/keyfile;
-          chmod 400 /data/keyfile;
-          chown 999:999 /data/keyfile;
-        fi;
-        exec docker-entrypoint.sh mongod --replSet rs0 --bind_ip_all --keyFile /data/keyfile
-      "
-    healthcheck:
-      test: [ "CMD", "mongosh", "-u", "dev", "-p", "Dev@123456", "--authenticationDatabase", "admin", "--eval", "db.adminCommand('ping')" ]
-      interval: 5s
-      timeout: 10s
-      retries: 10
-      start_period: 20s
-
-  # ── Mongo Replica Set Init ────────────────────────────────────
-  mongo-rs-init:
-    image: mongo:7
-    container_name: mongo-rs-init
-    restart: "no"
-    depends_on:
-      mongodb:
-        condition: service_healthy
-    entrypoint: >
-      bash -c "
-        echo 'Initializing MongoDB replica set...' &&
-        mongosh --host mongodb --username dev --password Dev@123456 --authenticationDatabase admin --eval '
-          try {
-            rs.status();
-            print(\"Replica set already initialized.\");
-          } catch(e) {
-            rs.initiate({
-              _id: \"rs0\",
-              members: [{ _id: 0, host: \"mongodb:27017\" }]
-            });
-            print(\"Replica set initialized.\");
-          }
-        '
-      "
-
 # ── Named volumes ──────────────────────────────────────────────
 volumes:
   mssql_data:
   mysql_data:
   postgres_data:
-  mongo_data:

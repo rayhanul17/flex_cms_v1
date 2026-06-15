@@ -2,11 +2,10 @@ namespace FlexCms.Framework.Search;
 
 /// <summary>
 /// Pluggable full-text search backend (Phase 16 — Issue 106). Default
-/// impl is <see cref="LikeSearchProvider"/> (works on any RDBMS / Mongo
-/// via simple <c>LIKE %term%</c>); production deployments swap in a
-/// vendor-specific impl that uses MySQL FULLTEXT / Postgres tsvector /
-/// SQL Server FTS / MongoDB text indexes for sub-100ms results on
-/// large corpora.
+/// impl is <see cref="LikeSearchProvider"/> (works on any RDBMS via simple
+/// <c>LIKE %term%</c>); production deployments swap in a vendor-specific
+/// impl that uses MySQL FULLTEXT / Postgres tsvector / SQL Server FTS for
+/// sub-100ms results on large corpora.
 ///
 /// <para>
 /// Modules can register additional <see cref="IFcmsSearchableSource"/>

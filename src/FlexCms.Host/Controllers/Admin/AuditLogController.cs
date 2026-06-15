@@ -15,9 +15,7 @@ public class AuditLogController : BaseAdminController
     private readonly IRepository<FcmsLogArchive> _archives;
 
     // Inject IRepository<> instead of FcmsDbContext directly so the
-    // controller works on both EF and Mongo deployments — Mongo-only
-    // installs don't register FcmsDbContext, which previously broke
-    // /admin/audit-log with "Unable to resolve service for type FcmsDbContext".
+    // controller stays decoupled from the concrete EF provider.
     public AuditLogController(
         IFcmsLogService auditLog,
         IRepository<FcmsLog> logs,

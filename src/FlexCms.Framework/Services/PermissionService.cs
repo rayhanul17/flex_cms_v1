@@ -16,10 +16,9 @@ public class PermissionService : IPermissionService
     private readonly IFcmsUnitOfWork _uow;
     // Optional — when present, AssignAsync/RevokeAsync emit a dedicated audit
     // entry ("Permission.Assigned" / "Permission.Revoked") in addition to the
-    // generic FcmsRolePermission write captured by the EF interceptor /
-    // Mongo AuditingRepository decorator. Without this you only see
-    // "RolePermission.Created" rows in the audit log, which makes it hard
-    // to track WHICH permission was granted to WHICH role.
+    // generic FcmsRolePermission write captured by the EF interceptor. Without
+    // this you only see "RolePermission.Created" rows in the audit log, which
+    // makes it hard to track WHICH permission was granted to WHICH role.
     private readonly IFcmsLogService? _audit;
 
     private const string Group = "permissions";

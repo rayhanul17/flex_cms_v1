@@ -12,8 +12,7 @@ namespace FlexCms.Host.Controllers.Admin;
 public class RedirectController : BaseAdminController
 {
     // Use IRepository<> + IFcmsUnitOfWork instead of FcmsDbContext directly
-    // so the controller works on both EF and Mongo deployments. (FcmsDbContext
-    // is only registered when a relational provider is configured.)
+    // so the controller stays decoupled from the concrete EF provider.
     private readonly IRepository<FcmsRedirect> _redirects;
     private readonly IFcmsUnitOfWork _uow;
 

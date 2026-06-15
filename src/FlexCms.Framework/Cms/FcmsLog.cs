@@ -8,8 +8,7 @@ namespace FlexCms.Framework.Cms;
 /// columns (Status, DeletedAt, UpdatedAt, UpdatedBy, CreatedBy) are
 /// explicitly ignored in <c>FcmsDbContext.OnModelCreating</c> because logs
 /// are never updated or soft-deleted. The <see cref="Db.IAppendOnlyEntity"/>
-/// marker tells <c>MongoRepository</c> to skip the same soft-delete filter
-/// so EF and Mongo behavior stay symmetric.
+/// marker excludes them from the global Status soft-delete filter.
 /// </summary>
 public class FcmsLog : BaseEfEntity, Db.IAppendOnlyEntity
 {

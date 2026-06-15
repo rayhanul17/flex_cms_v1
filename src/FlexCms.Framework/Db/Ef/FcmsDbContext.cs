@@ -136,15 +136,8 @@ public class FcmsDbContext : IdentityDbContext<FcmsUser, FcmsRole, Guid>
         modelBuilder.Entity<IdentityRoleClaim<Guid>>().ToTable("fcms_role_claims");
         modelBuilder.Entity<IdentityUserToken<Guid>>().ToTable("fcms_user_tokens");
 
-        // Embedded collections used in Mongo only; ignore in EF
-        modelBuilder.Entity<FcmsUser>().Ignore(u => u.Roles);
-        modelBuilder.Entity<FcmsUser>().Ignore(u => u.Claims);
-        modelBuilder.Entity<FcmsUser>().Ignore(u => u.Logins);
-        modelBuilder.Entity<FcmsUser>().Ignore(u => u.Tokens);
         // Computed property — not mapped to a column
         modelBuilder.Entity<FcmsUser>().Ignore(u => u.ResolvedDisplayName);
-
-        modelBuilder.Entity<FcmsRole>().Ignore(r => r.Claims);
 
         // Unique index: one permission key per role
         modelBuilder.Entity<FcmsRolePermission>()
@@ -168,6 +161,13 @@ public class FcmsDbContext : IdentityDbContext<FcmsUser, FcmsRole, Guid>
         modelBuilder.Entity<FcmsModuleRecord>()
             .HasIndex(m => m.ModuleId)
             .IsUnique();
+
+        // ActivationError holds an exception message — uncapped strings become
+        // TEXT on MySQL and nvarchar(max) on SQL Server, both of which can't be
+        // indexed. Cap to 2k which is enough for any single message we surface.
+        modelBuilder.Entity<FcmsModuleRecord>()
+            .Property(m => m.ActivationError)
+            .HasMaxLength(2000);
 
         // ── CMS ────────────────────────────────────────────────────────────────
 

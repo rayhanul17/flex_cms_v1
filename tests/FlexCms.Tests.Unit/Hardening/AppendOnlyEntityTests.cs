@@ -5,11 +5,12 @@ using Xunit;
 namespace FlexCms.Tests.Unit.Hardening;
 
 /// <summary>
-/// Marker semantics check — both repo backends inspect
-/// <see cref="IAppendOnlyEntity"/> via reflection. If someone removes the
-/// marker from FcmsLog/FcmsLogArchive, both EF and Mongo would silently
-/// start hiding soft-deleted log rows. Lock the marker into the type
-/// hierarchy with a quick assertion.
+/// Marker semantics check — the EF model build inspects
+/// <see cref="IAppendOnlyEntity"/> via reflection to strip soft-delete /
+/// audit columns and skip the global query filter. If someone removes the
+/// marker from FcmsLog/FcmsLogArchive, the soft-delete filter would silently
+/// hide deleted log rows. Lock the marker into the type hierarchy with a
+/// quick assertion.
 /// </summary>
 public class AppendOnlyEntityTests
 {
@@ -17,7 +18,7 @@ public class AppendOnlyEntityTests
     public void FcmsLog_implements_IAppendOnlyEntity()
     {
         Assert.True(typeof(IAppendOnlyEntity).IsAssignableFrom(typeof(FcmsLog)),
-            "FcmsLog must implement IAppendOnlyEntity — losing the marker re-enables soft-delete filtering, hides deleted log rows on Mongo.");
+            "FcmsLog must implement IAppendOnlyEntity — losing the marker re-enables soft-delete filtering and hides deleted log rows.");
     }
 
     [Fact]

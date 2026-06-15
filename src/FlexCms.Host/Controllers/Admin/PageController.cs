@@ -46,9 +46,8 @@ public class PageController : BaseAdminController
         };
 
         // Public URL is composed client-side (the View resolves SiteSettings.BaseUrl
-        // and the JS does {base}/{slug} per row). MongoDB LINQ can't translate
-        // string-interpolation inside a .Select() projection — anything that
-        // touches BaseUrl in the IQueryable<> would 500 the request.
+        // and the JS does {base}/{slug} per row), so we don't push the base URL
+        // through the EF projection.
         return DataTableResult(
             _pageRepo.Query(),
             req,

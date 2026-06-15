@@ -11,11 +11,8 @@ public class UserController : BaseAdminController
     private readonly UserManager<FcmsUser> _userManager;
     private readonly RoleManager<FcmsRole> _roleManager;
 
-    // Removed direct FcmsDbContext dependency — broke on Mongo-only deploys
-    // because FcmsDbContext is only registered when a relational provider is
-    // configured. UserManager.GetRolesAsync works on both EF and Mongo
-    // identity stores; the per-user N+1 cost is acceptable for typical
-    // admin user counts (<100).
+    // Uses UserManager.GetRolesAsync rather than a direct DbContext join — the
+    // per-user N+1 cost is acceptable for typical admin user counts (<100).
     public UserController(UserManager<FcmsUser> userManager, RoleManager<FcmsRole> roleManager)
     {
         _userManager = userManager;

@@ -21,9 +21,16 @@ public class SetupHelper
         _setupFilePath = Path.Combine(appDataPath, "setup.json");
     }
 
-    // Static check — no DI required; used in Program.cs before container is built
+    // Static check — no DI required; used in Program.cs before container is built.
+    // A setup.json whose DbProvider points at a no-longer-supported backend
+    // (legacy "mongodb") is treated as incomplete so the wizard re-runs against
+    // a supported relational provider instead of letting DI validation crash.
     public static bool IsSetupComplete(string appDataPath)
-        => ReadStatic(appDataPath)?.IsSetupComplete == true;
+    {
+        var cfg = ReadStatic(appDataPath);
+        if (cfg?.IsSetupComplete != true) return false;
+        return cfg.DbProvider is "mysql" or "mssql" or "postgresql";
+    }
 
     // Static read — no DI required; used in Program.cs to build FlexCmsOptions from setup.json
     public static SetupConfig? ReadStatic(string appDataPath)

@@ -6,9 +6,8 @@ namespace FlexCms.Tests.Unit.Hardening;
 /// <summary>
 /// Pinning the exception contract — controllers catch
 /// <see cref="FcmsConcurrencyException"/> and surface "another editor saved
-/// first; refresh to merge". The Mongo repository throws this directly;
-/// EF wraps DbUpdateConcurrencyException into it for backend-neutral
-/// handling.
+/// first; refresh to merge". EF wraps DbUpdateConcurrencyException into it
+/// for backend-neutral handling.
 /// </summary>
 public class FcmsConcurrencyExceptionTests
 {

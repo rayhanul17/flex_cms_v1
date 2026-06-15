@@ -46,8 +46,9 @@ public class PostController : BaseAdminController
             p => p.CreatedAt
         };
 
-        // Public URL composed client-side — MongoDB LINQ can't translate
-        // string interpolation inside .Select() projections.
+        // Public URL composed client-side — the View resolves SiteSettings.BaseUrl
+        // and the JS does {base}/{slug} per row, so we don't push the base URL
+        // through the EF projection.
         return DataTableResult(
             _postRepo.Query(),
             req,

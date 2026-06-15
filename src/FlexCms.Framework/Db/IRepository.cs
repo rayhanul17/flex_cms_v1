@@ -46,29 +46,6 @@ public interface IRepository<T> where T : class, IBaseEntity
     /// Returns a non-deleted <see cref="IQueryable{T}"/> for advanced LINQ
     /// composition (joins, projections, server-side DataTables). The query
     /// already excludes <see cref="EntityStatus.Deleted"/> rows.
-    ///
-    /// <para>
-    /// EF returns <c>IQueryable&lt;T&gt;</c>; Mongo returns
-    /// <c>MongoDB.Driver.Linq.IMongoQueryable&lt;T&gt;</c> (which derives
-    /// from <c>IQueryable&lt;T&gt;</c>) — callers using
-    /// <c>BaseAdminController.DataTableResult</c> get correct behavior either way.
-    /// </para>
-    ///
-    /// <para>
-    /// <b>Cross-backend caveat</b>: Mongo's LINQ provider supports a
-    /// strict subset of the EF translator. Avoid in shared code:
-    /// </para>
-    /// <list type="bullet">
-    ///   <item>Navigation-property access (<c>Page.Children</c>) — Mongo never auto-loads.</item>
-    ///   <item>Custom string methods like <c>EF.Functions.Like()</c>.</item>
-    ///   <item>Complex GroupBy projections — both translate but differ in shape.</item>
-    ///   <item>Joins across collections — Mongo emulates with $lookup, EF with SQL JOIN; behavior differs at scale.</item>
-    /// </list>
-    /// <para>
-    /// When in doubt, materialize via <see cref="GetAllAsync"/> /
-    /// <see cref="FindAsync(System.Linq.Expressions.Expression{System.Func{T,bool}},CancellationToken,bool)"/>
-    /// and shape in C#.
-    /// </para>
     /// </summary>
     IQueryable<T> Query();
 
@@ -83,10 +60,4 @@ public interface IRepository<T> where T : class, IBaseEntity
     /// Returns a <see cref="PagedResponse{T}"/> using the pagination settings in <paramref name="filter"/>.
     /// </summary>
     Task<PagedResponse<T>> FindPagedAsync(QueryFilter<T> filter, CancellationToken ct = default);
-
-    /// <summary>
-    /// Full-text regex search across all string properties of <typeparamref name="T"/>.
-    /// Only supported by <c>MongoRepository</c>; EF implementation throws <see cref="NotSupportedException"/>.
-    /// </summary>
-    Task<List<T>> FindByTextAsync(string searchTerm, CancellationToken ct = default);
 }

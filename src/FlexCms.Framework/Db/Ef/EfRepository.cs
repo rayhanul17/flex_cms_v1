@@ -198,8 +198,5 @@ public class EfRepository<T> : IRepository<T> where T : BaseEfEntity
         return PagedResponse<T>.Create(items, total, page, pageSize > 0 ? pageSize : total);
     }
 
-    public Task<List<T>> FindByTextAsync(string searchTerm, CancellationToken ct = default)
-        => throw new NotSupportedException("Text search is only supported with MongoDB.");
-
     public IQueryable<T> Query() => NotDeleted;
 }

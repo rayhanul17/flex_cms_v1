@@ -93,7 +93,7 @@ public class FcmsLogService : IFcmsLogService
         {
             // Page-and-move: oldest-first so newly-arriving logs don't get
             // dragged into the same window. We rely on FindAsync returning
-            // a snapshot list (both EF + Mongo do); for huge log tables the
+            // a snapshot list; for huge log tables the
             // ArchiveBatchSize cap (1000) keeps each iteration cheap.
             var batch = (await _logs.FindAsync(l => l.CreatedAt < cutoff, ct))
                 .OrderBy(l => l.CreatedAt)
@@ -129,9 +129,7 @@ public class FcmsLogService : IFcmsLogService
 
     public async Task ClearArchiveAsync(CancellationToken ct = default)
     {
-        // IRepository abstracts the bulk delete: EF impl uses
-        // ExecuteDeleteAsync where supported; Mongo uses DeleteManyAsync.
-        // Same call site, no backend-specific branches.
+        // IRepository abstracts the bulk delete (EF ExecuteDeleteAsync where supported).
         var all = await _archives.GetAllAsync(ct);
         if (all.Count == 0) return;
         await _archives.DeleteRangeAsync(all, ct);

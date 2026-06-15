@@ -2,8 +2,7 @@ namespace FlexCms.Framework.Cms;
 
 /// <summary>
 /// Well-known action strings written to <see cref="FcmsLog.Action"/>.
-/// Convention: "{EntityType}.{Verb}" — keeps audit log rows filterable and consistent
-/// across every provider (EF + MongoDB).
+/// Convention: "{EntityType}.{Verb}" — keeps audit log rows filterable and consistent.
 /// </summary>
 public static class FcmsAuditActions
 {
@@ -42,4 +41,11 @@ public static class FcmsAuditActions
     public const string OtpVerified = "Otp.Verified";      // correct code entered
     public const string OtpFailed = "Otp.Failed";        // wrong/expired/too-many-attempts
     public const string RecoveryCodeUsed = "Otp.RecoveryCodeUsed"; // backup code consumed
+
+    // ── Modules ───────────────────────────────────────────────────────────────
+    public const string ModuleUploaded = "Module.Uploaded";       // ZIP uploaded into modules/
+    public const string ModuleActivated = "Module.Activated";      // marker cleared; pending restart
+    public const string ModuleDeactivated = "Module.Deactivated";    // marker added; pending restart
+    public const string ModuleUninstalled = "Module.Uninstalled";    // marked for filesystem removal
+    public const string ModuleUpdated = "Module.Updated";        // new binaries deployed
 }

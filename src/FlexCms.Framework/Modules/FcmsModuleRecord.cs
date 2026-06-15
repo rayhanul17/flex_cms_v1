@@ -23,13 +23,26 @@ public class FcmsModuleRecord : BaseEfEntity
 
     /// <summary>
     /// Phase 15 / Issue 95: snapshot of capabilities the operator approved
-    /// at install time. Stored as comma-separated for portability across
-    /// EF + Mongo. Empty = no capabilities approved yet (must be set before
-    /// activation if the manifest declares any).
+    /// at install time. Stored as comma-separated. Empty = no capabilities
+    /// approved yet (must be set before activation if the manifest declares any).
     /// </summary>
     public string ApprovedCapabilities { get; set; } = "";
 
     /// <summary>Phase 15 / Issue 95: who approved + when, for audit.</summary>
     public Guid? ApprovedByUserId { get; set; }
     public DateTime? ApprovedAt { get; set; }
+
+    /// <summary>
+    /// Timestamp of the most recent activation attempt — set on every startup
+    /// pass of <see cref="ModuleActivationService"/>, regardless of outcome.
+    /// </summary>
+    public DateTime? LastActivationAttemptAt { get; set; }
+
+    /// <summary>
+    /// Last error captured while activating this module (migration failure,
+    /// seed failure, permission seed failure, etc.). Cleared on a successful
+    /// activation pass. The admin module list renders this as a red badge
+    /// + tooltip so operators see the problem immediately.
+    /// </summary>
+    public string? ActivationError { get; set; }
 }

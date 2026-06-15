@@ -29,11 +29,9 @@ using FlexCms.Framework.Sessions;
 using FlexCms.Framework.Webhooks;
 using FlexCms.Framework.Clock;
 using FlexCms.Framework.Storage;
-using FlexCms.Framework.Auth.MongoDb;
 using FlexCms.Framework.Db;
 using FlexCms.Framework.Db.Ef;
 using FlexCms.Framework.Db.Migration;
-using FlexCms.Framework.Db.MongoDb;
 using FlexCms.Framework.Documents;
 using FlexCms.Framework.Exports;
 using FlexCms.Framework.Hosting;
@@ -61,7 +59,6 @@ using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using System.Threading.RateLimiting;
 using Microsoft.Extensions.DependencyInjection;
-using MongoDB.Driver;
 
 namespace FlexCms.Framework.Extensions;
 
@@ -183,7 +180,7 @@ public static class FcmsServiceExtensions
 
         // Health checks — built-ins. Modules add more via AddSingleton<IFcmsHealthCheck, ...>().
         // EfDatabaseHealthCheck depends on FcmsDbContext which is only registered when
-        // a relational provider is configured — MongoDB-only deployments would fail to
+        // a relational provider is configured — pre-setup deployments would fail to
         // construct the service provider with strict validation.
         if (options.UsesRelationalDb)
             services.AddScoped<IFcmsHealthCheck, EfDatabaseHealthCheck>();
@@ -215,13 +212,7 @@ public static class FcmsServiceExtensions
 
         // ── Phase 15: SEO + Backup + Feature Flags + Maintenance ─────────────
         services.AddScoped<ISeoService, SeoService>();
-        // Backup impl is backend-specific. EF dumps DbSets via reflection;
-        // Mongo dumps every collection as canonical-extended-JSON. Both
-        // produce the same ZIP layout so the admin UI doesn't care.
-        if (options.UseMongoDB && !options.UsesRelationalDb)
-            services.AddScoped<IFcmsBackupService, MongoBackupService>();
-        else
-            services.AddScoped<IFcmsBackupService, FcmsBackupService>();
+        services.AddScoped<IFcmsBackupService, FcmsBackupService>();
         services.AddScoped<IFcmsFeatureService, FcmsFeatureService>();
         services.AddSingleton<IFcmsOutputCache, FcmsMemoryOutputCache>();
         services.AddSingleton<SlowQueryInterceptor>();
@@ -235,21 +226,12 @@ public static class FcmsServiceExtensions
         services.AddSingleton<IImageOptimizer, SkiaImageOptimizer>();
         services.AddScoped<IFcmsSearchAnalytics, FcmsSearchAnalytics>();
         services.AddScoped<IFcmsSearchProvider, LikeSearchProvider>();
-        // Search sources fan out into the provider; pick by backend.
-        // - Mongo deployments: native regex source (uses IMongoDatabase).
-        // - Relational deployments: per-entity LIKE sources via IRepository<T>.
-        // Admins running large corpora can additionally register MySqlFullText
-        // SearchSource / PostgresFullTextSearchSource (require the per-DB
-        // FULLTEXT/GIN indexes — see those classes' XML doc).
-        if (options.UseMongoDB && !options.UsesRelationalDb)
-        {
-            services.AddScoped<IFcmsSearchableSource, FlexCms.Framework.Search.Providers.MongoSearchSource>();
-        }
-        else
-        {
-            services.AddScoped<IFcmsSearchableSource, FlexCms.Framework.Search.Providers.PageSearchSource>();
-            services.AddScoped<IFcmsSearchableSource, FlexCms.Framework.Search.Providers.PostSearchSource>();
-        }
+        // Search sources fan out into the provider — per-entity LIKE sources via IRepository<T>.
+        // Admins running large corpora can additionally register MySqlFullTextSearchSource /
+        // PostgresFullTextSearchSource (require the per-DB FULLTEXT/GIN indexes — see those
+        // classes' XML doc).
+        services.AddScoped<IFcmsSearchableSource, FlexCms.Framework.Search.Providers.PageSearchSource>();
+        services.AddScoped<IFcmsSearchableSource, FlexCms.Framework.Search.Providers.PostSearchSource>();
         services.AddScoped<IEditorialService, EditorialService>();
         services.AddSingleton<IAdminNotificationPusher, AdminNotificationPusher>();
 
@@ -281,16 +263,19 @@ public static class FcmsServiceExtensions
         // Run module EF migrations + SeedDataAsync on every startup (idempotent)
         services.AddSingleton(new ModuleActivationOptions
         {
-            ConnectionString = options.UsesRelationalDb
-                ? (options.UseMySQL ? options.MySqlConnectionString
-                    : options.UseMsSql ? options.MsSqlConnectionString
-                    : options.PostgreSqlConnectionString)
+            ConnectionString = options.UseMySQL ? options.MySqlConnectionString
+                : options.UseMsSql ? options.MsSqlConnectionString
+                : options.UsePostgreSQL ? options.PostgreSqlConnectionString
                 : "",
             Provider = options.UseMySQL ? "mysql"
                 : options.UseMsSql ? "mssql"
                 : options.UsePostgreSQL ? "postgresql"
-                : "mongodb"
+                : ""
         });
+        services.AddScoped<ModulePermissionSeeder>();
+        // Schema upgrader runs FIRST so any column the module activator/seeder
+        // depends on is in place before they start querying FcmsModuleRecord.
+        services.AddHostedService<FrameworkSchemaUpgrader>();
         services.AddHostedService<ModuleActivationService>();
 
         // ── Module discovery + wiring ────────────────────────────────────────
@@ -433,7 +418,7 @@ public static class FcmsServiceExtensions
         });
 
         // Register DB provider + Identity stores (only when a provider is configured)
-        if (options.UsesRelationalDb || options.UseMongoDB)
+        if (options.UsesRelationalDb)
         {
             var identityBuilder = services
                 .AddIdentityCore<FcmsUser>(opts =>
@@ -494,46 +479,6 @@ public static class FcmsServiceExtensions
                          sp.GetRequiredService<FlexCms.Framework.Cms.FcmsAuditInterceptor>()));
 
                 RegisterEfServices(services, identityBuilder);
-            }
-
-            if (options.UseMongoDB)
-            {
-                MongoDbSerializerSetup.Register();
-
-                services.AddSingleton<IMongoClient>(_ =>
-                {
-                    var settings = MongoClientSettings.FromConnectionString(options.MongoConnectionString);
-                    // Fail fast on bad connection (default is 30s, blocks startup forever).
-                    settings.ServerSelectionTimeout = TimeSpan.FromSeconds(10);
-                    settings.ConnectTimeout = TimeSpan.FromSeconds(10);
-                    return new MongoClient(settings);
-                });
-                services.AddSingleton<IMongoDatabase>(sp =>
-                {
-                    var client = sp.GetRequiredService<IMongoClient>();
-                    return client.GetDatabase(options.MongoDatabaseName);
-                });
-
-                if (!options.UsesRelationalDb)
-                {
-                    // MongoDB-only mode: register Mongo repositories and identity stores.
-                    // AuditingRepository<T> decorator is applied inside MongoUnitOfWork.Repository<T>()
-                    // so we do NOT register a raw MongoRepository<T> here — all access goes via UoW.
-                    services.AddScoped(typeof(IRepository<>), typeof(MongoRepository<>));
-                    services.AddScoped<IFcmsUnitOfWork>(sp =>
-                        new MongoUnitOfWork(
-                            sp.GetRequiredService<IMongoClient>(),
-                            sp.GetRequiredService<IMongoDatabase>(),
-                            sp.GetService<Microsoft.AspNetCore.Http.IHttpContextAccessor>(),
-                            sp.GetService<Microsoft.Extensions.Logging.ILogger<MongoUnitOfWork>>(),
-                            sp));
-
-                    identityBuilder.AddUserStore<MongoUserStore>();
-                    identityBuilder.AddRoleStore<MongoRoleStore>();
-
-                    // Create indexes mirroring EF unique constraints / FKs
-                    services.AddHostedService<MongoIndexService>();
-                }
             }
         }
 
@@ -601,11 +546,6 @@ public class FlexCmsOptions
 
     public bool UsePostgreSQL { get; set; }
     public string PostgreSqlConnectionString { get; set; } = string.Empty;
-
-    // ── MongoDB (can run alongside a relational provider for Mongo-specific data) ──
-    public bool UseMongoDB { get; set; }
-    public string MongoConnectionString { get; set; } = "mongodb://localhost:27017";
-    public string MongoDatabaseName { get; set; } = "flexcms";
 
     public string[] AllowedIps { get; set; } = [];
     public bool EnforceIpFilter { get; set; }

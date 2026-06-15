@@ -24,9 +24,16 @@ public class ModuleListItem
     public string ModuleName { get; set; } = "";
     public string Version { get; set; } = "";
     public string Author { get; set; } = "";
+    public string Email { get; set; } = "";
+    public string Website { get; set; } = "";
+    public string Category { get; set; } = "";
     public string Description { get; set; } = "";
     public string TablePrefix { get; set; } = "";
+    public string MinFrameworkVersion { get; set; } = "";
     public string Status { get; set; } = "";
     public DateTime? ActivatedAt { get; set; }
+    public DateTime? LastActivationAttemptAt { get; set; }
+    public string? ActivationError { get; set; }
     public string[] DependsOn { get; set; } = [];
+    public int RequestedPermissionsCount { get; set; }
 }

@@ -32,4 +32,7 @@ public abstract class BaseModule : IFcmsModule
 
     /// <inheritdoc/>
     public virtual List<FcmsMenuItemDef> GetMenuItems() => [];
+
+    /// <inheritdoc/>
+    public virtual List<FcmsPermissionDef> GetPermissions() => [];
 }

@@ -79,17 +79,42 @@ else
         {
             <tr data-module-id="@m.ModuleId" data-module-name="@m.ModuleName">
                 <td>
-                    <div class="fw-semibold">@m.ModuleName <span class="text-muted small">@m.ModuleId</span></div>
+                    <div class="fw-semibold d-flex align-items-center flex-wrap gap-2">
+                        <span>@m.ModuleName</span>
+                        <span class="text-muted small">@m.ModuleId</span>
+                        @if (!string.IsNullOrEmpty(m.Category))
+                        {
+                            <span class="badge text-bg-info-subtle text-info-emphasis border border-info-subtle">@m.Category</span>
+                        }
+                    </div>
                     @if (!string.IsNullOrEmpty(m.Description))
                     {
                         <div class="text-muted small">@m.Description</div>
                     }
-                    @if (!string.IsNullOrEmpty(m.Author))
+                    <div class="text-muted small d-flex flex-wrap gap-3 mt-1">
+                        @if (!string.IsNullOrEmpty(m.Author))
+                        {
+                            <span><i class="bi bi-person"></i> @m.Author</span>
+                        }
+                        @if (!string.IsNullOrEmpty(m.Email))
+                        {
+                            <a href="mailto:@m.Email" class="text-decoration-none text-muted"><i class="bi bi-envelope"></i> @m.Email</a>
+                        }
+                        @if (FlexCms.Framework.Helpers.FcmsUrlHelper.IsAbsoluteHttpUrl(m.Website))
+                        {
+                            <a href="@m.Website" target="_blank" rel="noopener" class="text-decoration-none text-muted"><i class="bi bi-globe"></i> Website</a>
+                        }
+                    </div>
+                </td>
+                <td>
+                    <code>@m.Version</code>
+                    @if (!string.IsNullOrEmpty(m.MinFrameworkVersion))
                     {
-                        <div class="text-muted small">By @m.Author</div>
+                        <div class="text-muted small" title="Minimum FlexCMS framework version required">
+                            <i class="bi bi-cpu"></i> needs @m.MinFrameworkVersion+
+                        </div>
                     }
                 </td>
-                <td><code>@m.Version</code></td>
                 <td><code>@m.TablePrefix</code></td>
                 <td>
                     @if (m.DependsOn.Length == 0)
@@ -113,9 +138,19 @@ else
                     {
                         <span class="badge text-bg-secondary">Inactive</span>
                     }
+                    else if (m.Status == "Error")
+                    {
+                        <span class="badge text-bg-danger" data-bs-toggle="tooltip" title="@m.ActivationError">Error</span>
+                    }
                     else
                     {
                         <span class="badge text-bg-warning">@m.Status</span>
+                    }
+                    @if (!string.IsNullOrEmpty(m.ActivationError))
+                    {
+                        <div class="text-danger small mt-1" style="max-width:320px;white-space:normal;word-break:break-word">
+                            <i class="bi bi-exclamation-triangle-fill"></i> @m.ActivationError
+                        </div>
                     }
                 </td>
                 <td class="small text-muted">

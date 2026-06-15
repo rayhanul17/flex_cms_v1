@@ -12,6 +12,22 @@ public class ModuleManifest
     public string Author { get; set; } = "";
     public string Description { get; set; } = "";
 
+    /// <summary>Optional author / support email — shown on the module list page.</summary>
+    public string Email { get; set; } = "";
+
+    /// <summary>
+    /// Optional homepage / docs URL — rendered as a clickable link on the
+    /// module list page. Validated against http(s) before display so a
+    /// malformed value never produces a broken anchor.
+    /// </summary>
+    public string Website { get; set; } = "";
+
+    /// <summary>
+    /// Optional broad category for grouping in the admin module list and a
+    /// future marketplace ("Commerce", "CRM", "Finance", "Education", etc.).
+    /// </summary>
+    public string Category { get; set; } = "";
+
     /// <summary>Minimum FlexCms framework version this module requires.</summary>
     public string MinFrameworkVersion { get; set; } = "1.0.0";
 

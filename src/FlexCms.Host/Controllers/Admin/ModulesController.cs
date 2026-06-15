@@ -56,11 +56,18 @@ public class ModulesController : BaseAdminController
                     ModuleName = m.Manifest.ModuleName,
                     Version = m.Manifest.Version,
                     Author = m.Manifest.Author,
+                    Email = m.Manifest.Email,
+                    Website = m.Manifest.Website,
+                    Category = m.Manifest.Category,
                     Description = m.Manifest.Description,
                     TablePrefix = m.Manifest.TablePrefix,
+                    MinFrameworkVersion = m.Manifest.MinFrameworkVersion,
                     Status = m.IsDeactivated ? "Inactive" : (rec?.ActivationStatus ?? "Active"),
                     ActivatedAt = rec?.ActivatedAt,
-                    DependsOn = m.Manifest.DependsOn
+                    LastActivationAttemptAt = rec?.LastActivationAttemptAt,
+                    ActivationError = rec?.ActivationError,
+                    DependsOn = m.Manifest.DependsOn,
+                    RequestedPermissionsCount = m.Manifest.RequestedPermissions.Length
                 };
             }).ToList()
         };
@@ -71,7 +78,7 @@ public class ModulesController : BaseAdminController
 
     [HttpPost("activate/{id}")]
     [ValidateAntiForgeryToken]
-    public IActionResult Activate(string id)
+    public async Task<IActionResult> Activate(string id, CancellationToken ct)
     {
         var module = _registry.FindById(id);
         if (module is null) return FcmsFail("Module not found.");
@@ -80,6 +87,8 @@ public class ModulesController : BaseAdminController
             return FcmsFail("Could not activate module — folder missing.");
 
         _state.SyncWwwroot(module.FolderPath, _env.WebRootPath, module.ModuleId);
+        await OpLog.LogAsync(FcmsAuditActions.ModuleActivated, nameof(FcmsModuleRecord), module.ModuleId,
+            value: new { module.ModuleId, module.Manifest.Version }, module: "core", ct: ct);
         return FcmsOk("Module activated. Restart the app to apply.");
     }
 
@@ -101,6 +110,8 @@ public class ModulesController : BaseAdminController
         if (menuService is not null)
             await menuService.RemoveModuleItemsAsync(id, ct);
 
+        await OpLog.LogAsync(FcmsAuditActions.ModuleDeactivated, nameof(FcmsModuleRecord), module.ModuleId,
+            value: new { module.ModuleId, module.Manifest.Version }, module: "core", ct: ct);
         return FcmsOk("Module deactivated. Restart the app to apply.");
     }
 
@@ -153,6 +164,8 @@ public class ModulesController : BaseAdminController
             await _uow.SaveChangesAsync(ct);
         }
 
+        await OpLog.LogAsync(FcmsAuditActions.ModuleUninstalled, nameof(FcmsModuleRecord), module.ModuleId,
+            value: new { module.ModuleId, module.Manifest.Version, dropTables }, module: "core", ct: ct);
         return FcmsOk("Module marked for uninstall. Restart the app to remove its files.");
     }
 
@@ -246,6 +259,8 @@ public class ModulesController : BaseAdminController
             if (Directory.Exists(dest2)) Directory.Delete(dest2, recursive: true);
 
             CopyDirectory(moduleSrcDir, dest2);
+            await OpLog.LogAsync(FcmsAuditActions.ModuleUploaded, nameof(FcmsModuleRecord), moduleId,
+                value: new { moduleId, fileName = file.FileName, overwrite }, module: "core", ct: ct);
             return FcmsOk($"Module \"{moduleId}\" uploaded. Restart the app to load it.", new { moduleId });
         }
         catch (InvalidDataException)
@@ -331,25 +346,32 @@ public class ModulesController : BaseAdminController
     {
         Directory.CreateDirectory(dest);
         var shortName = moduleId.Split('.').Last();
+        var moduleIdLower = moduleId.ToLowerInvariant();
+
+        // Token order matters: long, distinct tokens first so they don't get
+        // shadowed by shorter ones (e.g. __ShortName__ vs Name). All template
+        // placeholders use double-underscore fences to avoid colliding with
+        // ordinary identifiers like "Name" inside docs/comments.
+        string Apply(string s) => s
+            .Replace("FlexCms.Module.Name", moduleId)
+            .Replace("FlexCms_Module_Name", moduleId.Replace(".", "_"))
+            .Replace("flexcms.module.name", moduleIdLower)
+            .Replace("__ModuleId__", moduleId)
+            .Replace("__ModuleIdLower__", moduleIdLower)
+            .Replace("__ShortName__", shortName)
+            .Replace("__shortname__", shortName.ToLowerInvariant())
+            .Replace("mod_prefix", tablePrefix);
 
         foreach (var file in Directory.GetFiles(src, "*", SearchOption.AllDirectories))
         {
             var rel = Path.GetRelativePath(src, file);
-            var destRel = rel
-                .Replace("FlexCms.Module.Name", moduleId)
-                .Replace("FlexCms_Module_Name", moduleId.Replace(".", "_"))
-                .Replace("Name", shortName);
+            var destRel = Apply(rel);
 
             var destFile = Path.Combine(dest, destRel);
             Directory.CreateDirectory(Path.GetDirectoryName(destFile)!);
 
-            var content = System.IO.File.ReadAllText(file)
-                .Replace("FlexCms.Module.Name", moduleId)
-                .Replace("FlexCms_Module_Name", moduleId.Replace(".", "_"))
-                .Replace("mod_prefix", tablePrefix)
-                .Replace("Name", shortName);
-
-            System.IO.File.WriteAllText(destFile, content);
+            var content = System.IO.File.ReadAllText(file);
+            System.IO.File.WriteAllText(destFile, Apply(content));
         }
     }
 }

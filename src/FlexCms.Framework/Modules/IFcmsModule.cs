@@ -68,4 +68,13 @@ public interface IFcmsModule
     /// Return an empty list if the module adds no menu items.
     /// </summary>
     List<FcmsMenuItemDef> GetMenuItems();
+
+    /// <summary>
+    /// Permissions contributed by this module. Upserted into <c>fcms_permissions</c>
+    /// on every activation (idempotent). The framework prefixes each
+    /// <see cref="FcmsPermissionDef.Key"/> with <c>{ModuleId}.</c> on save so module
+    /// keys cannot collide across modules. Return an empty list if the module has no
+    /// admin-protected actions.
+    /// </summary>
+    List<FcmsPermissionDef> GetPermissions();
 }

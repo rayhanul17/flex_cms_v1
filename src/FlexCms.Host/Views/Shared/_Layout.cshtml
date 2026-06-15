@@ -173,9 +173,25 @@
         </div>
     </footer>
 
+    <partial name="_FcmsConfirm" />
+
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
     <script src="~/js/site.js" asp-append-version="true"></script>
+    <script src="~/js/fcms-loader.js" asp-append-version="true"></script>
+    <script src="~/js/fcms-confirm.js" asp-append-version="true"></script>
+    <script src="~/js/fcms-toast.js" asp-append-version="true"></script>
+    <script>
+        // Server-side TempData toast → fcms.toast on next render (shared with admin layout)
+        @if (TempData["Toast.Message"] is string toastMsg)
+        {
+            var toastType = TempData["Toast.Type"]?.ToString() ?? "success";
+            var toastDuration = TempData["Toast.Duration"] is int dur ? dur : 5;
+            var toastClose = TempData["Toast.CloseButton"] is bool close ? close : true;
+            var opts = new { duration = toastDuration * 1000, closeButton = toastClose };
+            <text>document.addEventListener('DOMContentLoaded', () => fcms.toast.@(toastType)(@Html.Raw(System.Text.Json.JsonSerializer.Serialize(toastMsg)), @Html.Raw(System.Text.Json.JsonSerializer.Serialize(opts))));</text>
+        }
+    </script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

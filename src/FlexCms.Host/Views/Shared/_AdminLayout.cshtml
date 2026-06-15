@@ -222,7 +222,14 @@
     @if (TempData["Toast.Message"] is string toastMsg)
     {
         var toastType = TempData["Toast.Type"]?.ToString() ?? "success";
-        <text>document.addEventListener('DOMContentLoaded', () => fcms.toast.@(toastType)(@Html.Raw(System.Text.Json.JsonSerializer.Serialize(toastMsg))));</text>
+        var toastDuration = TempData["Toast.Duration"] is int dur ? dur : 5;
+        var toastClose = TempData["Toast.CloseButton"] is bool close ? close : true;
+        var opts = new
+        {
+            duration = toastDuration * 1000,
+            closeButton = toastClose
+        };
+        <text>document.addEventListener('DOMContentLoaded', () => fcms.toast.@(toastType)(@Html.Raw(System.Text.Json.JsonSerializer.Serialize(toastMsg)), @Html.Raw(System.Text.Json.JsonSerializer.Serialize(opts))));</text>
     }
 
     // ── Sidebar toggle (mobile drawer + desktop rail) ─────────────────────

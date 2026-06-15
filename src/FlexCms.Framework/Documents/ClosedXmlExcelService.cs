@@ -1,3 +1,5 @@
+using System.Globalization;
+using System.Reflection;
 using ClosedXML.Excel;
 
 namespace FlexCms.Framework.Documents;
@@ -39,6 +41,122 @@ public sealed class ClosedXmlExcelService : IFcmsExcelService
             workbook.SaveAs(ms);
             return ms.ToArray();
         }, ct);
+    }
+
+    public Task<IReadOnlyList<IReadOnlyDictionary<string, string>>> ParseTableAsync(
+        Stream stream,
+        string? sheetName = null,
+        CancellationToken ct = default)
+    {
+        return Task.Run<IReadOnlyList<IReadOnlyDictionary<string, string>>>(() =>
+        {
+            using var workbook = new XLWorkbook(stream);
+            var ws = string.IsNullOrWhiteSpace(sheetName)
+                ? workbook.Worksheets.First()
+                : workbook.Worksheets.Worksheet(sheetName);
+
+            var range = ws.RangeUsed();
+            var result = new List<IReadOnlyDictionary<string, string>>();
+            if (range is null) return result;
+
+            // Headers: first row, trimmed, blank columns dropped.
+            var headerCells = range.Row(1).Cells().ToList();
+            var headers = headerCells
+                .Select(c => (c.GetString() ?? "").Trim())
+                .ToList();
+
+            for (int r = 2; r <= range.RowCount(); r++)
+            {
+                ct.ThrowIfCancellationRequested();
+                var rowRange = range.Row(r);
+                var dict = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                bool anyNonEmpty = false;
+                for (int c = 1; c <= headers.Count; c++)
+                {
+                    var header = headers[c - 1];
+                    if (string.IsNullOrEmpty(header)) continue;
+                    var value = rowRange.Cell(c).GetString() ?? "";
+                    if (value.Length > 0) anyNonEmpty = true;
+                    dict[header] = value;
+                }
+                if (anyNonEmpty) result.Add(dict);
+            }
+
+            return result;
+        }, ct);
+    }
+
+    public async Task<IReadOnlyList<T>> ParseAsync<T>(
+        Stream stream,
+        string? sheetName = null,
+        CancellationToken ct = default) where T : class, new()
+    {
+        var rows = await ParseTableAsync(stream, sheetName, ct);
+        if (rows.Count == 0) return Array.Empty<T>();
+
+        // Build a header→property map once.
+        var props = typeof(T).GetProperties(BindingFlags.Public | BindingFlags.Instance)
+            .Where(p => p.CanWrite)
+            .ToList();
+
+        var headerToProp = new Dictionary<string, PropertyInfo>(StringComparer.OrdinalIgnoreCase);
+        foreach (var p in props)
+        {
+            var attr = p.GetCustomAttribute<FcmsExcelColumnAttribute>();
+            var header = attr?.HeaderName ?? p.Name;
+            headerToProp[header] = p;
+        }
+
+        var output = new List<T>(rows.Count);
+        foreach (var row in rows)
+        {
+            var item = new T();
+            foreach (var (header, raw) in row)
+            {
+                if (!headerToProp.TryGetValue(header, out var prop)) continue;
+                var converted = ConvertValue(raw, prop.PropertyType);
+                if (converted is not null || IsNullableType(prop.PropertyType))
+                    prop.SetValue(item, converted);
+            }
+            output.Add(item);
+        }
+
+        return output;
+    }
+
+    // ── value conversion ──────────────────────────────────────────────────
+
+    private static bool IsNullableType(Type t)
+        => !t.IsValueType || Nullable.GetUnderlyingType(t) is not null;
+
+    private static object? ConvertValue(string raw, Type targetType)
+    {
+        var target = Nullable.GetUnderlyingType(targetType) ?? targetType;
+
+        if (string.IsNullOrWhiteSpace(raw))
+            return target == typeof(string) ? "" : null;
+
+        var s = raw.Trim();
+
+        if (target == typeof(string)) return s;
+        if (target == typeof(int)    && int.TryParse(s, NumberStyles.Integer, CultureInfo.InvariantCulture, out var i)) return i;
+        if (target == typeof(long)   && long.TryParse(s, NumberStyles.Integer, CultureInfo.InvariantCulture, out var l)) return l;
+        if (target == typeof(decimal) && decimal.TryParse(s, NumberStyles.Number, CultureInfo.InvariantCulture, out var dec)) return dec;
+        if (target == typeof(double) && double.TryParse(s, NumberStyles.Float, CultureInfo.InvariantCulture, out var d)) return d;
+        if (target == typeof(bool))
+        {
+            var t = s.ToLowerInvariant();
+            if (t is "true" or "1" or "yes" or "y") return true;
+            if (t is "false" or "0" or "no" or "n") return false;
+        }
+        if (target == typeof(Guid) && Guid.TryParse(s, out var g)) return g;
+        if (target == typeof(DateTime) && DateTime.TryParse(s, CultureInfo.InvariantCulture, DateTimeStyles.None, out var dt)) return dt;
+        if (target.IsEnum)
+        {
+            if (Enum.TryParse(target, s, ignoreCase: true, out var ev)) return ev;
+        }
+
+        return null;
     }
 
     private static XLCellValue ToXLValue(object? v) => v switch

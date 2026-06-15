@@ -148,11 +148,65 @@ public static class FcmsHelper
             var key = (int)(object)value;
             if (excludeList is not null && excludeList.Contains(key)) continue;
 
-            var desc = typeof(T).GetField(value.ToString())
-                ?.GetCustomAttribute<DescriptionAttribute>()?.Description;
-            result[key] = desc ?? value.ToString()!;
+            result[key] = GetEnumDescription(value);
         }
         return result;
+    }
+
+    /// <summary>
+    /// Returns the <see cref="DescriptionAttribute"/> text on
+    /// <paramref name="value"/>, falling back to <c>value.ToString()</c>.
+    /// </summary>
+    public static string GetEnumDescription<T>(T value) where T : struct, Enum
+    {
+        var field = typeof(T).GetField(value.ToString());
+        return field?.GetCustomAttribute<DescriptionAttribute>()?.Description ?? value.ToString();
+    }
+
+    /// <summary>
+    /// Looks up the description for an enum value by its integer ID. Returns
+    /// <paramref name="fallback"/> when no member has that value.
+    /// </summary>
+    public static string GetEnumDescriptionFromId<T>(int id, string fallback = "") where T : struct, Enum
+        => Enum.IsDefined(typeof(T), id)
+            ? GetEnumDescription((T)Enum.ToObject(typeof(T), id))
+            : fallback;
+
+    /// <summary>
+    /// Tries to find an enum value whose <see cref="DescriptionAttribute"/>
+    /// matches <paramref name="description"/> (case-insensitive). Returns
+    /// <c>null</c> when nothing matches.
+    /// </summary>
+    public static T? GetEnumFromDescription<T>(string description) where T : struct, Enum
+    {
+        if (string.IsNullOrWhiteSpace(description)) return null;
+        foreach (var v in Enum.GetValues<T>())
+        {
+            if (string.Equals(GetEnumDescription(v), description, StringComparison.OrdinalIgnoreCase))
+                return v;
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Materializes <c>{ Value, Text }</c> tuples for every enum member, suitable
+    /// for <c>SelectList</c> in Razor views. Text uses
+    /// <see cref="DescriptionAttribute"/> when present.
+    /// </summary>
+    public static IReadOnlyList<(int Value, string Text)> EnumToSelectList<T>(
+        bool includeAll = false,
+        string allText = "All",
+        List<int>? excludeList = null) where T : struct, Enum
+    {
+        var list = new List<(int, string)>();
+        if (includeAll) list.Add((0, allText));
+        foreach (var v in Enum.GetValues<T>())
+        {
+            var id = (int)(object)v;
+            if (excludeList is not null && excludeList.Contains(id)) continue;
+            list.Add((id, GetEnumDescription(v)));
+        }
+        return list;
     }
 
     // ── Display string helpers ─────────────────────────────────────────────

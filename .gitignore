@@ -82,14 +82,14 @@ backups/
 # (via .gitkeep) so the host runtime + the published image have the
 # right layout, but every child folder/file underneath stays untracked
 # in this repo. To work on a module locally:
-#   cd Modules/   (or src/FlexCms.Host/Modules/ for runtime drop-ins)
+#   cd modules/   (or src/FlexCms.Host/modules/ for runtime drop-ins)
 #   git clone https://github.com/<org>/FlexCms.Module.<Name>.git
 # Parent repo never sees the module's source tree.
-Modules/*
-!Modules/.gitkeep
-!Modules/**/*.zip.example
-src/FlexCms.Host/Modules/*
-!src/FlexCms.Host/Modules/.gitkeep
+modules/*
+!modules/.gitkeep
+!modules/**/*.zip.example
+src/FlexCms.Host/modules/*
+!src/FlexCms.Host/modules/.gitkeep
 
 # Environment
 .env

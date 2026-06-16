@@ -86,9 +86,12 @@ The fastest path:
 2. Fill in:
    - **ModuleId**: dotted identifier (e.g. `FlexCms.Module.Investment`)
    - **TablePrefix**: snake-case prefix (e.g. `invest`)
-3. The scaffold writes a runnable project to **solution-root `Modules/<ModuleId>/`**
-   (sibling of `src/`, `samples/`, `tests/` — NOT inside `src/FlexCms.Host/Modules/`,
-   that runtime folder is for ZIP uploads only). Contents:
+3. The scaffold writes a runnable project to **solution-root `modules/<ModuleId>/`**
+   (sibling of `src/`, `samples/`, `tests/` — NOT inside `src/FlexCms.Host/modules/`,
+   that runtime folder is for ZIP uploads only). Both `modules/` folders are
+   **gitignored in the parent repo** because each module is its own git
+   repository — you'll `cd modules/<ModuleId> && git init` (or `git remote add`)
+   to track its source separately. Contents:
    - `<ShortName>Module.cs` — entry point
    - `Data/<ShortName>DbContext.cs` + sample entity
    - `Data/<ShortName>DbContextDesignFactory.cs` — for `dotnet ef`
@@ -100,34 +103,38 @@ The fastest path:
 
 ### Opening the new project in your IDE
 
-The scaffold **auto-registers** the new csproj in `FlexCms.slnx` — Visual Studio,
-Rider and VS Code's C# Dev Kit pick it up the next time the solution is loaded.
+The scaffold does **not** auto-register the new csproj in `FlexCms.slnx` —
+that file is git-tracked and modules are separate repos, so a reference to
+a path that doesn't exist for other developers would break solution load.
+Two options:
 
-- **Visual Studio** — close + reopen the solution. If it doesn't appear, reload
-  the `.slnx` from **File → Open → Solution** and pick `FlexCms.slnx` again.
-- **VS Code** — the C# Dev Kit watches the `.slnx` file; the new project shows
-  up in the Solution Explorer pane automatically after the next workspace load.
-- **Rider** — `File → Reload Project from Disk` (or restart Rider).
+- **Open the module standalone.** From the module folder, run
+  `dotnet build` / `dotnet test` / `code .` — VS Code's C# Dev Kit
+  detects the lone csproj and gives you full IntelliSense without
+  involving the parent solution.
+- **Add it to your local solution manually.** Right-click the
+  **Solution** node in Visual Studio (not the Host project) →
+  *Add → Existing Project* → pick `modules/<ModuleId>/<ModuleId>.csproj`.
+  The change stays in your local `.slnx` (or revert before committing).
 
 > **⚠ "Add Existing Item" ≠ "Add Existing Project".** In Visual Studio,
-> right-clicking the **Host project** and choosing *Add → Existing Item* only
-> adds a *file* to that project (and hides `.csproj` files by default — so
-> you'll see only `.gitkeep` in the dialog and think the folder is empty).
-> The scaffold already added the project to the solution; you do not need
-> "Add Existing Project" at all. If you ever do need to add it manually:
-> right-click the **Solution** node → *Add → Existing Project* → pick
-> `Modules/<ModuleId>/<ModuleId>.csproj`.
+> right-clicking the **Host project** and choosing *Add → Existing Item*
+> only adds a *file* to that project (and hides `.csproj` files by
+> default — so you'll see only `.gitkeep` in the dialog and think the
+> folder is empty). What you actually want is the Solution-level
+> *Add → Existing Project* command described above.
 
 ### After the scaffold
 
 ```bash
-cd Modules/FlexCms.Module.Investment
+cd modules/FlexCms.Module.Investment
+git init                              # each module is its OWN git repo
 dotnet ef migrations add InitialSchema
 dotnet build
 ```
 
-Restart the host. The framework discovers the DLL (it now scans BOTH the
-solution-root `Modules/` and `src/FlexCms.Host/Modules/`), applies the
+Restart the host. The framework discovers the DLL (it scans BOTH the
+solution-root `modules/` and `src/FlexCms.Host/modules/`), applies the
 migration, seeds permissions, adds the menu entry, and your controller
 goes live at `/admin/<TablePrefix>`.
 

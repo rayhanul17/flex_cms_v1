@@ -207,11 +207,11 @@ public class ModulesController : BaseAdminController
             return FcmsFail("Module package must be a .zip file.");
 
         // Land in the SAME folder FcmsServiceExtensions scans at boot
-        // ({AppDataPath}/../Modules), not the solution-root Modules/ (dev source tree).
-        var modulesRoot = Path.GetFullPath(Path.Combine(_env.ContentRootPath, "Modules"));
+        // ({AppDataPath}/../modules), not the solution-root modules/ (dev source tree).
+        var modulesRoot = Path.GetFullPath(Path.Combine(_env.ContentRootPath, "modules"));
         Directory.CreateDirectory(modulesRoot);
 
-        // Stage to temp first so a malformed ZIP doesn't leave a half-extracted Modules/ folder.
+        // Stage to temp first so a malformed ZIP doesn't leave a half-extracted modules/ folder.
         var stagingDir = Path.Combine(Path.GetTempPath(), "fcms_module_upload_" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(stagingDir);
 
@@ -312,8 +312,12 @@ public class ModulesController : BaseAdminController
             return View("Scaffold", model);
         }
 
-        // Land at solution-root Modules/ so VS sees the new project as a sibling of src/.
-        var modulesRoot = Path.Combine(solutionRoot, "Modules");
+        // Land at solution-root modules/ — each module is its own git repo (gitignored
+        // in the parent), so we do NOT auto-register in FlexCms.slnx; that file is
+        // git-tracked and a reference to a path that doesn't exist for someone who
+        // hasn't cloned the module would break solution load. Open the module's
+        // standalone csproj or add it manually to your local .slnx.
+        var modulesRoot = Path.Combine(solutionRoot, "modules");
         Directory.CreateDirectory(modulesRoot);
         var dest = Path.Combine(modulesRoot, model.ModuleId);
 
@@ -332,39 +336,11 @@ public class ModulesController : BaseAdminController
 
         CopyAndReplace(templateSrc, dest, model.ModuleId, model.TablePrefix);
 
-        // Auto-register in .slnx so VS / VS Code / Rider show the new project on next reload.
-        var slnxPath = Path.Combine(solutionRoot, "FlexCms.slnx");
-        try { AddProjectToSlnx(slnxPath, $"Modules/{model.ModuleId}/{model.ModuleId}.csproj"); }
-        catch { /* best-effort — never block the scaffold */ }
-
-        TempData["Success"] = $"Module '{model.ModuleId}' scaffolded to Modules/{model.ModuleId}/. " +
-                              "Run `dotnet build Modules/" + model.ModuleId + "/" + model.ModuleId + ".csproj`, " +
-                              "then restart the host so it discovers your module.";
+        TempData["Success"] = $"Module '{model.ModuleId}' scaffolded to modules/{model.ModuleId}/. " +
+                              "Run `dotnet build modules/" + model.ModuleId + "/" + model.ModuleId + ".csproj`, " +
+                              "then restart the host so it discovers your module. " +
+                              "Each module is its own git repo — initialise one with `git init` inside the folder.";
         return RedirectToAction(nameof(Index));
-    }
-
-    /// <summary>Idempotent append to FlexCms.slnx's /Modules/ folder.</summary>
-    private static void AddProjectToSlnx(string slnxPath, string relativeProjectPath)
-    {
-        if (!System.IO.File.Exists(slnxPath)) return;
-        var text = System.IO.File.ReadAllText(slnxPath);
-        if (text.Contains(relativeProjectPath, StringComparison.OrdinalIgnoreCase)) return;
-
-        var modulesFolderLine = "<Folder Name=\"/Modules/\">";
-        if (text.Contains(modulesFolderLine, StringComparison.Ordinal))
-        {
-            text = text.Replace(modulesFolderLine,
-                $"{modulesFolderLine}\n    <Project Path=\"{relativeProjectPath}\" />");
-        }
-        else
-        {
-            var block =
-                "  <Folder Name=\"/Modules/\">\n" +
-                $"    <Project Path=\"{relativeProjectPath}\" />\n" +
-                "  </Folder>\n";
-            text = text.Replace("</Solution>", block + "</Solution>");
-        }
-        System.IO.File.WriteAllText(slnxPath, text);
     }
 
     /// <summary>Walk up looking for a directory with a <c>templates</c> subfolder.</summary>

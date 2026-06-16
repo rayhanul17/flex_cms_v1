@@ -24,9 +24,9 @@
 3. **Two on-disk paths for modules — they are NOT the same.**
    | Path | Purpose |
    |---|---|
-   | `Modules/<ModuleId>/` (solution root) | **Dev source** — csproj + code (git-tracked) |
-   | `src/FlexCms.Host/Modules/<ModuleId>/` | **Runtime drop-in** — DLL + module.json from the admin Upload flow (gitignored) |
-   The runtime scanner reads both. New modules you build live in **solution-root `Modules/`** — sibling of `src/`, `samples/`, `tests/`.
+   | `modules/<ModuleId>/` (solution root) | **Dev source** — csproj + code. Each module is its OWN git repo; this folder is gitignored in the parent. |
+   | `src/FlexCms.Host/modules/<ModuleId>/` | **Runtime drop-in** — DLL + module.json from the admin Upload flow (also gitignored). |
+   The runtime scanner reads both. New modules you build live in **solution-root `modules/`** — sibling of `src/`, `samples/`, `tests/`. Don't commit module source into the parent repo.
 4. **Use the scaffold, don't hand-write the skeleton.** It writes Razor SDK
    csproj + all stub files with correct token replacement and auto-registers
    the new project in `FlexCms.slnx`. Hand-rolled csprojs miss subtle pieces
@@ -49,13 +49,16 @@ cd src/FlexCms.Host && dotnet run --urls http://localhost:5099
 #    Or POST directly (you'll need the antiforgery token from a GET first):
 #    POST /admin/modules/scaffold  ModuleId=FlexCms.MyMod&TablePrefix=mymod
 
-# 3. The scaffold creates Modules/FlexCms.MyMod/ AND adds it to FlexCms.slnx.
+# 3. The scaffold creates modules/FlexCms.MyMod/ at the solution root.
+#    It does NOT touch FlexCms.slnx — each module is its own git repo
+#    and gitignored in the parent. Open the module standalone or add it
+#    to your LOCAL .slnx manually if you want both in one VS window.
 ```
 
 After the scaffold you have:
 
 ```
-Modules/FlexCms.MyMod/
+modules/FlexCms.MyMod/                           # gitignored in parent; init its own repo
 ├── FlexCms.MyMod.csproj                         # Sdk.Razor, refs Framework
 ├── module.json                                  # Embedded resource
 ├── MyModModule.cs                               # BaseModule subclass
@@ -77,7 +80,8 @@ Modules/FlexCms.MyMod/
 
 ```bash
 # A. Generate the initial migration — DesignFactory is already there
-cd Modules/FlexCms.MyMod
+cd modules/FlexCms.MyMod
+git init                            # each module is its OWN git repo
 dotnet ef migrations add InitialSchema
 
 # B. Build
@@ -200,7 +204,7 @@ public static class MyModPermissions
 
 ## 7. Done-when checklist
 
-- [ ] `dotnet build Modules/FlexCms.MyMod/FlexCms.MyMod.csproj` → 0 warnings, 0 errors
+- [ ] `dotnet build modules/FlexCms.MyMod/FlexCms.MyMod.csproj` → 0 warnings, 0 errors
 - [ ] `dotnet ef migrations add InitialSchema` ran, migration files exist under `Migrations/`
 - [ ] Host restart log shows `Module FlexCms.MyMod: migrations applied.` and `seed completed.`
 - [ ] `/admin/mymod` returns 200 (with `.view` permission) or 403 (without)
@@ -215,8 +219,9 @@ public static class MyModPermissions
 - ❌ Inject `IRepository<MyModItem>` directly — wrong DbContext. Use the scaffolded service.
 - ❌ Hand-write the csproj. Use the scaffold; you'll forget `<AddRazorSupportForMvc>true</AddRazorSupportForMvc>` and views won't render.
 - ❌ Skip the `module:` arg to `LogAsync`. Defaults to `"core"`, breaking audit filtering.
-- ❌ Add the module project to `FlexCms.Host.csproj` as a `ProjectReference`. Modules are runtime-loaded, not compile-time linked. The scaffold adds it to `FlexCms.slnx` (solution file) instead, which is correct.
-- ❌ Put files under `src/FlexCms.Host/Modules/`. That folder is for **uploaded ZIPs**; dev source belongs in solution-root `Modules/`.
+- ❌ Add the module project to `FlexCms.Host.csproj` as a `ProjectReference`. Modules are runtime-loaded, not compile-time linked. If you want it in the parent solution for IDE convenience, add it to YOUR local `FlexCms.slnx` and revert before pushing (or just open the module standalone).
+- ❌ Put files under `src/FlexCms.Host/modules/`. That folder is for **uploaded ZIPs**; dev source belongs in solution-root `modules/`.
+- ❌ Commit the module's source into the parent FlexCMS repo. Each module is its own git repo — `cd modules/<ModuleId> && git init` and push to a separate remote.
 - ❌ Use `FcmsOk()` / `FcmsFail()` from a non-AJAX POST handler. They return JSON; the browser will render the raw envelope on a blank page. Use `RedirectToAction` + `TempData["Success"]` for normal form submits.
 - ❌ Edit Sample.Hello when building a new module. Copy it conceptually, don't fork it. The sample exists as a reference, not a starting point.
 

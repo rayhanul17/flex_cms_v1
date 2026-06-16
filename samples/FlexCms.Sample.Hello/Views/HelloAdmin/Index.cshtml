@@ -1,0 +1,59 @@
+@model List<HelloGreeting>
+@{
+    ViewData["Title"] = "Hello — Greetings";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="mb-0">Greetings</h4>
+    <a asp-action="Create" class="btn btn-primary btn-sm">
+        <i class="bi bi-plus-lg"></i> New Greeting
+    </a>
+</div>
+
+@if (TempData["Success"] is string ok)
+{
+    <div class="alert alert-success py-2">@ok</div>
+}
+
+<div class="card shadow-sm">
+    <div class="card-body p-0">
+        <table class="table table-hover mb-0 align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th>Audience</th>
+                    <th>Message</th>
+                    <th>Created</th>
+                    <th class="text-end" style="width:140px">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (!Model.Any())
+                {
+                    <tr><td colspan="4" class="text-center text-muted py-4">No greetings yet.</td></tr>
+                }
+                @foreach (var g in Model)
+                {
+                    <tr data-row-id="@g.Id">
+                        <td>@g.Audience</td>
+                        <td>@g.Message</td>
+                        <td class="text-muted small">@g.CreatedAt.ToString("yyyy-MM-dd HH:mm")</td>
+                        <td class="text-end">
+                            <a asp-action="Edit" asp-route-id="@g.Id" class="btn btn-sm btn-outline-secondary">
+                                <i class="bi bi-pencil"></i>
+                            </a>
+                            <button type="button" class="btn btn-sm btn-outline-danger"
+                                    data-fcms-action="delete"
+                                    data-url="/admin/hello/@g.Id/delete"
+                                    data-confirm-title="Delete greeting?"
+                                    data-confirm-message="Audience: @g.Audience"
+                                    data-confirm-variant="danger"
+                                    data-confirm-label="Delete">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>

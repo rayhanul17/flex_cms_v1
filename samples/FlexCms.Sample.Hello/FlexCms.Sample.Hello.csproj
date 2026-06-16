@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk.Razor">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -7,6 +7,9 @@
     <IsPackable>false</IsPackable>
     <!-- Sample only — not part of the production solution build. -->
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <!-- Razor SDK compiles Views/**/*.cshtml into the module DLL so the
+         AddApplicationPart() call in the host can serve them at runtime. -->
+    <AddRazorSupportForMvc>true</AddRazorSupportForMvc>
   </PropertyGroup>
 
   <ItemGroup>

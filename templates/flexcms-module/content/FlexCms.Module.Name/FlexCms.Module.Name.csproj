@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk.Razor">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -6,6 +6,9 @@
     <Nullable>enable</Nullable>
     <LangVersion>latest</LangVersion>
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <!-- Razor SDK compiles Views/**/*.cshtml into the module DLL so the
+         host's AddApplicationPart() call serves them at runtime. -->
+    <AddRazorSupportForMvc>true</AddRazorSupportForMvc>
   </PropertyGroup>
 
   <ItemGroup>
@@ -18,7 +21,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- Reference the host solution's framework project (adjust path as needed). -->
+    <!-- modules/{ModuleId}/{ModuleId}.csproj → ../../src/FlexCms.Framework/… -->
     <ProjectReference Include="..\..\src\FlexCms.Framework\FlexCms.Framework.csproj" />
   </ItemGroup>
 

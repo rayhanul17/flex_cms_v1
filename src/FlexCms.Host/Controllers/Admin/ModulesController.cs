@@ -327,8 +327,15 @@ public class ModulesController : BaseAdminController
         // Handles both src/FlexCms.Host (project) and bin/Debug/net10.0 (running output) layouts.
         var solutionRoot = FindSolutionRoot(_env.ContentRootPath);
         if (solutionRoot is null)
-            return FcmsFail("Could not locate the solution root (looked for a 'templates' sibling).");
+        {
+            ModelState.AddModelError(string.Empty, "Could not locate the solution root (looked for a 'templates' sibling).");
+            return View("Scaffold", model);
+        }
 
+        // Drop the scaffolded project into the SOLUTION-ROOT modules/ folder
+        // (sibling of src/, samples/, templates/) — same place the runtime now
+        // scans alongside src/FlexCms.Host/modules. Visual Studio sees the
+        // project as a top-level entry, not a file nested under the host.
         var modulesRoot = Path.Combine(solutionRoot, "modules");
         Directory.CreateDirectory(modulesRoot);
         var dest = Path.Combine(modulesRoot, model.ModuleId);
@@ -341,10 +348,52 @@ public class ModulesController : BaseAdminController
 
         var templateSrc = Path.Combine(solutionRoot, "templates", "flexcms-module", "content", "FlexCms.Module.Name");
         if (!Directory.Exists(templateSrc))
-            return FcmsFail($"Template source not found at: {templateSrc}");
+        {
+            ModelState.AddModelError(string.Empty, $"Template source not found at: {templateSrc}");
+            return View("Scaffold", model);
+        }
 
         CopyAndReplace(templateSrc, dest, model.ModuleId, model.TablePrefix);
-        return FcmsOk($"Module '{model.ModuleId}' scaffolded to modules/{model.ModuleId}/. Open the project, implement your module, build, and restart.");
+
+        // Register the new csproj in FlexCms.slnx so it shows up in Visual
+        // Studio / Rider / VS Code's solution explorer immediately.
+        var slnxPath = Path.Combine(solutionRoot, "FlexCms.slnx");
+        try { AddProjectToSlnx(slnxPath, $"modules/{model.ModuleId}/{model.ModuleId}.csproj"); }
+        catch { /* solution-file edit is best-effort — never block the scaffold */ }
+
+        TempData["Success"] = $"Module '{model.ModuleId}' scaffolded to modules/{model.ModuleId}/. " +
+                              "Run `dotnet build modules/" + model.ModuleId + "/" + model.ModuleId + ".csproj`, " +
+                              "then restart the host so it discovers your module.";
+        return RedirectToAction(nameof(Index));
+    }
+
+    /// <summary>
+    /// Append a project entry to FlexCms.slnx's /modules/ folder. Idempotent —
+    /// silently no-ops if the project is already listed.
+    /// </summary>
+    private static void AddProjectToSlnx(string slnxPath, string relativeProjectPath)
+    {
+        if (!System.IO.File.Exists(slnxPath)) return;
+        var text = System.IO.File.ReadAllText(slnxPath);
+        if (text.Contains(relativeProjectPath, StringComparison.OrdinalIgnoreCase)) return;
+
+        var modulesFolderLine = "<Folder Name=\"/modules/\">";
+        if (text.Contains(modulesFolderLine, StringComparison.Ordinal))
+        {
+            // Append project entry inside the existing /modules/ folder block.
+            text = text.Replace(modulesFolderLine,
+                $"{modulesFolderLine}\n    <Project Path=\"{relativeProjectPath}\" />");
+        }
+        else
+        {
+            // Insert a fresh /modules/ folder block just before </Solution>.
+            var block =
+                "  <Folder Name=\"/modules/\">\n" +
+                $"    <Project Path=\"{relativeProjectPath}\" />\n" +
+                "  </Folder>\n";
+            text = text.Replace("</Solution>", block + "</Solution>");
+        }
+        System.IO.File.WriteAllText(slnxPath, text);
     }
 
     /// <summary>

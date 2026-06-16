@@ -22,7 +22,10 @@ namespace FlexCms.Module.Name;
 /// </summary>
 public class __ShortName__Module : BaseModule
 {
-    public override string ModuleId    => "FlexCms.Module.Name";
+    /// <summary>Compile-time constant for callers (controllers, services) that need to pass this module id to LogAsync etc.</summary>
+    public const string ModuleIdValue = "FlexCms.Module.Name";
+
+    public override string ModuleId    => ModuleIdValue;
     public override string ModuleName  => "__ShortName__";
     public override string Version     => "1.0.0";
     public override string TablePrefix => "mod_prefix";
@@ -58,11 +61,22 @@ public class __ShortName__Module : BaseModule
         // same context the framework used to run migrations, so the seed lives
         // on the exact schema we just applied. Idempotent: only runs when
         // FcmsModuleRecord.SeedCompleted is false.
-        var opts = sp.GetRequiredService<FlexCms.Framework.Modules.ModuleActivationOptions>();
+        var opts = sp.GetRequiredService<ModuleActivationOptions>();
         var ctx = CreateMigrationContext(opts.ConnectionString, opts.Provider) as __ShortName__DbContext;
         if (ctx is null) return;
         await using (ctx)
         {
+            // Don't crash on first run if the developer hasn't generated migrations yet —
+            // surface a helpful message in the logs and skip. After `dotnet ef migrations
+            // add InitialSchema` + restart, this branch is skipped and the real seed runs.
+            if (!await ctx.Database.CanConnectAsync(ct)) return;
+            var tables = await ctx.Database.GetAppliedMigrationsAsync(ct);
+            if (!tables.Any())
+            {
+                Console.WriteLine($"[{ModuleId}] No EF migrations found — run `dotnet ef migrations add InitialSchema` to enable seeding.");
+                return;
+            }
+
             if (!await ctx.Items.AnyAsync(ct))
             {
                 ctx.Items.Add(new __ShortName__Item

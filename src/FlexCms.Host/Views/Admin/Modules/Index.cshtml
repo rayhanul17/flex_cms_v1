@@ -5,6 +5,14 @@
 
 <form id="csrf" style="display:none">@Html.AntiForgeryToken()</form>
 
+@if (TempData["Success"] is string ok)
+{
+    <div class="alert alert-success d-flex align-items-start gap-2" role="alert">
+        <i class="bi bi-check-circle-fill mt-1"></i>
+        <div>@ok</div>
+    </div>
+}
+
 <div class="d-flex justify-content-between align-items-center mb-3">
     <h4 class="mb-0">Installed Modules</h4>
     <div class="d-flex gap-2">

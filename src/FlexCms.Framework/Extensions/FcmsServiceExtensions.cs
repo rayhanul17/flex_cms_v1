@@ -289,8 +289,16 @@ public static class FcmsServiceExtensions
         services.AddSingleton<ModuleManager>();
         services.AddSingleton<ModuleStateService>();
 
-        var modulesRoot = Path.Combine(options.AppDataPath, "..", "modules");
-        var registry = BuildModuleRegistry(services, modulesRoot);
+        // Scan two roots so scaffolded / source-controlled modules at the
+        // solution-root <c>modules/</c> folder are picked up alongside the
+        // packaged ones that landed in <c>src/FlexCms.Host/modules/</c> via
+        // the admin Upload flow. Solution-root scanned first so a dev's
+        // in-tree copy wins over a stale uploaded build of the same id.
+        var hostModulesRoot = Path.GetFullPath(Path.Combine(options.AppDataPath, "..", "modules"));
+        var solutionRoot = Directory.GetParent(hostModulesRoot)?.Parent?.Parent?.FullName;
+        var rootModulesRoot = solutionRoot is not null ? Path.Combine(solutionRoot, "modules") : null;
+        var registry = BuildModuleRegistry(services,
+            Directory.Exists(rootModulesRoot ?? "") ? new[] { rootModulesRoot!, hostModulesRoot } : new[] { hostModulesRoot });
         services.AddSingleton(registry);
 
         // Cookie authentication (8h sliding window).
@@ -506,7 +514,7 @@ public static class FcmsServiceExtensions
     /// into the host: call its <c>RegisterServices</c>, scan its assembly
     /// for attribute-marked types, and add it as an MVC ApplicationPart.
     /// </summary>
-    private static ModuleRegistry BuildModuleRegistry(IServiceCollection services, string modulesRoot)
+    private static ModuleRegistry BuildModuleRegistry(IServiceCollection services, IReadOnlyList<string> modulesRoots)
     {
         // We can't pull a logger from DI here (container isn't built yet);
         // the manager / loader log via NullLogger when invoked statically.
@@ -515,7 +523,20 @@ public static class FcmsServiceExtensions
         var loader = new ModuleLoader(loaderLog);
         var manager = new ModuleManager(loader, managerLog);
 
-        var loaded = manager.ScanAndLoad(modulesRoot);
+        // Walk every root in order; the first occurrence of a given ModuleId wins,
+        // so solution-root scaffolds take precedence over uploaded packages.
+        var loaded = new List<Modules.LoadedModule>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var root in modulesRoots)
+        {
+            if (!Directory.Exists(root)) continue;
+            foreach (var m in manager.ScanAndLoad(root))
+            {
+                if (seen.Add(m.Manifest.ModuleId))
+                    loaded.Add(m);
+            }
+        }
+
         var mvcBuilder = services.AddMvcCore();   // idempotent — returns existing builder if already added
 
         foreach (var module in loaded)

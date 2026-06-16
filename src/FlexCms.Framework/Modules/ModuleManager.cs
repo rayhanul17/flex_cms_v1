@@ -51,7 +51,17 @@ public class ModuleManager
         {
             var disabled = File.Exists(Path.Combine(moduleFolder, DisabledMarker));
 
-            foreach (var dll in Directory.GetFiles(moduleFolder, "*.dll"))
+            // 1) Try DLLs sitting at the folder root — that's where Upload writes
+            //    them after extracting the package zip.
+            // 2) Fall back to bin/{Release,Debug}/net*/  so source-controlled dev
+            //    modules (scaffolded straight into modules/<Id>/) work without
+            //    a manual copy step — the developer just runs `dotnet build` on
+            //    the project and restarts the host.
+            var candidates = Directory.GetFiles(moduleFolder, "*.dll")
+                .Concat(SafeEnumerate(Path.Combine(moduleFolder, "bin", "Release")))
+                .Concat(SafeEnumerate(Path.Combine(moduleFolder, "bin", "Debug")));
+
+            foreach (var dll in candidates)
             {
                 var module = _loader.LoadFromPath(dll, moduleFolder, disabled);
                 if (module is null) continue;
@@ -63,6 +73,19 @@ public class ModuleManager
         }
 
         return SortByDependencies(loaded);
+    }
+
+    /// <summary>
+    /// Enumerate DLLs inside any <c>net*</c> subfolder of the given path,
+    /// returning an empty sequence if the path doesn't exist (uncompiled
+    /// project, missing bin/, etc.).
+    /// </summary>
+    private static IEnumerable<string> SafeEnumerate(string binRoot)
+    {
+        if (!Directory.Exists(binRoot)) yield break;
+        foreach (var tfmDir in Directory.GetDirectories(binRoot, "net*"))
+            foreach (var dll in Directory.GetFiles(tfmDir, "*.dll"))
+                yield return dll;
     }
 
     private void ProcessPendingUninstalls(string modulesRoot)

@@ -1,6 +1,6 @@
 {
   "ModuleId": "FlexCms.Module.Name",
-  "ModuleName": "Name",
+  "ModuleName": "__ShortName__",
   "Version": "1.0.0",
   "Author": "",
   "Email": "",
@@ -10,6 +10,11 @@
   "MinFrameworkVersion": "1.0.0",
   "TablePrefix": "mod_prefix",
   "DependsOn": [],
-  "RequestedPermissions": [],
+  "RequestedPermissions": [
+    "__shortname__.view",
+    "__shortname__.create",
+    "__shortname__.edit",
+    "__shortname__.delete"
+  ],
   "RequestedCapabilities": []
 }

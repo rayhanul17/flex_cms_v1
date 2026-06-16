@@ -1,15 +1,40 @@
-@model FlexCms.Module.Name.Data.__ShortName__Item
+@model __ShortName__Item
 @{
-    ViewData["Title"] = "Edit __ShortName__";
+    var isNew = ViewData["IsNew"] as bool? ?? Model.Id == Guid.Empty;
+    ViewData["Title"] = isNew ? "New __ShortName__" : "Edit __ShortName__";
+    var formAction = isNew ? "/admin/mod_prefix/create" : $"/admin/mod_prefix/{Model.Id}/edit";
 }
 
-<h4 class="mb-3">Edit __ShortName__</h4>
+<div class="d-flex align-items-center mb-3 gap-2">
+    <a asp-action="Index" class="btn btn-sm btn-outline-secondary">← Back</a>
+    <h4 class="mb-0">@ViewData["Title"]</h4>
+</div>
 
-<form asp-action="EditPost" asp-route-id="@Model.Id" method="post" class="col-lg-8">
+<form method="post" action="@formAction">
     @Html.AntiForgeryToken()
-    <partial name="_Form" model="Model" />
-    <div class="mt-3 d-flex gap-2">
-        <button type="submit" class="btn btn-primary">Save</button>
-        <a asp-action="Index" class="btn btn-outline-secondary">Cancel</a>
+    <div asp-validation-summary="ModelOnly" class="alert alert-danger" role="alert"></div>
+
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <div class="mb-3">
+                <label asp-for="Title" class="form-label">Title <span class="text-danger">*</span></label>
+                <input asp-for="Title" class="form-control" required />
+                <span asp-validation-for="Title" class="text-danger small"></span>
+            </div>
+            <div class="mb-3">
+                <label asp-for="Description" class="form-label">Description</label>
+                <textarea asp-for="Description" class="form-control" rows="6"></textarea>
+                <span asp-validation-for="Description" class="text-danger small"></span>
+            </div>
+            <div class="form-check mb-0">
+                <input asp-for="IsPublished" class="form-check-input" />
+                <label asp-for="IsPublished" class="form-check-label">Published</label>
+            </div>
+        </div>
+    </div>
+
+    <div class="mt-3">
+        <button type="submit" class="btn btn-primary">@(isNew ? "Create" : "Save Changes")</button>
+        <a asp-action="Index" class="btn btn-outline-secondary ms-2">Cancel</a>
     </div>
 </form>

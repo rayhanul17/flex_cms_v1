@@ -43,7 +43,74 @@ are involved and **commits must be split between them correctly**:
    - `dotnet build` (run from the dir whose .csproj you touched)
    - `cd D:\flex_cms_v1 && dotnet test --nologo` — expect
      **661 unit + 296 integration passing**. If integration tests need
-     a DB, MySQL must be reachable at the default connection string.
+     a DB, PostgreSQL must be reachable at the connection string below.
+
+## Credentials (dev environment)
+
+> ⚠ These are **local-dev only** — the database is a Docker container
+> bound to `localhost`, never internet-exposed. Do **not** reuse this
+> password for production. Treat the values below as fixtures for this
+> developer machine, not secrets.
+
+| What | Value |
+|---|---|
+| **DB provider** | PostgreSQL |
+| DB host / port | `localhost` / `5432` (Docker container named `postgres`, image `postgres:16`) |
+| DB name | `flexcms` |
+| DB user | `dev` |
+| DB password | `Dev@123456` |
+| Setup wizard "Database Provider" | PostgreSQL |
+| **Admin email** | `rayhanul.cse@gmail.com` |
+| **Admin password** | `Dev@123456` |
+| Admin Full Name | (anything sensible, e.g. `Rayhanul Islam Raj`) |
+| Site name | (anything, e.g. `FlexCMS Dev`) |
+| Site Base URL | `http://localhost:5099` |
+| Timezone | `(UTC+06:00) Dhaka` |
+| Default language | English |
+
+### Setup-wizard scenario (fresh install)
+
+If `D:\flex_cms_v1\src\FlexCms.Host\App_Data\setup.json` does NOT exist
+(or `IsSetupComplete: false`), the host redirects everything to `/Setup`.
+Drive the 3-step wizard via Playwright (preferred) or fill the form
+manually in a real browser:
+
+1. **Step 1 — Database**: pick PostgreSQL, host `localhost`, port `5432`,
+   database `flexcms`, user `dev`, password `Dev@123456`. Click
+   **Test Connection** (expect ✓ Connected successfully) → **Next**.
+2. **Step 2 — Site Info**: site name + tagline (anything),
+   Base URL `http://localhost:5099`, Timezone Dhaka, language English
+   → **Next**.
+3. **Step 3 — Admin Account**: Full Name (anything),
+   Email `rayhanul.cse@gmail.com`, Password / Confirm `Dev@123456`
+   → **Finish Setup**. The wizard creates the DB schema, seeds
+   permissions / menu items, and writes `setup.json`. **Stop and
+   restart the host** so the runtime exits setup mode and starts
+   the module-discovery + DB connection in production-mode services.
+
+### Already-set-up scenario
+
+If `setup.json` exists with `IsSetupComplete: true` AND the DB still
+has the schema, just log in at `http://localhost:5099/auth/login` with
+the admin email + password above. If the admin email is something else
+(e.g. a previous run used `admin@flexcms.test`), either log in with
+that email or fully reset (see § Reset below).
+
+### Reset to a clean fresh setup
+
+```bash
+# 1. Stop the host
+# 2. Drop + recreate the database (Postgres in Docker):
+docker exec postgres psql -U dev -d postgres -c "DROP DATABASE IF EXISTS flexcms;"
+docker exec postgres psql -U dev -d postgres -c "CREATE DATABASE flexcms;"
+# 3. Wipe the setup state and runtime artifacts:
+rm -f  D:\flex_cms_v1\src\FlexCms.Host\App_Data\setup.json
+rm -rf D:\flex_cms_v1\src\FlexCms.Host\App_Data\keys
+rm -rf D:\flex_cms_v1\src\FlexCms.Host\App_Data\logs
+rm -rf D:\flex_cms_v1\src\FlexCms.Host\modules\*       # keep .gitkeep
+rm -rf D:\flex_cms_v1\src\FlexCms.Host\wwwroot\uploads
+# 4. Start the host — `dotnet run` will land on /Setup, follow the wizard above.
+```
 
 ## Initial setup (run once at the start)
 
@@ -137,7 +204,7 @@ If the repo already has files, skip 1–6 and continue with the task below.
 
 ## Task
 
-<TASK>
+You have full discussion in this chat
 
 ## Report back
 
@@ -157,13 +224,3 @@ When done, state in plain English:
 
 ---
 
-## Notes for the prompt author (you, not the agent)
-
-- Replace `<TASK>` with a specific ask. Examples that work well:
-  - *"Add a `Plan` entity (name, monthly_amount, tenure_months, is_active) with admin CRUD at /admin/investpro/plans. Public read-only endpoint at /api/investpro/plans. Use the existing investpro DbContext."*
-  - *"The investpro module's admin page throws on Edit when Description is empty. Reproduce, fix in the module repo, push."*
-  - *"Add support for soft-deleting plans to the framework — extend `IRepository<T>` if needed — then surface a 'Restore' button in investpro's admin Trash view."*
-- Open-ended asks ("improve the module") produce vague work — be specific
-  about the entity / endpoint / behavior you want.
-- For multi-step tasks, list the steps as a checklist inside `<TASK>` —
-  agents handle "do X, then Y, then Z" better than "build everything".

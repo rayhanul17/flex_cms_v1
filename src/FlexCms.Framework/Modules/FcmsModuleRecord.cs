@@ -45,4 +45,13 @@ public class FcmsModuleRecord : BaseEfEntity
     /// + tooltip so operators see the problem immediately.
     /// </summary>
     public string? ActivationError { get; set; }
+
+    /// <summary>
+    /// Number of times the seed has thrown before completing. After
+    /// <see cref="Modules.ModuleActivationService.MaxSeedAttempts"/> failed
+    /// attempts the activator stops retrying on every restart — the module
+    /// still shows the red Error badge so a developer can fix the bug and
+    /// reset this counter by clicking "Retry seed" in the admin UI.
+    /// </summary>
+    public int SeedAttemptCount { get; set; }
 }

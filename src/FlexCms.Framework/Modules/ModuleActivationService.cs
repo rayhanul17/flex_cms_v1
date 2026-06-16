@@ -27,6 +27,14 @@ namespace FlexCms.Framework.Modules;
 /// </summary>
 public class ModuleActivationService : IHostedService
 {
+    /// <summary>
+    /// Hard cap on per-restart seed retries. Three is enough to absorb a
+    /// transient DB hiccup (mid-publish window etc.) but cheap enough that
+    /// a genuine bug surfaces within minutes instead of growing a giant
+    /// repeating stack trace in the audit log.
+    /// </summary>
+    public const int MaxSeedAttempts = 3;
+
     private readonly ModuleRegistry _registry;
     private readonly ModuleActivationOptions _opts;
     private readonly ModuleStateService _state;
@@ -133,20 +141,35 @@ public class ModuleActivationService : IHostedService
             }
 
             // ── 5. Seed data (first activation only) ─────────────────────────
-            if (!record.SeedCompleted)
+            // Cap the retry-on-restart loop. Repeating a buggy SeedDataAsync
+            // every reboot hides the real failure: the module never reaches
+            // a usable state, but logs fill with the same exception and an
+            // operator can't tell whether the third retry might recover. After
+            // MaxSeedAttempts we leave SeedCompleted = false but stop trying
+            // and surface "give up — manual fix needed" on the module list.
+            if (!record.SeedCompleted && record.SeedAttemptCount < MaxSeedAttempts)
             {
+                record.SeedAttemptCount++;
                 try
                 {
                     await module.SeedDataAsync(scope.ServiceProvider, ct);
                     record.SeedCompleted = true;
+                    record.SeedAttemptCount = 0;
                     record.Version = module.Version;
                     _logger.LogInformation("Module {Id}: seed completed.", module.ModuleId);
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Module {Id}: seed failed.", module.ModuleId);
-                    errors.Add("seed: " + ex.Message);
+                    _logger.LogError(ex, "Module {Id}: seed failed (attempt {Attempt}/{Max}).",
+                        module.ModuleId, record.SeedAttemptCount, MaxSeedAttempts);
+                    errors.Add($"seed (attempt {record.SeedAttemptCount}/{MaxSeedAttempts}): {ex.Message}");
                 }
+            }
+            else if (!record.SeedCompleted)
+            {
+                // Cap exceeded — keep flagging the error but don't try again
+                // unless the operator resets the counter.
+                errors.Add($"seed gave up after {MaxSeedAttempts} attempts — fix the module then click Retry seed in admin.");
             }
 
             // ── 6. OnUpgrade — version changed since last successful seed ────

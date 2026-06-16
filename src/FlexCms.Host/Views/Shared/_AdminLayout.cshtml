@@ -33,17 +33,7 @@
     }
     catch { /* settings unavailable on early boot — fall through to defaults */ }
 }
-@functions {
-    sealed class SiteIdentitySnapshot
-    {
-        public string SiteName { get; set; } = "";
-        public string? BaseUrl { get; set; }
-        public Guid? LogoMediaId { get; set; }
-        public Guid? FaviconMediaId { get; set; }
-    }
-}
 @{
-
     bool IsActive(FcmsMenuItem item) =>
         currentPath.Equals(item.Url, StringComparison.OrdinalIgnoreCase)
         || (item.Url is not null && item.Url.Length > 1 && !item.Url.StartsWith('#')
@@ -357,6 +347,17 @@
             var dd = bootstrap.Dropdown.getInstance(trigger);
             if (dd) dd.hide();
         }, { passive: true });
+    })();
+
+    // ── Auto-scroll the active sidebar link into view ─────────────────────
+    // When the menu list is taller than the sidebar (lots of modules /
+    // children), the active item can sit below the fold. Bring it into
+    // view on every page render — `block: 'nearest'` avoids snapping the
+    // whole sidebar if the item is already visible.
+    (function () {
+        var active = document.querySelector('aside.sidebar .nav-link.active, aside.sidebar .submenu.show .nav-link.active');
+        if (!active) return;
+        try { active.scrollIntoView({ block: 'nearest', behavior: 'instant' }); } catch { active.scrollIntoView(); }
     })();
 </script>
 @await RenderSectionAsync("Scripts", required: false)

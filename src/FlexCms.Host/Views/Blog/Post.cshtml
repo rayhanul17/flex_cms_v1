@@ -1,7 +1,10 @@
 @model FlexCms.Framework.Cms.FcmsPost
 @using FlexCms.Framework.Cms.Comments
+@using FlexCms.Framework.Helpers
+@using FlexCms.Framework.I18n
 @using FlexCms.Framework.Services
 @inject ISettingsService SettingsService
+@inject IFcmsTranslator T
 @{
     ViewData["Title"] = Model.MetaTitle ?? Model.Title;
     var comments            = ViewBag.Comments as List<FcmsComment> ?? [];
@@ -173,7 +176,7 @@
                             Comments are moderated and will appear after approval.
                         </p>
                         <form asp-controller="Blog" asp-action="SubmitComment" asp-route-slug="@Model.Slug"
-                              method="post" novalidate>
+                              method="post" class="needs-validation fcms-comment-form" novalidate>
                             @Html.AntiForgeryToken()
                             @if (!isAuthenticated)
                             {
@@ -182,11 +185,13 @@
                                         <label class="form-label fw-medium" for="authorName">Name <span class="text-danger">*</span></label>
                                         <input type="text" id="authorName" name="authorName" class="form-control"
                                                placeholder="Your name" required maxlength="100" />
+                                        <div class="invalid-feedback">Please enter your name.</div>
                                     </div>
                                     <div class="col-sm-6">
                                         <label class="form-label fw-medium" for="authorEmail">Email <span class="text-muted fw-normal">(optional)</span></label>
                                         <input type="email" id="authorEmail" name="authorEmail" class="form-control"
                                                placeholder="your@email.com" maxlength="200" />
+                                        <div class="invalid-feedback">Please enter a valid email address.</div>
                                     </div>
                                 </div>
                             }
@@ -199,13 +204,33 @@
                             <div class="mb-3">
                                 <label class="form-label fw-medium" for="body">Comment <span class="text-danger">*</span></label>
                                 <textarea id="body" name="body" class="form-control" rows="4"
-                                          placeholder="Share your thoughts..." required maxlength="2000"></textarea>
+                                          placeholder="Share your thoughts..." required maxlength="2000" minlength="2"></textarea>
                                 <div class="form-text">Max 2000 characters.</div>
+                                <div class="invalid-feedback">Please write a short comment (at least 2 characters).</div>
                             </div>
                             <button type="submit" class="btn btn-primary">
                                 <i class="bi bi-send me-1"></i> Submit Comment
                             </button>
                         </form>
+                        <script>
+                        // Bootstrap-flavoured client-side validation: keep
+                        // novalidate so the browser's native popup doesn't
+                        // race the inline feedback, and toggle .was-validated
+                        // on submit to reveal the .invalid-feedback messages.
+                        (function () {
+                            var form = document.querySelector('.fcms-comment-form');
+                            if (!form) return;
+                            form.addEventListener('submit', function (e) {
+                                if (!form.checkValidity()) {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    var firstInvalid = form.querySelector(':invalid');
+                                    if (firstInvalid) firstInvalid.focus();
+                                }
+                                form.classList.add('was-validated');
+                            }, false);
+                        })();
+                        </script>
                     </div>
                 </div>
             </section>
@@ -229,28 +254,34 @@
                     </div>
                 }
 
+                @{
+                    // Bengali / Arabic-Indic visitors expect localised digits in
+                    // counters too — pull the per-request language from the same
+                    // place LanguageMiddleware stores it and rewrite the digits.
+                    var currentLang = Context.Items[FlexCms.Framework.I18n.SupportedLanguages.ContextItemKey] as string;
+                }
                 <div class="card border-0 shadow-sm mb-4">
                     <div class="card-header border-0 fw-semibold">
-                        <i class="bi bi-info-circle me-2"></i>Post Info
+                        <i class="bi bi-info-circle me-2"></i>@T.T("post.post_info")
                     </div>
                     <ul class="list-group list-group-flush">
                         <li class="list-group-item d-flex justify-content-between border-0 px-3">
-                            <span class="text-muted small">Published</span>
-                            <span class="small">@Model.PublishedAt?.ToString("MMM d, yyyy")</span>
+                            <span class="text-muted small">@T.T("common.published")</span>
+                            <span class="small">@(Model.PublishedAt?.ToString("MMM d, yyyy") ?? "")</span>
                         </li>
                         <li class="list-group-item d-flex justify-content-between border-0 px-3">
-                            <span class="text-muted small">Views</span>
-                            <span class="small">@Model.ViewCount</span>
+                            <span class="text-muted small">@T.T("post.views")</span>
+                            <span class="small">@FcmsHelper.ConvertDigits(Model.ViewCount, currentLang)</span>
                         </li>
                         <li class="list-group-item d-flex justify-content-between border-0 px-3">
-                            <span class="text-muted small">Comments</span>
-                            <span class="small">@comments.Count</span>
+                            <span class="text-muted small">@T.T("post.comments")</span>
+                            <span class="small">@FcmsHelper.ConvertDigits(comments.Count, currentLang)</span>
                         </li>
                     </ul>
                 </div>
 
                 <a href="#comments" class="btn btn-outline-secondary btn-sm w-100">
-                    <i class="bi bi-chat-left-text me-1"></i> Jump to Comments
+                    <i class="bi bi-chat-left-text me-1"></i> @T.T("post.jump_to_comments")
                 </a>
             </div>
         </div>

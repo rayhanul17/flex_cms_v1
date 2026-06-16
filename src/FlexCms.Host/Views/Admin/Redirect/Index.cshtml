@@ -46,8 +46,10 @@ else
                 </td>
                 <td class="small text-muted">@r.HitCount</td>
                 <td class="text-end">
-                    <a asp-action="Edit" asp-route-id="@r.Id" class="btn btn-sm btn-outline-secondary">Edit</a>
-                    <button class="btn btn-sm btn-outline-danger js-delete" data-id="@r.Id">Delete</button>
+                    <a asp-action="Edit" asp-route-id="@r.Id" class="btn btn-sm btn-outline-secondary"
+                       fcms-authorize="@FcmsPermissions.RedirectsEdit">Edit</a>
+                    <button class="btn btn-sm btn-outline-danger js-delete" data-id="@r.Id"
+                            fcms-authorize="@FcmsPermissions.RedirectsDelete">Delete</button>
                 </td>
             </tr>
         }

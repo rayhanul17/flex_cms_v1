@@ -58,8 +58,10 @@
                         <td class="text-muted small">@(item.RequiredPermission ?? "—")</td>
                         <td class="text-muted small">@item.ModuleId</td>
                         <td class="text-end">
-                            <a asp-action="Edit" asp-route-id="@item.Id" class="btn btn-sm btn-outline-secondary">Edit</a>
+                            <a asp-action="Edit" asp-route-id="@item.Id" class="btn btn-sm btn-outline-secondary"
+                               fcms-authorize="@FcmsPermissions.SettingsManage">Edit</a>
                             <button class="btn btn-sm btn-outline-danger delete-btn"
+                                    fcms-authorize="@FcmsPermissions.SettingsManage"
                                     data-id="@item.Id" data-name="@item.DefaultName">Delete</button>
                         </td>
                     </tr>

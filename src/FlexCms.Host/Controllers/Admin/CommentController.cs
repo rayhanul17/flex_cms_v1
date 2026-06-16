@@ -1,4 +1,5 @@
 using FlexCms.Framework.Auth;
+using FlexCms.Framework.Cms;
 using FlexCms.Framework.Cms.Comments;
 using FlexCms.Framework.Db;
 using FlexCms.Framework.Services;
@@ -15,17 +16,26 @@ namespace FlexCms.Host.Controllers.Admin;
 public class CommentController : BaseAdminController
 {
     private readonly IRepository<FcmsComment> _repo;
+    private readonly IRepository<FcmsPost> _posts;
+    private readonly IRepository<FcmsPage> _pages;
     private readonly ICommentService _comments;
     private readonly IFcmsContextService _ctx;
+    private readonly ISettingsService _settings;
 
     public CommentController(
         IRepository<FcmsComment> repo,
+        IRepository<FcmsPost> posts,
+        IRepository<FcmsPage> pages,
         ICommentService comments,
-        IFcmsContextService ctx)
+        IFcmsContextService ctx,
+        ISettingsService settings)
     {
         _repo = repo;
+        _posts = posts;
+        _pages = pages;
         _comments = comments;
         _ctx = ctx;
+        _settings = settings;
     }
 
     [HttpGet("")]
@@ -40,6 +50,32 @@ public class CommentController : BaseAdminController
             .OrderByDescending(c => c.CreatedAt)
             .ToList();
 
+        // Resolve parent entities once for the rendered slice — pull titles
+        // and public URLs so moderators see "Reply to: <Post Title> →"
+        // instead of an opaque 8-character GUID stump.
+        var postIds = rows.Where(c => c.EntityType == nameof(FcmsPost)).Select(c => c.EntityId).Distinct().ToList();
+        var pageIds = rows.Where(c => c.EntityType == nameof(FcmsPage)).Select(c => c.EntityId).Distinct().ToList();
+
+        var postLookup = postIds.Count == 0
+            ? new Dictionary<Guid, (string Title, string Slug)>()
+            : (await _posts.GetByIdsAsync(postIds, ct))
+                .ToDictionary(p => p.Id, p => (p.Title, p.Slug));
+        var pageLookup = pageIds.Count == 0
+            ? new Dictionary<Guid, (string Title, string Slug)>()
+            : (await _pages.GetByIdsAsync(pageIds, ct))
+                .ToDictionary(p => p.Id, p => (p.Title, p.Slug));
+
+        string baseUrl = "";
+        try
+        {
+            var snap = await _settings.GetAsync<SiteIdentitySnapshot>("site:general", ct: ct);
+            baseUrl = (snap?.BaseUrl ?? "").TrimEnd('/');
+        }
+        catch { /* settings unavailable — leave baseUrl empty, links become relative */ }
+
+        ViewBag.PostLookup = postLookup;
+        ViewBag.PageLookup = pageLookup;
+        ViewBag.BaseUrl = baseUrl;
         ViewBag.SelectedStatus = requestedStatus;
         ViewBag.Counts = new Dictionary<CommentStatus, int>
         {

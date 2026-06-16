@@ -1,3 +1,5 @@
+using FlexCms.Framework.Cms;
+using FlexCms.Framework.Services;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
 using Microsoft.AspNetCore.Razor.TagHelpers;
@@ -25,8 +27,13 @@ namespace FlexCms.Framework.TagHelpers;
 public sealed class FcmsSlugInputTagHelper : TagHelper
 {
     private readonly IHtmlGenerator _generator;
+    private readonly ISettingsService _settings;
 
-    public FcmsSlugInputTagHelper(IHtmlGenerator generator) => _generator = generator;
+    public FcmsSlugInputTagHelper(IHtmlGenerator generator, ISettingsService settings)
+    {
+        _generator = generator;
+        _settings = settings;
+    }
 
     [HtmlAttributeName("asp-for")]
     public ModelExpression For { get; set; } = default!;
@@ -45,20 +52,41 @@ public sealed class FcmsSlugInputTagHelper : TagHelper
     [ViewContext, HtmlAttributeNotBound]
     public ViewContext ViewContext { get; set; } = default!;
 
-    public override void Process(TagHelperContext context, TagHelperOutput output)
+    public override async Task ProcessAsync(TagHelperContext context, TagHelperOutput output)
     {
         var fieldId = For.Name.Replace('.', '_');
         var fieldName = For.Name;
         var value = For.Model?.ToString() ?? "";
 
+        // When the prefix starts with "/" we treat it as a public-URL path
+        // segment (e.g. "/blog/", "/") and try to prepend the configured
+        // site BaseUrl so the admin sees the real outward-facing URL while
+        // composing the slug. Falling back to the raw prefix when settings
+        // are unavailable (setup mode) or BaseUrl was left blank.
+        var renderedPrefix = Prefix;
+        if (!string.IsNullOrEmpty(Prefix) && Prefix.StartsWith('/'))
+        {
+            try
+            {
+                var snap = await _settings.GetAsync<SiteIdentitySnapshot>("site:general");
+                var baseUrl = snap?.BaseUrl?.TrimEnd('/');
+                if (!string.IsNullOrEmpty(baseUrl))
+                    renderedPrefix = baseUrl + Prefix;
+            }
+            catch
+            {
+                // Settings unavailable — fall back to the raw "/blog/" prefix.
+            }
+        }
+
         // Wrap in input-group when a prefix is supplied
-        if (!string.IsNullOrEmpty(Prefix))
+        if (!string.IsNullOrEmpty(renderedPrefix))
         {
             output.TagName = "div";
             output.Attributes.SetAttribute("class", "input-group");
             output.TagMode = TagMode.StartTagAndEndTag;
             output.Content.SetHtmlContent(
-                $"<span class=\"input-group-text\">{System.Net.WebUtility.HtmlEncode(Prefix)}</span>" +
+                $"<span class=\"input-group-text\">{System.Net.WebUtility.HtmlEncode(renderedPrefix)}</span>" +
                 BuildInput(fieldId, fieldName, value));
         }
         else

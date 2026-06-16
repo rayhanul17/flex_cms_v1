@@ -271,6 +271,49 @@ public static class FcmsHelper
         return Convert.ToHexString(bytes).ToLowerInvariant();
     }
 
+    // ── Localized digits ─────────────────────────────────────────────────
+
+    private static readonly char[] BengaliDigits = ['০','১','২','৩','৪','৫','৬','৭','৮','৯'];
+    private static readonly char[] ArabicIndicDigits = ['٠','١','٢','٣','٤','٥','٦','٧','٨','٩'];
+
+    /// <summary>
+    /// Rewrites every ASCII digit (0-9) in <paramref name="value"/> into the
+    /// script for <paramref name="languageCode"/>. Currently supports
+    /// <c>"bn"</c> (Bengali / Bangla) and <c>"ar"</c> (Arabic-Indic). Unknown
+    /// languages or null input pass through unchanged.
+    ///
+    /// <para>
+    /// Use in views: <c>@FcmsHelper.ConvertDigits(post.ViewCount.ToString(), currentLang)</c>.
+    /// Output is HTML-safe — only digit code points are replaced.
+    /// </para>
+    /// </summary>
+    public static string ConvertDigits(string? value, string? languageCode)
+    {
+        if (string.IsNullOrEmpty(value)) return value ?? "";
+        if (string.IsNullOrEmpty(languageCode)) return value;
+
+        char[]? target = languageCode.ToLowerInvariant() switch
+        {
+            "bn" or "bn-bd" or "bn-in" => BengaliDigits,
+            "ar" => ArabicIndicDigits,
+            _ => null
+        };
+        if (target is null) return value;
+
+        var sb = new StringBuilder(value.Length);
+        foreach (var c in value)
+            sb.Append(c is >= '0' and <= '9' ? target[c - '0'] : c);
+        return sb.ToString();
+    }
+
+    /// <summary>Overload for integers. Equivalent to <c>ConvertDigits(n.ToString(), lang)</c>.</summary>
+    public static string ConvertDigits(int value, string? languageCode)
+        => ConvertDigits(value.ToString(System.Globalization.CultureInfo.InvariantCulture), languageCode);
+
+    /// <inheritdoc cref="ConvertDigits(int,string)" />
+    public static string ConvertDigits(long value, string? languageCode)
+        => ConvertDigits(value.ToString(System.Globalization.CultureInfo.InvariantCulture), languageCode);
+
     // ── DateTime helpers ───────────────────────────────────────────────────
 
     /// <summary>

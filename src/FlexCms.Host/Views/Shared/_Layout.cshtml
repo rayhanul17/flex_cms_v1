@@ -39,15 +39,6 @@
     var action = (string?)ViewContext.RouteData.Values["action"];
     string ActiveIf(bool match) => match ? "active" : "";
 }
-@functions {
-    sealed class SiteIdentitySnapshot
-    {
-        public string SiteName { get; set; } = "";
-        public string? Tagline { get; set; }
-        public Guid? LogoMediaId { get; set; }
-        public Guid? FaviconMediaId { get; set; }
-    }
-}
 <!DOCTYPE html>
 <html lang="en" data-bs-theme="@bsTheme" data-theme-mode="@themeMode.ToString().ToLowerInvariant()">
 <head>

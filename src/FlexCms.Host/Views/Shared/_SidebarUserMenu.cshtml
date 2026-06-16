@@ -1,19 +1,53 @@
+@using FlexCms.Framework.Auth
 @using FlexCms.Framework.Services
 @using FlexCms.Framework.Themes
+@using Microsoft.AspNetCore.Identity
 @inject IFcmsContextService FcmsContext
+@inject UserManager<FcmsUser> UserManager
 @inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
 @{
-    // Initials = first character of each whitespace-separated chunk in the
-    // username (cap at 2). Falls back to email-local part if no name. Lets
-    // the avatar look human even before a real photo upload feature ships.
-    var name = FcmsContext.Username ?? FcmsContext.Email ?? "User";
+    // Avatar initials: prefer the FullName / DisplayName stored on the
+    // FcmsUser entity ("Rayhanul Islam Raj" → "RR" — first letter of the
+    // first chunk + first letter of the last chunk) rather than splitting
+    // the email local-part, which on "rayhanul@gmail.com" gave the
+    // misleading "RG". Falls back through DisplayName → FullName →
+    // ClaimTypes.Name → Email-local → "U" so the avatar always renders.
     var displayName = FcmsContext.Username ?? FcmsContext.Email ?? "User";
     var email = FcmsContext.Email ?? "";
-    var initials = string.Join("", name
-        .Split(new[] { ' ', '.', '_', '-', '@' }, StringSplitOptions.RemoveEmptyEntries)
-        .Take(2)
-        .Select(p => char.ToUpperInvariant(p[0])));
-    if (string.IsNullOrEmpty(initials)) initials = "?";
+    var initialsSource = displayName;
+    string? photoUrl = null;
+
+    if (FcmsContext.UserId is Guid uid)
+    {
+        var u = await UserManager.FindByIdAsync(uid.ToString());
+        if (u is not null)
+        {
+            if (!string.IsNullOrWhiteSpace(u.ResolvedDisplayName))
+            {
+                displayName = u.ResolvedDisplayName;
+                initialsSource = u.ResolvedDisplayName;
+            }
+            if (!string.IsNullOrWhiteSpace(u.ImageUrl)) photoUrl = u.ImageUrl;
+        }
+    }
+
+    string Initials(string source)
+    {
+        var parts = source
+            .Split(new[] { ' ', '.', '_', '-', '@' }, StringSplitOptions.RemoveEmptyEntries)
+            .ToList();
+        if (parts.Count >= 2)
+            return (char.ToUpperInvariant(parts[0][0]).ToString() + char.ToUpperInvariant(parts[^1][0])).Trim();
+        if (parts.Count == 1)
+        {
+            var p = parts[0];
+            return p.Length >= 2
+                ? (char.ToUpperInvariant(p[0]).ToString() + char.ToUpperInvariant(p[1])).Trim()
+                : char.ToUpperInvariant(p[0]).ToString();
+        }
+        return "U";
+    }
+    var initials = Initials(initialsSource);
 
     var token = Antiforgery.GetAndStoreTokens(Context).RequestToken;
     var returnUrl = Context.Request.Path + Context.Request.QueryString;
@@ -35,7 +69,14 @@
             data-bs-auto-close="outside"
             data-bs-offset="0,8"
             aria-expanded="false" aria-label="Account menu">
-        <span class="sidebar-user-avatar">@initials</span>
+        @if (!string.IsNullOrEmpty(photoUrl))
+        {
+            <img src="@photoUrl" alt="" class="sidebar-user-avatar" style="object-fit:cover" />
+        }
+        else
+        {
+            <span class="sidebar-user-avatar">@initials</span>
+        }
         <span class="sidebar-user-meta">
             <span class="sidebar-user-name">@displayName</span>
             <span class="sidebar-user-email">@email</span>
@@ -46,7 +87,14 @@
     <ul class="dropdown-menu sidebar-user-menu shadow-lg">
         <li class="px-3 py-2 border-bottom">
             <div class="d-flex align-items-center gap-2">
-                <span class="sidebar-user-avatar sidebar-user-avatar-sm">@initials</span>
+                @if (!string.IsNullOrEmpty(photoUrl))
+                {
+                    <img src="@photoUrl" alt="" class="sidebar-user-avatar sidebar-user-avatar-sm" style="object-fit:cover" />
+                }
+                else
+                {
+                    <span class="sidebar-user-avatar sidebar-user-avatar-sm">@initials</span>
+                }
                 <div class="min-w-0">
                     <div class="fw-semibold text-truncate">@displayName</div>
                     <div class="small text-muted text-truncate">@email</div>

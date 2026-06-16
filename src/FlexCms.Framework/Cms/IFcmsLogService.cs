@@ -31,8 +31,12 @@ public interface IFcmsLogService
         FcmsLogSeverity severity = FcmsLogSeverity.Info,
         CancellationToken ct = default);
 
-    /// <summary>Moves all logs older than <paramref name="age"/> to the archive table (hard delete from main).</summary>
-    Task ArchiveOlderThanAsync(TimeSpan age, CancellationToken ct = default);
+    /// <summary>
+    /// Moves all logs older than <paramref name="age"/> to the archive table
+    /// (hard delete from main). Returns the number of rows actually moved so
+    /// callers can surface "0 archived" vs "12 archived" honestly in the UI.
+    /// </summary>
+    Task<int> ArchiveOlderThanAsync(TimeSpan age, CancellationToken ct = default);
 
     /// <summary>Hard-deletes ALL records from the archive table.</summary>
     Task ClearArchiveAsync(CancellationToken ct = default);

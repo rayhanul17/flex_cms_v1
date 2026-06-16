@@ -110,6 +110,10 @@
   "post.published_at": "Published at",
   "post.author": "Author",
   "post.view_count": "Views",
+  "post.views": "Views",
+  "post.comments": "Comments",
+  "post.post_info": "Post Info",
+  "post.jump_to_comments": "Jump to Comments",
 
   "settings.title": "Settings",
   "settings.site_identity": "Site Identity",

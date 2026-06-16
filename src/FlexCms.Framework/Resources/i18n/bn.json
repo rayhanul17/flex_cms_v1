@@ -110,6 +110,10 @@
   "post.published_at": "প্রকাশের সময়",
   "post.author": "লেখক",
   "post.view_count": "ভিউ",
+  "post.views": "ভিউ",
+  "post.comments": "মন্তব্য",
+  "post.post_info": "পোস্ট তথ্য",
+  "post.jump_to_comments": "মন্তব্যে যান",
 
   "settings.title": "সেটিংস",
   "settings.site_identity": "সাইট পরিচয়",

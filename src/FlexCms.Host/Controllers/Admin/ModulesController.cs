@@ -169,6 +169,24 @@ public class ModulesController : BaseAdminController
         return FcmsOk("Module marked for uninstall. Restart the app to remove its files.");
     }
 
+    [HttpPost("retry-seed/{id}")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> RetrySeed(string id, CancellationToken ct)
+    {
+        // Resets the seed attempt counter + clears the activation error so
+        // the next restart's ModuleActivationService re-runs SeedDataAsync
+        // (instead of the "gave up — manual fix needed" short-circuit).
+        var rec = (await _records.GetAllAsync(ct))
+            .FirstOrDefault(r => string.Equals(r.ModuleId, id, StringComparison.OrdinalIgnoreCase));
+        if (rec is null) return FcmsFail("Module record not found.");
+
+        rec.SeedAttemptCount = 0;
+        rec.ActivationError = null;
+        await _records.UpdateAsync(rec, ct);
+        await _uow.SaveChangesAsync(ct);
+        return FcmsOk("Seed attempt counter reset. Restart the app to retry.");
+    }
+
     [HttpPost("restart")]
     [ValidateAntiForgeryToken]
     public IActionResult Restart()

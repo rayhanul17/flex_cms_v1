@@ -65,6 +65,10 @@ public sealed class FrameworkSchemaUpgrader : IHostedService
         {
             ("fcms_module_records", "LastActivationAttemptAt", "datetime(6) NULL"),
             ("fcms_module_records", "ActivationError",         "varchar(2000) NULL"),
+            ("fcms_module_records", "SeedAttemptCount",        "int NOT NULL DEFAULT 0"),
+            ("fcms_users",          "ImageUrl",                "varchar(500) NULL"),
+            ("fcms_users",          "BlockedUntil",            "datetime(6) NULL"),
+            ("fcms_users",          "BlockReason",             "varchar(500) NULL"),
         };
 
         foreach (var (table, column, ddl) in upgrades)

@@ -1,9 +1,13 @@
 @using FlexCms.Framework.Cms.Comments
+@using FlexCms.Framework.Cms
 @model IReadOnlyList<FcmsComment>
 @{
     ViewData["Title"] = "Comments";
     var selected = (CommentStatus?)ViewBag.SelectedStatus ?? CommentStatus.Pending;
     var counts = (Dictionary<CommentStatus, int>)ViewBag.Counts;
+    var postLookup = (Dictionary<Guid, (string Title, string Slug)>)ViewBag.PostLookup;
+    var pageLookup = (Dictionary<Guid, (string Title, string Slug)>)ViewBag.PageLookup;
+    var baseUrl = (string)ViewBag.BaseUrl;
 
     string TabClass(CommentStatus s) => selected == s ? "nav-link active" : "nav-link";
     string Badge(CommentStatus s) => s switch
@@ -13,6 +17,15 @@
         CommentStatus.Trashed  => "text-bg-secondary",
         _                      => "text-bg-warning"
     };
+
+    (string Title, string Url)? Resolve(FcmsComment c)
+    {
+        if (c.EntityType == nameof(FcmsPost) && postLookup.TryGetValue(c.EntityId, out var p))
+            return (p.Title, $"{baseUrl}/blog/{p.Slug}");
+        if (c.EntityType == nameof(FcmsPage) && pageLookup.TryGetValue(c.EntityId, out var pg))
+            return (pg.Title, $"{baseUrl}/{pg.Slug}");
+        return null;
+    }
 }
 
 <form id="csrf" style="display:none">@Html.AntiForgeryToken()</form>
@@ -73,7 +86,21 @@
                                     </span>
                                 }
                             </td>
-                            <td class="small text-muted">@c.EntityType<br /><code class="small">@c.EntityId.ToString().Substring(0, 8)</code></td>
+                            <td class="small text-muted" style="max-width:260px">
+                                @{ var on = Resolve(c); }
+                                @if (on is not null)
+                                {
+                                    <div class="text-truncate" title="@on.Value.Title">@on.Value.Title</div>
+                                    <a href="@on.Value.Url" target="_blank" rel="noopener" class="small text-decoration-none">
+                                        <i class="bi bi-box-arrow-up-right"></i> View @c.EntityType.Replace("Fcms", "").ToLowerInvariant()
+                                    </a>
+                                }
+                                else
+                                {
+                                    <span>@c.EntityType</span><br />
+                                    <code class="small">@c.EntityId.ToString().Substring(0, 8)</code>
+                                }
+                            </td>
                             <td class="small text-muted">@c.CreatedAt.ToString("yyyy-MM-dd HH:mm")</td>
                             <td><span class="badge @Badge(c.CommentStatus)">@c.CommentStatus</span></td>
                             <td class="text-end">

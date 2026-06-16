@@ -85,9 +85,10 @@ public class FcmsLogService : IFcmsLogService
         await _uow.SaveChangesAsync(ct);
     }
 
-    public async Task ArchiveOlderThanAsync(TimeSpan age, CancellationToken ct = default)
+    public async Task<int> ArchiveOlderThanAsync(TimeSpan age, CancellationToken ct = default)
     {
         var cutoff = FcmsTime.Now - age;
+        var archived = 0;
 
         while (!ct.IsCancellationRequested)
         {
@@ -122,9 +123,13 @@ public class FcmsLogService : IFcmsLogService
             await _logs.DeleteRangeAsync(batch, ct);
             await _uow.SaveChangesAsync(ct);
 
+            archived += batch.Count;
+
             // Last partial batch — nothing more to archive.
             if (batch.Count < ArchiveBatchSize) break;
         }
+
+        return archived;
     }
 
     public async Task ClearArchiveAsync(CancellationToken ct = default)

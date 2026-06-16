@@ -20,9 +20,33 @@ public class FcmsUser : IdentityUser<Guid>
     /// <summary>Returns DisplayName if set, otherwise FullName.</summary>
     public string ResolvedDisplayName => string.IsNullOrWhiteSpace(DisplayName) ? FullName : DisplayName;
 
+    /// <summary>
+    /// Optional avatar / profile photo URL — points at an entry in
+    /// <c>fcms_medias</c> uploaded via the media picker. When null the admin
+    /// sidebar + comment author block fall back to initials of
+    /// <see cref="ResolvedDisplayName"/>.
+    /// </summary>
+    public string? ImageUrl { get; set; }
+
     public bool ForcePasswordChange { get; set; }
     public DateTime CreatedAt { get; set; } = FlexCms.Framework.Clock.FcmsTime.Now;
     public DateTime UpdatedAt { get; set; } = FlexCms.Framework.Clock.FcmsTime.Now;
+
+    /// <summary>
+    /// Admin-initiated block end-time. Distinct from Identity's
+    /// <c>LockoutEnd</c> (which the framework uses for failed-login
+    /// auto-lockout): <see cref="BlockedUntil"/> is set by a moderator
+    /// clicking "Block" in the user admin and survives a manual
+    /// LockoutEnd reset, so a re-enabled admin lockout doesn't accidentally
+    /// re-permit a banned account. Null = not blocked.
+    /// </summary>
+    public DateTime? BlockedUntil { get; set; }
+
+    /// <summary>
+    /// Free-text reason captured when an admin blocks a user. Surfaced on
+    /// the user detail page so the next moderator knows why.
+    /// </summary>
+    public string? BlockReason { get; set; }
 
     /// <summary>
     /// Selected 2FA channel — only honored when Identity's

@@ -113,8 +113,10 @@ public class AuditLogController : BaseAdminController
     [FcmsAuthorize(FcmsPermissions.AuditManage)]
     public async Task<IActionResult> ForceArchive(CancellationToken ct)
     {
-        await _auditLog.ArchiveOlderThanAsync(TimeSpan.FromHours(24), ct);
-        return FcmsOk("Logs older than 24 hours moved to archive.");
+        var moved = await _auditLog.ArchiveOlderThanAsync(TimeSpan.FromHours(24), ct);
+        return FcmsOk(moved == 0
+            ? "Nothing to archive — all current logs are newer than 24 hours."
+            : $"{moved} log entr{(moved == 1 ? "y" : "ies")} older than 24 hours moved to archive.");
     }
 
     [HttpPost("clear-archive")]

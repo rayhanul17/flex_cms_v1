@@ -88,7 +88,7 @@ public class ModulesController : BaseAdminController
 
         _state.SyncWwwroot(module.FolderPath, _env.WebRootPath, module.ModuleId);
         await OpLog.LogAsync(FcmsAuditActions.ModuleActivated, nameof(FcmsModuleRecord), module.ModuleId,
-            value: new { module.ModuleId, module.Manifest.Version }, module: "core", ct: ct);
+            value: new { module.ModuleId, module.Manifest.Version }, module: module.ModuleId, ct: ct);
         return FcmsOk("Module activated. Restart the app to apply.");
     }
 
@@ -111,7 +111,7 @@ public class ModulesController : BaseAdminController
             await menuService.RemoveModuleItemsAsync(id, ct);
 
         await OpLog.LogAsync(FcmsAuditActions.ModuleDeactivated, nameof(FcmsModuleRecord), module.ModuleId,
-            value: new { module.ModuleId, module.Manifest.Version }, module: "core", ct: ct);
+            value: new { module.ModuleId, module.Manifest.Version }, module: module.ModuleId, ct: ct);
         return FcmsOk("Module deactivated. Restart the app to apply.");
     }
 
@@ -165,7 +165,7 @@ public class ModulesController : BaseAdminController
         }
 
         await OpLog.LogAsync(FcmsAuditActions.ModuleUninstalled, nameof(FcmsModuleRecord), module.ModuleId,
-            value: new { module.ModuleId, module.Manifest.Version, dropTables }, module: "core", ct: ct);
+            value: new { module.ModuleId, module.Manifest.Version, dropTables }, module: module.ModuleId, ct: ct);
         return FcmsOk("Module marked for uninstall. Restart the app to remove its files.");
     }
 
@@ -281,7 +281,7 @@ public class ModulesController : BaseAdminController
 
             CopyDirectory(moduleSrcDir, dest2);
             await OpLog.LogAsync(FcmsAuditActions.ModuleUploaded, nameof(FcmsModuleRecord), moduleId,
-                value: new { moduleId, fileName = file.FileName, overwrite }, module: "core", ct: ct);
+                value: new { moduleId, fileName = file.FileName, overwrite }, module: moduleId, ct: ct);
             return FcmsOk($"Module \"{moduleId}\" uploaded. Restart the app to load it.", new { moduleId });
         }
         catch (InvalidDataException)

@@ -123,7 +123,7 @@ public sealed class FcmsAuditInterceptor : SaveChangesInterceptor
                     EntityType = entry.EntityType,
                     EntityId = entry.EntityId,
                     Value = entry.Snapshot,
-                    Module = "core",
+                    Module = entry.Module,
                     Severity = entry.Severity,
                 });
             }
@@ -184,6 +184,7 @@ public sealed class FcmsAuditInterceptor : SaveChangesInterceptor
                 EntityType: type.Name,
                 EntityId: entry.Entity.Id.ToString(),
                 Snapshot: snapshot,
+                Module: GetModuleId(entry.Entity, type),
                 Severity: severity));
         }
 
@@ -215,11 +216,41 @@ public sealed class FcmsAuditInterceptor : SaveChangesInterceptor
         return name.StartsWith("Fcms", StringComparison.Ordinal) ? name[4..] : name;
     }
 
+    /// <summary>
+    /// Resolve the module ID for an audit row so admins can filter
+    /// <c>fcms_logs</c> by module.
+    /// <list type="number">
+    ///   <item>If the entity itself carries a <c>ModuleId</c> string property
+    ///         (FcmsMenuItem, FcmsPermission, FcmsModuleRecord, FcmsSettings)
+    ///         use that value verbatim — that's the most precise signal.</item>
+    ///   <item>Else derive from the CLR namespace root: anything not under
+    ///         <c>FlexCms.Framework.*</c>, <c>FlexCms.Core.*</c>, or
+    ///         <c>FlexCms.Host.*</c> is treated as a module entity and tagged
+    ///         with the assembly's simple name (e.g. <c>FlexCms.Sample.Hello</c>).</item>
+    ///   <item>Framework / host entities fall back to <c>"core"</c>.</item>
+    /// </list>
+    /// </summary>
+    internal static string GetModuleId(object entity, Type type)
+    {
+        var moduleIdProp = type.GetProperty("ModuleId", typeof(string));
+        if (moduleIdProp is not null && moduleIdProp.GetValue(entity) is string mid && !string.IsNullOrWhiteSpace(mid))
+            return mid;
+
+        var ns = type.Namespace ?? "";
+        if (ns.StartsWith("FlexCms.Framework", StringComparison.Ordinal) ||
+            ns.StartsWith("FlexCms.Core", StringComparison.Ordinal) ||
+            ns.StartsWith("FlexCms.Host", StringComparison.Ordinal))
+            return "core";
+
+        return type.Assembly.GetName().Name ?? "core";
+    }
+
     private sealed record PendingEntry(
         string Action,
         string EntityType,
         string EntityId,
         string? Snapshot,
+        string Module,
         FcmsLogSeverity Severity);
 
     private sealed class CallState(List<PendingEntry> pending)

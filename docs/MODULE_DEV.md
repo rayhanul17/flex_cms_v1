@@ -82,20 +82,50 @@ The fastest path:
 2. Fill in:
    - **ModuleId**: dotted identifier (e.g. `FlexCms.Module.Investment`)
    - **TablePrefix**: snake-case prefix (e.g. `invest`)
-3. The template emits a runnable project under `modules/<ModuleId>/` with:
-   - Entry-point module class
-   - EF `DbContext` + a sample entity
-   - Admin CRUD controller (DataTables + Create / Edit / Delete)
-   - Razor views (Index / Create / Edit + `_Form` partial)
-   - Permissions, menu items, and `DropTablesAsync()` already wired
-   - i18n JSON stubs (`Resources/i18n/en.json` + `bn.json`)
-4. Add the project to your solution, generate the initial migration:
-   ```bash
-   cd modules/FlexCms.Module.Investment
-   dotnet ef migrations add InitialSchema
-   ```
-5. Build and restart. The framework runs the migration, seeds permissions,
-   adds the menu entry, and your controller is live at `/admin/<TablePrefix>`.
+3. The scaffold writes a runnable project to **solution-root `Modules/<ModuleId>/`**
+   (sibling of `src/`, `samples/`, `tests/` — NOT inside `src/FlexCms.Host/Modules/`,
+   that runtime folder is for ZIP uploads only). Contents:
+   - `<ShortName>Module.cs` — entry point
+   - `Data/<ShortName>DbContext.cs` + sample entity
+   - `Data/<ShortName>DbContextDesignFactory.cs` — for `dotnet ef`
+   - `Services/<ShortName>Service.cs` — wraps `EfRepository<T>(NewDb())`
+   - `Controllers/Admin<ShortName>Controller.cs` — full CRUD
+   - `Controllers/Public<ShortName>Controller.cs` — JSON endpoint stub
+   - `Views/Admin<ShortName>/{Index,Edit}.cshtml` + `Views/_ViewImports.cshtml`
+   - `module.json` (embedded), permissions + menu items + `DropTablesAsync()` wired
+
+### Opening the new project in your IDE
+
+The scaffold **auto-registers** the new csproj in `FlexCms.slnx` — Visual Studio,
+Rider and VS Code's C# Dev Kit pick it up the next time the solution is loaded.
+
+- **Visual Studio** — close + reopen the solution. If it doesn't appear, reload
+  the `.slnx` from **File → Open → Solution** and pick `FlexCms.slnx` again.
+- **VS Code** — the C# Dev Kit watches the `.slnx` file; the new project shows
+  up in the Solution Explorer pane automatically after the next workspace load.
+- **Rider** — `File → Reload Project from Disk` (or restart Rider).
+
+> **⚠ "Add Existing Item" ≠ "Add Existing Project".** In Visual Studio,
+> right-clicking the **Host project** and choosing *Add → Existing Item* only
+> adds a *file* to that project (and hides `.csproj` files by default — so
+> you'll see only `.gitkeep` in the dialog and think the folder is empty).
+> The scaffold already added the project to the solution; you do not need
+> "Add Existing Project" at all. If you ever do need to add it manually:
+> right-click the **Solution** node → *Add → Existing Project* → pick
+> `Modules/<ModuleId>/<ModuleId>.csproj`.
+
+### After the scaffold
+
+```bash
+cd Modules/FlexCms.Module.Investment
+dotnet ef migrations add InitialSchema
+dotnet build
+```
+
+Restart the host. The framework discovers the DLL (it now scans BOTH the
+solution-root `Modules/` and `src/FlexCms.Host/Modules/`), applies the
+migration, seeds permissions, adds the menu entry, and your controller
+goes live at `/admin/<TablePrefix>`.
 
 ---
 

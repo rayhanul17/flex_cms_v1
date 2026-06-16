@@ -3,8 +3,6 @@
 A modular, plug-and-play CMS built on .NET 10 — designed for Bangladesh market, Bangla-first, single-instance deployment-friendly.
 
 > **🚀 New developer? Start here:** [`docs/DEVELOPER_GUIDE.md`](docs/DEVELOPER_GUIDE.md) — step-by-step from clone to production deploy.
->
-> **Architecture plan:** see [`docs/plan.md`](docs/plan.md) (~14,500-line self-contained spec covering all 17 development phases)
 
 ---
 
@@ -66,7 +64,7 @@ flex_cms_v1/
 ├── tests/                       # xUnit test projects
 ├── docker/                      # Dockerfile + docker-compose files
 ├── scripts/                     # Deploy, backup, scaffold helpers
-├── docs/                        # Documentation (incl. plan.md)
+├── docs/                        # Developer guide, deployment, module dev, manual test guide
 └── .github/workflows/           # CI/CD pipelines
 ```
 
@@ -134,7 +132,7 @@ The plan covers **17 phases** across CMS Core, Production Hardening, Modern UX &
 16. **Performance Critical + A11y + Editorial** (image optimize, full-text search, WCAG)
 17. **Modern UX + AI + Marketplace** (Cmd+K search, PWA, AI provider, Prometheus, marketplace)
 
-See [`docs/plan.md`](docs/plan.md) for full details with checkbox verification per phase।
+See [`docs/DEVELOPER_GUIDE.md`](docs/DEVELOPER_GUIDE.md) for full details.
 
 ---
 

@@ -17,7 +17,6 @@ public class PermissionController : BaseAdminController
         _permissions = permissions;
     }
 
-    // ── List (read-only — assign/revoke happens on Role detail page) ──────────
 
     [HttpGet("")]
     [FcmsAuthorize(FcmsPermissions.RolesPermissions)]
@@ -31,7 +30,6 @@ public class PermissionController : BaseAdminController
         return View(groups);
     }
 
-    // ── AJAX: assign permission to role ───────────────────────────────────────
 
     [HttpPost("assign")]
     [ValidateAntiForgeryToken]
@@ -45,7 +43,6 @@ public class PermissionController : BaseAdminController
         return FcmsOk();
     }
 
-    // ── AJAX: revoke permission from role ─────────────────────────────────────
 
     [HttpPost("revoke")]
     [ValidateAntiForgeryToken]

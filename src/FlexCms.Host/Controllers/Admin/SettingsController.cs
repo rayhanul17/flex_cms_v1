@@ -63,7 +63,6 @@ public class SettingsController : BaseAdminController
         return RedirectToAction(nameof(Index));
     }
 
-    // ── Audit log toggle ──────────────────────────────────────────────────────
 
     [HttpPost("audit/toggle")]
     [ValidateAntiForgeryToken]
@@ -76,7 +75,6 @@ public class SettingsController : BaseAdminController
         return FcmsOk(cfg.Enabled ? "Audit logging enabled." : "Audit logging disabled.", new { enabled = cfg.Enabled });
     }
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
 
     private async Task<SettingsViewModel> BuildVmAsync(SiteSettings site, bool auditEnabled, ThemeSettings theme, CancellationToken ct)
     {

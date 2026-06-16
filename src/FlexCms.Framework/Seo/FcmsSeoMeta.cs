@@ -27,7 +27,6 @@ public class FcmsSeoMeta : BaseEfEntity
     /// <summary>If true, render &lt;meta name="robots" content="noindex,nofollow"&gt;.</summary>
     public bool NoIndex { get; set; }
 
-    // ── Open Graph (Facebook + LinkedIn + most chat apps) ───────────────────
     public string? OgTitle { get; set; }
     public string? OgDescription { get; set; }
     /// <summary>Public URL of the social-share image. 1200×630 recommended.</summary>
@@ -35,13 +34,11 @@ public class FcmsSeoMeta : BaseEfEntity
     /// <summary><c>article</c>, <c>website</c>, <c>video</c>, <c>product</c>...</summary>
     public string OgType { get; set; } = "article";
 
-    // ── Twitter (now X) — falls back to OG if blank ─────────────────────────
     public string? TwitterCard { get; set; } = "summary_large_image";
     public string? TwitterTitle { get; set; }
     public string? TwitterDescription { get; set; }
     public string? TwitterImageUrl { get; set; }
 
-    // ── Schema.org JSON-LD ──────────────────────────────────────────────────
     /// <summary>Schema.org type — e.g. <c>Article</c>, <c>NewsArticle</c>, <c>BlogPosting</c>, <c>Product</c>, <c>FAQPage</c>.</summary>
     public string SchemaType { get; set; } = "Article";
 

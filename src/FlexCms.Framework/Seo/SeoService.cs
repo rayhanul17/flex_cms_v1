@@ -86,7 +86,6 @@ public sealed class SeoService : ISeoService
         if (seo?.NoIndex == true)
             sb.Append("<meta name=\"robots\" content=\"noindex,nofollow\" />\n");
 
-        // ── Open Graph ─────────────────────────────────────────────────────
         sb.Append("<meta property=\"og:type\" content=\"").Append(HtmlEncode(seo?.OgType ?? "article")).Append("\" />\n");
         sb.Append("<meta property=\"og:title\" content=\"").Append(HtmlEncode(title)).Append("\" />\n");
         sb.Append("<meta property=\"og:description\" content=\"").Append(HtmlEncode(description)).Append("\" />\n");
@@ -95,7 +94,6 @@ public sealed class SeoService : ISeoService
         if (!string.IsNullOrEmpty(ogImage))
             sb.Append("<meta property=\"og:image\" content=\"").Append(HtmlEncode(ogImage)).Append("\" />\n");
 
-        // ── Twitter ────────────────────────────────────────────────────────
         sb.Append("<meta name=\"twitter:card\" content=\"").Append(HtmlEncode(seo?.TwitterCard ?? "summary_large_image")).Append("\" />\n");
         sb.Append("<meta name=\"twitter:title\" content=\"").Append(HtmlEncode(twitterTitle)).Append("\" />\n");
         sb.Append("<meta name=\"twitter:description\" content=\"").Append(HtmlEncode(twitterDesc)).Append("\" />\n");

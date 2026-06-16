@@ -119,7 +119,6 @@ public static class FcmsServiceExtensions
         services.AddScoped<IFcmsLogService, FcmsLogService>();
         services.AddHostedService<LogArchiveService>();
 
-        // ── Messaging (Phase 8) ──────────────────────────────────────────────
         // Settings facades wrap ISettingsService with IDataProtector to keep
         // SMTP password / SMS API key encrypted at rest.
         services.AddScoped<ISmtpSettingsService, SmtpSettingsService>();
@@ -146,7 +145,6 @@ public static class FcmsServiceExtensions
 
         services.AddScoped<IBroadcastService, BroadcastService>();
 
-        // ── Phase 9: Notifications + widgets + honeypot + view rendering ─────
         services.AddScoped<IFcmsNotificationService, FcmsNotificationService>();
         services.AddScoped<IFcmsWidgetManager, FcmsWidgetManager>();
         services.AddSingleton<IFcmsHoneypotService, FcmsHoneypotService>();
@@ -155,7 +153,6 @@ public static class FcmsServiceExtensions
         // ── Phase 10: Chat (SignalR is added at the host level via AddSignalR) ─
         services.AddScoped<IChatService, ChatService>();
 
-        // ── Phase 12: Payments + PDF/Excel + Async Exports ───────────────────
         services.AddScoped<Payments.Services.IPaymentSettingsService, Payments.Services.PaymentSettingsService>();
         services.AddSingleton<Payments.IPaymentChargeCalculator, Payments.PaymentChargeCalculator>();
         services.AddHttpClient<Payments.Gateways.BkashPaymentGateway>();
@@ -172,7 +169,6 @@ public static class FcmsServiceExtensions
         services.AddSingleton(new ExportProcessorOptions());
         services.AddHostedService<ExportProcessorService>();
 
-        // ── Phase 13: Auth hardening ─────────────────────────────────────────
         services.AddScoped<ISessionService, SessionService>();
         services.AddScoped<ILoginHistoryService, LoginHistoryService>();
         services.AddScoped<ILoginRedirectService, LoginRedirectService>();
@@ -189,7 +185,6 @@ public static class FcmsServiceExtensions
             sp.GetRequiredService<FcmsBackgroundQueueOptions>()));
         services.AddSingleton<IFcmsHealthCheck>(sp => new DiskSpaceHealthCheck(options.AppDataPath));
 
-        // ── Phase 14: API + Integrations + Engagement ────────────────────────
         services.AddScoped<IApiTokenService, ApiTokenService>();
         services.AddHttpClient<WebhookDispatcher>();
         services.AddScoped<IWebhookDispatcher>(sp => sp.GetRequiredService<WebhookDispatcher>());
@@ -210,7 +205,6 @@ public static class FcmsServiceExtensions
         services.AddScoped<IPreviewTokenService, PreviewTokenService>();
         services.AddScoped<IDraftSnapshotService, DraftSnapshotService>();
 
-        // ── Phase 15: SEO + Backup + Feature Flags + Maintenance ─────────────
         services.AddScoped<ISeoService, SeoService>();
         services.AddScoped<IFcmsBackupService, FcmsBackupService>();
         services.AddScoped<IFcmsFeatureService, FcmsFeatureService>();
@@ -235,7 +229,6 @@ public static class FcmsServiceExtensions
         services.AddScoped<IEditorialService, EditorialService>();
         services.AddSingleton<IAdminNotificationPusher, AdminNotificationPusher>();
 
-        // ── Phase 17: Module API Registry ─────────────────────────────────
         services.AddSingleton<IFcmsModuleApiRegistry, FcmsModuleApiRegistry>();
 
         // Bearer scheme registered alongside the existing cookie scheme so
@@ -278,7 +271,6 @@ public static class FcmsServiceExtensions
         services.AddHostedService<FrameworkSchemaUpgrader>();
         services.AddHostedService<ModuleActivationService>();
 
-        // ── Module discovery + wiring ────────────────────────────────────────
         // Scan the modules/ directory (sibling of App_Data). Each discovered module gets:
         //   1. RegisterServices(services) called
         //   2. AttributeScanner runs over its assembly for [FcmsScoped]/etc
@@ -558,7 +550,6 @@ public class FlexCmsOptions
 {
     public string AppDataPath { get; set; } = "App_Data";
 
-    // ── Relational providers (mutually exclusive — only one active at a time) ──
     public bool UseMySQL { get; set; }
     public string MySqlConnectionString { get; set; } = string.Empty;
 

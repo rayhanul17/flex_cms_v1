@@ -26,12 +26,10 @@ public class PostController : BaseAdminController
         _postRepo = postRepo;
     }
 
-    // ── List ──────────────────────────────────────────────────────────────────
 
     [HttpGet("")]
     public IActionResult Index() => View();
 
-    // ── DataTable AJAX endpoint (server-side processing) ─────────────────────
 
     [HttpPost("datatable")]
     [ValidateAntiForgeryToken]
@@ -72,7 +70,6 @@ public class PostController : BaseAdminController
             ct: ct);
     }
 
-    // ── Create ────────────────────────────────────────────────────────────────
 
     [HttpGet("create")]
     [FcmsAuthorize(FcmsPermissions.PostsCreate)]
@@ -108,7 +105,6 @@ public class PostController : BaseAdminController
         return RedirectToAction(nameof(Index));
     }
 
-    // ── Edit ──────────────────────────────────────────────────────────────────
 
     [HttpGet("{id:guid}/edit")]
     [FcmsAuthorize(FcmsPermissions.PostsEdit)]
@@ -170,7 +166,6 @@ public class PostController : BaseAdminController
         return RedirectToAction(nameof(Index));
     }
 
-    // ── Delete ────────────────────────────────────────────────────────────────
 
     [HttpPost("{id:guid}/delete")]
     [ValidateAntiForgeryToken]
@@ -182,7 +177,6 @@ public class PostController : BaseAdminController
         return FcmsOk("Post deleted.");
     }
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
 
     private async Task<List<SelectListItem>> GetCategorySelectListAsync(CancellationToken ct)
     {

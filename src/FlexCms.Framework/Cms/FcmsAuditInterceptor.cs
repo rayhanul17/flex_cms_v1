@@ -59,7 +59,6 @@ public sealed class FcmsAuditInterceptor : SaveChangesInterceptor
         _logger = logger;
     }
 
-    // ── Capture entries BEFORE EF commits (tracker is cleared after save) ────
 
     public override ValueTask<InterceptionResult<int>> SavingChangesAsync(
         DbContextEventData eventData,
@@ -75,7 +74,6 @@ public sealed class FcmsAuditInterceptor : SaveChangesInterceptor
         return base.SavingChangesAsync(eventData, result, ct);
     }
 
-    // ── Write audit rows AFTER a successful commit ───────────────────────────
 
     public override async ValueTask<int> SavedChangesAsync(
         SaveChangesCompletedEventData eventData,
@@ -154,7 +152,6 @@ public sealed class FcmsAuditInterceptor : SaveChangesInterceptor
         return result;
     }
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
 
     private static List<PendingEntry> Capture(DbContext? ctx)
     {

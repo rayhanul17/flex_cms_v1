@@ -69,7 +69,6 @@ public class ModuleStateService
         return true;
     }
 
-    // ── wwwroot sync ──────────────────────────────────────────────────────────
 
     /// <summary>
     /// Copy <c>{moduleFolder}/wwwroot/</c> → <c>{webRootPath}/modules/{moduleId}/</c>.

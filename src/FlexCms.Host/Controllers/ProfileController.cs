@@ -24,7 +24,6 @@ public class ProfileController : Controller
         _otp = otp;
     }
 
-    // ── Profile fields (default landing) ─────────────────────────────────────
 
     [HttpGet("")]
     public async Task<IActionResult> Index()
@@ -64,7 +63,6 @@ public class ProfileController : Controller
         return RedirectToAction(nameof(Index));
     }
 
-    // ── Change password ──────────────────────────────────────────────────────
 
     [HttpGet("password")]
     public IActionResult Password() => View();
@@ -93,7 +91,6 @@ public class ProfileController : Controller
         return RedirectToAction(nameof(Password));
     }
 
-    // ── Two-factor authentication ────────────────────────────────────────────
 
     [HttpGet("security/two-factor")]
     public async Task<IActionResult> TwoFactor()

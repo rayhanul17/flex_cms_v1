@@ -9,9 +9,7 @@
 > if you do both EF (MySQL) and Mongo. Do both — silent provider drift
 > is the most common production surprise.
 >
-> **Granular per-phase manual checks** live in `phase-*-test-cases.md`.
-> This doc is the **pre-ship sanity sweep** — broader, less detailed,
-> hits every user-visible surface once.
+> **Pre-ship sanity sweep** — hits every user-visible surface once.
 
 ---
 

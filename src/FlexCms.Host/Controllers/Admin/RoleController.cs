@@ -27,7 +27,6 @@ public class RoleController : BaseAdminController
         _permissions = permissions;
     }
 
-    // ── List ──────────────────────────────────────────────────────────────────
 
     [HttpGet("")]
     public async Task<IActionResult> Index(CancellationToken ct)
@@ -53,7 +52,6 @@ public class RoleController : BaseAdminController
         return View(list);
     }
 
-    // ── Create ────────────────────────────────────────────────────────────────
 
     [HttpGet("create")]
     [FcmsAuthorize(FcmsPermissions.RolesCreate)]
@@ -94,7 +92,6 @@ public class RoleController : BaseAdminController
         return RedirectToAction(nameof(Index));
     }
 
-    // ── Edit ──────────────────────────────────────────────────────────────────
 
     [HttpGet("{id:guid}/edit")]
     [FcmsAuthorize(FcmsPermissions.RolesEdit)]
@@ -151,7 +148,6 @@ public class RoleController : BaseAdminController
         return RedirectToAction(nameof(Detail), new { id });
     }
 
-    // ── Detail (Permissions + Users tabs) ─────────────────────────────────────
 
     [HttpGet("{id:guid}")]
     public async Task<IActionResult> Detail(Guid id, CancellationToken ct)
@@ -189,7 +185,6 @@ public class RoleController : BaseAdminController
         });
     }
 
-    // ── Delete ────────────────────────────────────────────────────────────────
 
     [HttpPost("{id:guid}/delete")]
     [ValidateAntiForgeryToken]

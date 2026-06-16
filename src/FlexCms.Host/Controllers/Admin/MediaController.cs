@@ -200,7 +200,6 @@ public class MediaController : BaseAdminController
         return RedirectToAction(nameof(Index));
     }
 
-    // ── Bulk alt-text editor ─────────────────────────────────────────────────
     // Accessibility (WCAG 2.1 AA) + image-search SEO both depend on alt text.
     // Editing one media item at a time is fine for new uploads but useless
     // for bringing legacy libraries into compliance — typical sites import

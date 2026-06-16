@@ -19,7 +19,6 @@ namespace FlexCms.Host.Controllers.Admin;
 [FcmsAuthorize]
 public abstract class BaseAdminController : BaseFcmsController
 {
-    // ── Shorthand for admin-only DI services ──────────────────────────────
 
     protected IFcmsContextService FcmsContext =>
         HttpContext.RequestServices.GetRequiredService<IFcmsContextService>();

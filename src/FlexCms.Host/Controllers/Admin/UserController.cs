@@ -13,16 +13,12 @@ public class UserController : BaseAdminController
     private readonly RoleManager<FcmsRole> _roleManager;
     private readonly ISessionService _sessions;
 
-    // Uses UserManager.GetRolesAsync rather than a direct DbContext join — the
-    // per-user N+1 cost is acceptable for typical admin user counts (<100).
     public UserController(UserManager<FcmsUser> userManager, RoleManager<FcmsRole> roleManager, ISessionService sessions)
     {
         _userManager = userManager;
         _roleManager = roleManager;
         _sessions = sessions;
     }
-
-    // ── List ──────────────────────────────────────────────────────────────────
 
     [HttpGet("")]
     public async Task<IActionResult> Index(CancellationToken ct)
@@ -35,6 +31,7 @@ public class UserController : BaseAdminController
         var list = new List<UserListItemViewModel>(users.Count);
         foreach (var u in users)
         {
+            // GetRolesAsync per user — N+1 acceptable for typical admin user counts (<100).
             var roles = await _userManager.GetRolesAsync(u);
             list.Add(new UserListItemViewModel
             {
@@ -54,8 +51,6 @@ public class UserController : BaseAdminController
 
         return View(list);
     }
-
-    // ── Create ────────────────────────────────────────────────────────────────
 
     [HttpGet("create")]
     [FcmsAuthorize(FcmsPermissions.UsersCreate)]
@@ -102,8 +97,6 @@ public class UserController : BaseAdminController
         ShowSuccess($"User '{model.Email}' created.");
         return RedirectToAction(nameof(Index));
     }
-
-    // ── Edit ──────────────────────────────────────────────────────────────────
 
     [HttpGet("{id:guid}/edit")]
     [FcmsAuthorize(FcmsPermissions.UsersEdit)]
@@ -169,8 +162,6 @@ public class UserController : BaseAdminController
         return RedirectToAction(nameof(Index));
     }
 
-    // ── Active toggle (AJAX) ──────────────────────────────────────────────────
-
     [HttpPost("{id:guid}/toggle-active")]
     [ValidateAntiForgeryToken]
     [FcmsAuthorize(FcmsPermissions.UsersEdit)]
@@ -182,6 +173,7 @@ public class UserController : BaseAdminController
         if (user.Status == FlexCms.Framework.Db.EntityStatus.Active)
         {
             user.Status = FlexCms.Framework.Db.EntityStatus.InActive;
+            // 100-year lockout sentinel = "indefinitely locked", reverted by toggle-active.
             await _userManager.SetLockoutEndDateAsync(user, DateTimeOffset.UtcNow.AddYears(100));
             await _userManager.UpdateAsync(user);
             await OpLog.LogAsync("users.deactivate", "FcmsUser", user.Id.ToString(), value: user);
@@ -196,12 +188,6 @@ public class UserController : BaseAdminController
             return FcmsOk("User activated.", new { newStatus = "Active" });
         }
     }
-
-    // ── Block / Unblock (admin time-bound lockout) ────────────────────────────
-    // Block writes BlockedUntil + BlockReason on FcmsUser AND sets the Identity
-    // LockoutEnd so PasswordSignInAsync bounces login. Unblock clears both.
-    // FcmsSessionValidationMiddleware reads BlockedUntil to force-logout active
-    // sessions on the next request.
 
     [HttpPost("{id:guid}/block")]
     [ValidateAntiForgeryToken]
@@ -224,9 +210,8 @@ public class UserController : BaseAdminController
         await _userManager.UpdateAsync(user);
         await _userManager.SetLockoutEndDateAsync(user, new DateTimeOffset(DateTime.SpecifyKind(model.BlockedUntil, DateTimeKind.Utc)));
 
-        // Revoke every active session so the user is force-logged-out on the
-        // next request — SetLockoutEndDateAsync only stops re-login, not the
-        // already-issued auth cookies.
+        // SetLockoutEndDateAsync only stops re-login; existing cookies stay valid
+        // until next request. Revoke sessions so the user is kicked immediately.
         await RevokeUserSessionsSafe(user.Id, "Admin block: " + user.BlockReason);
 
         FcmsLogContext.SetEntityId(HttpContext, user.Id);
@@ -246,8 +231,8 @@ public class UserController : BaseAdminController
         user.BlockedUntil = null;
         user.BlockReason = null;
         await _userManager.UpdateAsync(user);
-        // Only clear lockout if the user is currently Active — leave deactivated
-        // users locked out via the 100-year sentinel set by ToggleActive.
+        // Don't clear lockout for InActive users — they're locked via ToggleActive's
+        // 100-year sentinel, which must survive an unblock.
         if (user.Status == FlexCms.Framework.Db.EntityStatus.Active)
             await _userManager.SetLockoutEndDateAsync(user, null);
 
@@ -255,8 +240,6 @@ public class UserController : BaseAdminController
         FcmsLogContext.SetValue(HttpContext, user);
         return FcmsOk("User unblocked.");
     }
-
-    // ── Delete ────────────────────────────────────────────────────────────────
 
     [HttpPost("{id:guid}/delete")]
     [ValidateAntiForgeryToken]
@@ -276,12 +259,10 @@ public class UserController : BaseAdminController
         return FcmsOk("User deleted.");
     }
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
-
     private async Task RevokeUserSessionsSafe(Guid userId, string reason)
     {
         try { await _sessions.RevokeAllForUserAsync(userId, FcmsContext.UserId, reason); }
-        catch { /* best-effort — block already saved, lockout end is the hard stop */ }
+        catch { /* best-effort — block already saved, lockout is the hard stop */ }
     }
 
     private Task<List<RoleSelectItem>> GetRoleSelectItemsAsync()

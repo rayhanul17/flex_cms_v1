@@ -25,12 +25,10 @@ public class PageController : BaseAdminController
         _pageRepo = pageRepo;
     }
 
-    // ── List ──────────────────────────────────────────────────────────────────
 
     [HttpGet("")]
     public IActionResult Index() => View();
 
-    // ── DataTable AJAX endpoint (server-side processing) ─────────────────────
 
     [HttpPost("datatable")]
     [ValidateAntiForgeryToken]
@@ -70,7 +68,6 @@ public class PageController : BaseAdminController
             ct: ct);
     }
 
-    // ── Create ────────────────────────────────────────────────────────────────
 
     [HttpGet("create")]
     [FcmsAuthorize(FcmsPermissions.PagesCreate)]
@@ -108,7 +105,6 @@ public class PageController : BaseAdminController
         return RedirectToAction(nameof(Index));
     }
 
-    // ── Edit ──────────────────────────────────────────────────────────────────
 
     [HttpGet("{id:guid}/edit")]
     [FcmsAuthorize(FcmsPermissions.PagesEdit)]
@@ -171,7 +167,6 @@ public class PageController : BaseAdminController
         return RedirectToAction(nameof(Index));
     }
 
-    // ── Delete ────────────────────────────────────────────────────────────────
 
     [HttpPost("{id:guid}/delete")]
     [ValidateAntiForgeryToken]
@@ -183,7 +178,6 @@ public class PageController : BaseAdminController
         return FcmsOk("Page deleted.");
     }
 
-    // ── Helper ────────────────────────────────────────────────────────────────
 
     private static string HashPassword(string password) => FcmsHelper.HashPagePassword(password);
 

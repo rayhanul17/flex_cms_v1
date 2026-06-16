@@ -42,15 +42,9 @@ public class AuthController : Controller
     [HttpGet]
     public async Task<IActionResult> Login(string? returnUrl = null)
     {
-        // Already authenticated → bypass the login form entirely and send
-        // the user to their landing page (returnUrl wins, then SuperAdmin
-        // → /admin, then role-based map). Avoids the previous antiforgery
-        // 400 caused by rendering the form against a non-anonymous identity:
-        // by the time the POST landed, the user's cookie state could have
-        // shifted (revoked session, expired ticket) and the token's claim
-        // didn't match → "antiforgery token meant for a different
-        // claims-based user". With this redirect there's no stale token
-        // window in the first place.
+        // Bypass the form for already-authenticated users — rendering it against a
+        // non-anonymous identity led to antiforgery 400s when cookie state shifted
+        // between GET and POST ("token meant for a different claims-based user").
         if (User?.Identity?.IsAuthenticated == true)
         {
             if (!string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl))
@@ -79,9 +73,7 @@ public class AuthController : Controller
         {
             var user = await _userManager.FindByNameAsync(model.UserName);
 
-            // 2FA gate: if user has a channel set, password alone is NOT
-            // enough — undo the cookie just issued and stash a pending-2FA
-            // marker so /auth/two-factor can complete the login.
+            // 2FA gate — undo the cookie + stash a pending marker for /auth/two-factor.
             if (user is not null && user.TwoFactorEnabled && user.TwoFactorChannel != TwoFactorChannel.Disabled)
             {
                 await _signInManager.SignOutAsync();
@@ -90,9 +82,6 @@ public class AuthController : Controller
                 var issue = await _otp.IssueAsync(user);
                 if (!issue.Success)
                 {
-                    // Failed to send — bail back to login with the error.
-                    // Bonus: don't record this as Success since the user
-                    // hasn't actually completed login.
                     ModelState.AddModelError(string.Empty, issue.Error ?? "Could not deliver verification code.");
                     return View(model);
                 }
@@ -104,13 +93,12 @@ public class AuthController : Controller
 
             if (user is not null)
             {
-                // Issue a session id and re-sign-in with it as a claim so the
-                // session-validation middleware can revoke this cookie later.
+                // Re-sign-in with a session_id claim so SessionValidationMiddleware can revoke later.
                 var sessionId = Guid.NewGuid().ToString("N");
                 var deviceLabel = ua.Length > 60 ? ua[..60] : ua;
                 await _sessions.RecordLoginAsync(user.Id, sessionId, ip, ua, deviceLabel);
 
-                await _signInManager.SignOutAsync();   // clear the cookie just issued without the claim
+                await _signInManager.SignOutAsync();
                 await _signInManager.SignInWithClaimsAsync(user, model.RememberMe,
                     [new Claim(FcmsSessionValidationMiddleware.SessionIdClaim, sessionId)]);
             }
@@ -148,8 +136,7 @@ public class AuthController : Controller
     [Authorize]
     public async Task<IActionResult> Logout()
     {
-        // Revoke the session row so the cookie can't be replayed even if it
-        // somehow leaks before the SignOut response reaches the browser.
+        // Revoke the session row so a leaked cookie can't be replayed.
         var sessionId = User.FindFirstValue(FcmsSessionValidationMiddleware.SessionIdClaim);
         if (!string.IsNullOrEmpty(sessionId))
         {
@@ -185,8 +172,7 @@ public class AuthController : Controller
             <p>If you didn't request this, you can safely ignore this email.</p>
             """;
 
-        // Fire-and-forget through the in-memory queue. The processor opens its
-        // own scope and resolves IFcmsEmailService — keeps this request fast.
+        // Fire-and-forget through the in-memory queue (resolves IFcmsEmailService in its own scope).
         var to = user.Email ?? "";
         _queue.TryEnqueue(async (sp, ct) =>
         {
@@ -284,8 +270,6 @@ public class AuthController : Controller
     [HttpGet]
     public IActionResult AccessDenied() => View();
 
-    // ── 2FA verify (post-password challenge) ─────────────────────────────────
-
     public const string PendingTwoFactorCookie = "fcms.pending2fa";
 
     [HttpGet("auth/two-factor")]
@@ -315,9 +299,7 @@ public class AuthController : Controller
         var ip = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "";
         var ua = Request.Headers.UserAgent.ToString();
 
-        // Recovery code path: any value with a dash is treated as a recovery
-        // code attempt (10-char alphanumeric formatted as XXXXX-XXXXX). Plain
-        // 6-digit input goes through the OTP path.
+        // Dashed input (XXXXX-XXXXX) routes to recovery codes; plain digits to OTP.
         bool ok;
         if (model.Code?.Contains('-') == true)
         {
@@ -378,10 +360,7 @@ public class AuthController : Controller
 
     private void StashPendingTwoFactor(Guid userId, bool rememberMe, string? returnUrl)
     {
-        // Short-lived (10 min) HttpOnly + SameSite=Strict cookie carrying
-        // the bare facts we need to complete the login. We deliberately
-        // do NOT use Session for this — Session can outlive a browser
-        // restart in some configurations; this stash should not.
+        // Short-lived HttpOnly cookie (10 min). Not Session: Session can outlive a browser restart.
         var payload = $"{userId:N}|{(rememberMe ? "1" : "0")}|{Uri.EscapeDataString(returnUrl ?? "")}";
         var bytes = System.Text.Encoding.UTF8.GetBytes(payload);
         Response.Cookies.Append(PendingTwoFactorCookie, Convert.ToBase64String(bytes), new CookieOptions
@@ -417,13 +396,7 @@ public class AuthController : Controller
 
     private sealed record PendingTwoFactor(Guid UserId, bool RememberMe, string ReturnUrl);
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
-
-    /// <summary>
-    /// SuperAdmin → /admin always.
-    /// Other roles: pick highest-Priority role's LoginRedirectUrl (fallback "/").
-    /// returnUrl takes precedence over role redirect (checked before this is called).
-    /// </summary>
+    /// <summary>SuperAdmin → /admin; else highest-Priority role's LoginRedirectUrl (fallback "/").</summary>
     private async Task<string> ResolveLoginRedirectAsync(FcmsUser user)
     {
         var roleNames = await _userManager.GetRolesAsync(user);

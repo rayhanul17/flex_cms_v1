@@ -18,7 +18,6 @@ public class MenuController : BaseAdminController
         _permissions = permissions;
     }
 
-    // ── List ──────────────────────────────────────────────────────────────────
 
     [HttpGet("")]
     [FcmsAuthorize(FcmsPermissions.SettingsManage)]
@@ -28,7 +27,6 @@ public class MenuController : BaseAdminController
         return View(items);
     }
 
-    // ── Create / Edit (single combined view) ──────────────────────────────────
 
     [HttpGet("create")]
     [FcmsAuthorize(FcmsPermissions.SettingsManage)]
@@ -67,7 +65,6 @@ public class MenuController : BaseAdminController
         return RedirectToAction(nameof(Index));
     }
 
-    // ── Delete (AJAX) ─────────────────────────────────────────────────────────
 
     [HttpPost("{id:guid}/delete")]
     [ValidateAntiForgeryToken]
@@ -82,7 +79,6 @@ public class MenuController : BaseAdminController
         return FcmsOk("Deleted.");
     }
 
-    // ── Rename (AJAX — inline edit on Index) ─────────────────────────────────
 
     [HttpPost("{id:guid}/rename")]
     [ValidateAntiForgeryToken]
@@ -95,7 +91,6 @@ public class MenuController : BaseAdminController
         return FcmsOk("Renamed.");
     }
 
-    // ── Reorder (AJAX) ────────────────────────────────────────────────────────
 
     [HttpPost("reorder")]
     [ValidateAntiForgeryToken]
@@ -111,7 +106,6 @@ public class MenuController : BaseAdminController
         return FcmsOk("Order saved.");
     }
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
 
     private async Task<MenuItemEditViewModel> BuildVmAsync(
         FcmsMenuItem item, CancellationToken ct, MenuItemEditViewModel? source = null)

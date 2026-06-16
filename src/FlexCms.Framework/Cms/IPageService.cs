@@ -15,7 +15,6 @@ public interface IPageService
     Task RestoreAsync(Guid id, CancellationToken ct = default);
     Task HardDeleteAsync(Guid id, CancellationToken ct = default);
 
-    // ── Translations (Phase 7) ───────────────────────────────────────────────
 
     /// <summary>
     /// Resolve a page by language-aware slug. Lookup order:

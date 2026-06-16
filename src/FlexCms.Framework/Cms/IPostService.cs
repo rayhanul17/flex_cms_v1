@@ -18,7 +18,6 @@ public interface IPostService
     /// <summary>Returns tag slugs for a post without relying on navigation-property loading.</summary>
     Task<List<string>> GetTagSlugsAsync(Guid postId, CancellationToken ct = default);
 
-    // ── Translations (Phase 7) ───────────────────────────────────────────────
 
     /// <summary>
     /// Resolve a post by language-aware slug. Translation slug match wins, then

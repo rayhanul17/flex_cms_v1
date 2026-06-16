@@ -104,8 +104,7 @@ public class ModulesController : BaseAdminController
 
         _state.DeleteWwwroot(_env.WebRootPath, module.ModuleId);
 
-        // Hide module menu items so they don't 404 on click after restart.
-        // Restored on next activation by MenuService.SeedAsync (Status set back to Active).
+        // Hide menu items so they don't 404 after restart; restored by MenuService.SeedAsync on reactivation.
         var menuService = HttpContext.RequestServices.GetService<IMenuService>();
         if (menuService is not null)
             await menuService.RemoveModuleItemsAsync(id, ct);
@@ -122,7 +121,7 @@ public class ModulesController : BaseAdminController
         var module = _registry.FindById(id);
         if (module is null) return FcmsFail("Module not found.");
 
-        // Safety check — admin must type the module name to confirm
+        // Admin must type the module name as confirmation.
         if (!string.Equals(confirmName, module.Manifest.ModuleName, StringComparison.Ordinal))
             return FcmsFail($"Confirmation does not match. Type exactly: {module.Manifest.ModuleName}");
 
@@ -131,7 +130,6 @@ public class ModulesController : BaseAdminController
 
         _state.DeleteWwwroot(_env.WebRootPath, module.ModuleId);
 
-        // Drop tables if requested (runs before the DLL is locked on next startup)
         if (dropTables)
         {
             var opts = HttpContext.RequestServices.GetRequiredService<ModuleActivationOptions>();
@@ -147,13 +145,11 @@ public class ModulesController : BaseAdminController
             }
         }
 
-        // Remove module menu items
         var menuService = HttpContext.RequestServices.GetService<IMenuService>();
         if (menuService is not null)
             await menuService.RemoveModuleItemsAsync(id, ct);
 
-        // Soft-delete the DB record now (folder will be removed on next startup
-        // by ModuleManager.ProcessPendingUninstalls)
+        // Folder removal happens on next startup via ModuleManager.ProcessPendingUninstalls.
         var record = (await _records.GetAllAsync(ct))
             .FirstOrDefault(r => string.Equals(r.ModuleId, id, StringComparison.OrdinalIgnoreCase));
         if (record is not null)
@@ -173,9 +169,7 @@ public class ModulesController : BaseAdminController
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> RetrySeed(string id, CancellationToken ct)
     {
-        // Resets the seed attempt counter + clears the activation error so
-        // the next restart's ModuleActivationService re-runs SeedDataAsync
-        // (instead of the "gave up — manual fix needed" short-circuit).
+        // Clears the attempt counter so the next restart re-runs SeedDataAsync.
         var rec = (await _records.GetAllAsync(ct))
             .FirstOrDefault(r => string.Equals(r.ModuleId, id, StringComparison.OrdinalIgnoreCase));
         if (rec is null) return FcmsFail("Module record not found.");
@@ -199,15 +193,11 @@ public class ModulesController : BaseAdminController
         return FcmsOk("Restart triggered.");
     }
 
-    // ── Upload a module ZIP ───────────────────────────────────────────────────
-    // Accepts a ZIP whose root contains the module DLL + module.json (or a
-    // single top-level folder containing them). Extracts under the solution's
-    // modules/ directory; the module is loaded on the next app restart.
-    //
-    // Security: rejects path-traversal entries (anything with .. or absolute
-    // paths) and refuses to overwrite an existing module folder unless the
-    // caller passes overwrite=true.
-
+    /// <summary>
+    /// Accepts a ZIP whose root contains the module DLL + module.json (or a single top-level
+    /// folder containing them). Extracts into the runtime-scanned Modules/ directory; loaded
+    /// on next restart. Refuses path-traversal entries and won't overwrite without overwrite=true.
+    /// </summary>
     [HttpPost("upload")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Upload(IFormFile? file, bool overwrite = false, CancellationToken ct = default)
@@ -216,17 +206,12 @@ public class ModulesController : BaseAdminController
         if (!file.FileName.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
             return FcmsFail("Module package must be a .zip file.");
 
-        // Uploaded packages must land in the SAME folder the runtime scans
-        // (App_Data's sibling), not the solution-root Modules/ (that one is
-        // for source-controlled sample/dev modules). FcmsServiceExtensions
-        // computes modulesRoot as {AppDataPath}/../Modules at boot — replicate
-        // here so uploads are discovered on the next restart without the
-        // operator hand-copying files.
+        // Land in the SAME folder FcmsServiceExtensions scans at boot
+        // ({AppDataPath}/../Modules), not the solution-root Modules/ (dev source tree).
         var modulesRoot = Path.GetFullPath(Path.Combine(_env.ContentRootPath, "Modules"));
         Directory.CreateDirectory(modulesRoot);
 
-        // Stage to a temp folder first so a malformed ZIP doesn't pollute
-        // Modules/ with a half-extracted directory.
+        // Stage to temp first so a malformed ZIP doesn't leave a half-extracted Modules/ folder.
         var stagingDir = Path.Combine(Path.GetTempPath(), "fcms_module_upload_" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(stagingDir);
 
@@ -241,7 +226,6 @@ public class ModulesController : BaseAdminController
 
             foreach (var entry in archive.Entries)
             {
-                // Path-traversal guard
                 if (entry.FullName.Contains("..") || Path.IsPathRooted(entry.FullName))
                     return FcmsFail($"Refusing unsafe path in archive: {entry.FullName}");
 
@@ -254,7 +238,7 @@ public class ModulesController : BaseAdminController
                 ZipFileExtensions.ExtractToFile(entry, dest, overwrite: true);
             }
 
-            // Find module.json — either at extract root or one folder deep
+            // module.json may be at extract root OR one folder deep — pick the shallowest match.
             var manifestPath = Directory.GetFiles(extractDir, "module.json", SearchOption.AllDirectories)
                 .OrderBy(p => p.Length).FirstOrDefault();
             if (manifestPath is null) return FcmsFail("Archive does not contain module.json.");
@@ -307,8 +291,6 @@ public class ModulesController : BaseAdminController
             System.IO.File.Copy(file, file.Replace(src, dest, StringComparison.Ordinal), overwrite: true);
     }
 
-    // ── Dev-mode scaffold ─────────────────────────────────────────────────────
-
     [HttpGet("scaffold")]
     public IActionResult Scaffold()
     {
@@ -323,8 +305,6 @@ public class ModulesController : BaseAdminController
         if (!_env.IsDevelopment()) return NotFound();
         if (!ModelState.IsValid) return View("Scaffold", model);
 
-        // Walk up from ContentRootPath until we find both the templates and modules dirs.
-        // Handles both src/FlexCms.Host (project) and bin/Debug/net10.0 (running output) layouts.
         var solutionRoot = FindSolutionRoot(_env.ContentRootPath);
         if (solutionRoot is null)
         {
@@ -332,10 +312,7 @@ public class ModulesController : BaseAdminController
             return View("Scaffold", model);
         }
 
-        // Drop the scaffolded project into the SOLUTION-ROOT Modules/ folder
-        // (sibling of src/, samples/, templates/) — same place the runtime now
-        // scans alongside src/FlexCms.Host/Modules. Visual Studio sees the
-        // project as a top-level entry, not a file nested under the host.
+        // Land at solution-root Modules/ so VS sees the new project as a sibling of src/.
         var modulesRoot = Path.Combine(solutionRoot, "Modules");
         Directory.CreateDirectory(modulesRoot);
         var dest = Path.Combine(modulesRoot, model.ModuleId);
@@ -355,11 +332,10 @@ public class ModulesController : BaseAdminController
 
         CopyAndReplace(templateSrc, dest, model.ModuleId, model.TablePrefix);
 
-        // Register the new csproj in FlexCms.slnx so it shows up in Visual
-        // Studio / Rider / VS Code's solution explorer immediately.
+        // Auto-register in .slnx so VS / VS Code / Rider show the new project on next reload.
         var slnxPath = Path.Combine(solutionRoot, "FlexCms.slnx");
         try { AddProjectToSlnx(slnxPath, $"Modules/{model.ModuleId}/{model.ModuleId}.csproj"); }
-        catch { /* solution-file edit is best-effort — never block the scaffold */ }
+        catch { /* best-effort — never block the scaffold */ }
 
         TempData["Success"] = $"Module '{model.ModuleId}' scaffolded to Modules/{model.ModuleId}/. " +
                               "Run `dotnet build Modules/" + model.ModuleId + "/" + model.ModuleId + ".csproj`, " +
@@ -367,10 +343,7 @@ public class ModulesController : BaseAdminController
         return RedirectToAction(nameof(Index));
     }
 
-    /// <summary>
-    /// Append a project entry to FlexCms.slnx's /Modules/ folder. Idempotent —
-    /// silently no-ops if the project is already listed.
-    /// </summary>
+    /// <summary>Idempotent append to FlexCms.slnx's /Modules/ folder.</summary>
     private static void AddProjectToSlnx(string slnxPath, string relativeProjectPath)
     {
         if (!System.IO.File.Exists(slnxPath)) return;
@@ -380,13 +353,11 @@ public class ModulesController : BaseAdminController
         var modulesFolderLine = "<Folder Name=\"/Modules/\">";
         if (text.Contains(modulesFolderLine, StringComparison.Ordinal))
         {
-            // Append project entry inside the existing /Modules/ folder block.
             text = text.Replace(modulesFolderLine,
                 $"{modulesFolderLine}\n    <Project Path=\"{relativeProjectPath}\" />");
         }
         else
         {
-            // Insert a fresh /Modules/ folder block just before </Solution>.
             var block =
                 "  <Folder Name=\"/Modules/\">\n" +
                 $"    <Project Path=\"{relativeProjectPath}\" />\n" +
@@ -396,10 +367,7 @@ public class ModulesController : BaseAdminController
         System.IO.File.WriteAllText(slnxPath, text);
     }
 
-    /// <summary>
-    /// Walk up from <paramref name="start"/> looking for a directory that contains
-    /// a <c>templates</c> subfolder — that's the FlexCMS solution root.
-    /// </summary>
+    /// <summary>Walk up looking for a directory with a <c>templates</c> subfolder.</summary>
     private static string? FindSolutionRoot(string start)
     {
         var dir = new DirectoryInfo(start);
@@ -418,10 +386,7 @@ public class ModulesController : BaseAdminController
         var shortName = moduleId.Split('.').Last();
         var moduleIdLower = moduleId.ToLowerInvariant();
 
-        // Token order matters: long, distinct tokens first so they don't get
-        // shadowed by shorter ones (e.g. __ShortName__ vs Name). All template
-        // placeholders use double-underscore fences to avoid colliding with
-        // ordinary identifiers like "Name" inside docs/comments.
+        // Token order: long & distinct first so short tokens don't shadow them.
         string Apply(string s) => s
             .Replace("FlexCms.Module.Name", moduleId)
             .Replace("FlexCms_Module_Name", moduleId.Replace(".", "_"))

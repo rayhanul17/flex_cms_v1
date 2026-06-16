@@ -24,7 +24,6 @@ public class SetupController : Controller
         _env = env;
     }
 
-    // ── Step 1 — Database ─────────────────────────────────────────────────────
 
     [HttpGet("/Setup")]
     public IActionResult Index() => View(new SetupStep1ViewModel());
@@ -38,7 +37,6 @@ public class SetupController : Controller
         return RedirectToAction(nameof(Step2));
     }
 
-    // ── Test Connection (AJAX) ────────────────────────────────────────────────
 
     [HttpPost("/Setup/TestConnection")]
     [ValidateAntiForgeryToken]
@@ -60,7 +58,6 @@ public class SetupController : Controller
         }
     }
 
-    // ── Step 2 — Site Info ────────────────────────────────────────────────────
 
     [HttpGet("/Setup/Step2")]
     public IActionResult Step2()
@@ -79,7 +76,6 @@ public class SetupController : Controller
         return RedirectToAction(nameof(Step3));
     }
 
-    // ── Step 3 — Admin Account ────────────────────────────────────────────────
 
     [HttpGet("/Setup/Step3")]
     public IActionResult Step3()
@@ -126,7 +122,6 @@ public class SetupController : Controller
         return RedirectToAction(nameof(Complete));
     }
 
-    // ── Step 4 — Complete ─────────────────────────────────────────────────────
 
     [HttpGet("/Setup/Complete")]
     public IActionResult Complete()
@@ -147,7 +142,6 @@ public class SetupController : Controller
         return Ok();
     }
 
-    // ── DB Migration ──────────────────────────────────────────────────────────
 
     private static async Task MigrateDatabaseAsync(SetupConfig config, CancellationToken ct)
     {
@@ -195,7 +189,6 @@ public class SetupController : Controller
         }
     }
 
-    // ── Connection string builders ────────────────────────────────────────────
 
     private static string BuildMySqlConnectionString(SetupStep1ViewModel m)
         => $"Server={m.MySqlHost};Port={m.MySqlPort};Database={m.MySqlDatabase};" +
@@ -232,7 +225,6 @@ public class SetupController : Controller
         }
     }
 
-    // ── Setup config builder ──────────────────────────────────────────────────
 
     private SetupConfig BuildSetupConfig(
         SetupStep1ViewModel s1,

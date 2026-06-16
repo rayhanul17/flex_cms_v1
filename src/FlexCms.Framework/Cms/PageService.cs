@@ -82,7 +82,6 @@ public class PageService : IPageService
         await _uow.SaveChangesAsync(ct);
     }
 
-    // ── Translations (Phase 7) ───────────────────────────────────────────────
 
     public async Task<(FcmsPage Page, FcmsPageTranslation? Translation)?> ResolveBySlugAsync(
         string slug, string lang, CancellationToken ct = default)

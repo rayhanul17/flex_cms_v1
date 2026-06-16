@@ -192,7 +192,6 @@ public sealed class OtpChallengeService : IOtpChallengeService
         await _userManager.UpdateAsync(user);
     }
 
-    // ── helpers ──────────────────────────────────────────────────────────────
 
     private static string GenerateCode()
     {

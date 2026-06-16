@@ -31,7 +31,6 @@ namespace FlexCms.Framework.Mvc;
 /// </summary>
 public abstract class BaseFcmsController : Controller
 {
-    // ── TempData keys ─────────────────────────────────────────────────────
     // Kept as constants so the layout can read them without hardcoded strings.
     public const string TempDataMessageKey      = "Toast.Message";
     public const string TempDataTypeKey         = "Toast.Type";
@@ -43,7 +42,6 @@ public abstract class BaseFcmsController : Controller
     public const string ViewBagDurationKey      = "FcmsToastDuration";
     public const string ViewBagCloseButtonKey   = "FcmsToastCloseButton";
 
-    // ── Shorthand for DI services (lazy — no ctor required) ───────────────
 
     protected IMemoryCache Cache =>
         HttpContext.RequestServices.GetRequiredService<IMemoryCache>();
@@ -58,7 +56,6 @@ public abstract class BaseFcmsController : Controller
             .GetRequiredService<ILoggerFactory>()
             .CreateLogger(GetType());
 
-    // ── Toast / flash messages ────────────────────────────────────────────
 
     /// <summary>
     /// Surface a toast to the user.
@@ -138,7 +135,6 @@ public abstract class BaseFcmsController : Controller
                          bool showCloseButton = true)
         => ShowMessage(message, FcmsMessageType.Info, appendMessage, showAfterRedirect, durationSeconds, showCloseButton);
 
-    // ── AJAX response envelope ────────────────────────────────────────────
 
     /// <summary>
     /// Standard AJAX success envelope consumed by <c>fcms-actions.js</c>.
@@ -154,7 +150,6 @@ public abstract class BaseFcmsController : Controller
     protected JsonResult FcmsFail(string message, object? errors = null)
         => Json(new { isSuccess = false, message, errors });
 
-    // ── Cache shorthand ───────────────────────────────────────────────────
 
     protected T? GetCache<T>(string key) where T : class
         => Cache.TryGetValue(key, out T? val) ? val : null;
@@ -165,7 +160,6 @@ public abstract class BaseFcmsController : Controller
     protected void RemoveCache(string key)
         => Cache.Remove(key);
 
-    // ── Session shorthand (JSON-serialised) ───────────────────────────────
 
     protected T? GetSession<T>(string key) where T : class
     {
@@ -179,7 +173,6 @@ public abstract class BaseFcmsController : Controller
     protected void RemoveSession(string key)
         => HttpContext.Session.Remove(key);
 
-    // ── Route shorthand ───────────────────────────────────────────────────
 
     /// <summary>Active controller route value (without the <c>Controller</c> suffix).</summary>
     protected string ControllerName =>

@@ -21,12 +21,10 @@ public class CategoryController : BaseAdminController
         _categoryRepo = categoryRepo;
     }
 
-    // ── List ──────────────────────────────────────────────────────────────────
 
     [HttpGet("")]
     public IActionResult Index() => View();
 
-    // ── DataTable AJAX endpoint (server-side processing) ─────────────────────
 
     [HttpPost("datatable")]
     [ValidateAntiForgeryToken]
@@ -61,7 +59,6 @@ public class CategoryController : BaseAdminController
             ct: ct);
     }
 
-    // ── Create ────────────────────────────────────────────────────────────────
 
     [HttpGet("create")]
     [FcmsAuthorize(FcmsPermissions.CategoriesCreate)]
@@ -91,7 +88,6 @@ public class CategoryController : BaseAdminController
         return RedirectToAction(nameof(Index));
     }
 
-    // ── Edit ──────────────────────────────────────────────────────────────────
 
     [HttpGet("{id:guid}/edit")]
     [FcmsAuthorize(FcmsPermissions.CategoriesEdit)]
@@ -135,7 +131,6 @@ public class CategoryController : BaseAdminController
         return RedirectToAction(nameof(Index));
     }
 
-    // ── Delete ────────────────────────────────────────────────────────────────
 
     [HttpPost("{id:guid}/delete")]
     [ValidateAntiForgeryToken]
@@ -147,7 +142,6 @@ public class CategoryController : BaseAdminController
         return FcmsOk("Category deleted.");
     }
 
-    // ── Helper ────────────────────────────────────────────────────────────────
 
     private async Task<List<SelectListItem>> GetParentSelectListAsync(CancellationToken ct, Guid? excludeId = null)
     {

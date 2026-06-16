@@ -110,7 +110,6 @@ public class PostService : IPostService
         await _uow.SaveChangesAsync(ct);
     }
 
-    // ── Internal ──────────────────────────────────────────────────────────────
 
     private async Task SyncTagsAsync(Guid postId, IEnumerable<string> tagSlugs, CancellationToken ct)
     {
@@ -144,7 +143,6 @@ public class PostService : IPostService
     private static string ToTitleCase(string slug)
         => string.Join(' ', slug.Split('-').Select(w => w.Length > 0 ? char.ToUpper(w[0]) + w[1..] : w));
 
-    // ── Translations (Phase 7) ───────────────────────────────────────────────
 
     public async Task<(FcmsPost Post, FcmsPostTranslation? Translation)?> ResolveBySlugAsync(
         string slug, string lang, CancellationToken ct = default)

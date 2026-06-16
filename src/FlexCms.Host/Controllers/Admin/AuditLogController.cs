@@ -30,7 +30,6 @@ public class AuditLogController : BaseAdminController
     [FcmsAuthorize(FcmsPermissions.AuditView)]
     public IActionResult Index() => View();
 
-    // ── Recent logs DataTable ────────────────────────────────────────────────
 
     [HttpPost("datatable-recent")]
     [ValidateAntiForgeryToken]
@@ -68,7 +67,6 @@ public class AuditLogController : BaseAdminController
             ct: ct);
     }
 
-    // ── Archive DataTable ────────────────────────────────────────────────────
 
     [HttpPost("datatable-archive")]
     [ValidateAntiForgeryToken]

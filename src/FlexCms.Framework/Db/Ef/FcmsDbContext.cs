@@ -108,17 +108,14 @@ public class FcmsDbContext : IdentityDbContext<FcmsUser, FcmsRole, Guid>
     public DbSet<FcmsSubscriber> Subscribers => Set<FcmsSubscriber>();
     public DbSet<FcmsContentMeta> ContentMeta => Set<FcmsContentMeta>();
 
-    // ── Phase 15: SEO + Feature flags + Languages ─────────────────────────
     public DbSet<FcmsSeoMeta> SeoMeta => Set<FcmsSeoMeta>();
     public DbSet<FcmsFeatureFlag> FeatureFlags => Set<FcmsFeatureFlag>();
     public DbSet<FcmsLanguage> Languages => Set<FcmsLanguage>();
 
-    // ── Phase 16: Search analytics + Editorial ────────────────────────────
     public DbSet<FcmsSearchQuery> SearchQueries => Set<FcmsSearchQuery>();
     public DbSet<FcmsContentReview> ContentReviews => Set<FcmsContentReview>();
     public DbSet<FcmsContentAnnotation> ContentAnnotations => Set<FcmsContentAnnotation>();
 
-    // ── Post-phase hardening: draft autosave snapshots + 2FA recovery ─────
     public DbSet<FcmsContentDraftSnapshot> ContentDraftSnapshots => Set<FcmsContentDraftSnapshot>();
     public DbSet<FcmsRecoveryCode> RecoveryCodes => Set<FcmsRecoveryCode>();
 
@@ -169,7 +166,6 @@ public class FcmsDbContext : IdentityDbContext<FcmsUser, FcmsRole, Guid>
             .Property(m => m.ActivationError)
             .HasMaxLength(2000);
 
-        // ── CMS ────────────────────────────────────────────────────────────────
 
         // Pages: self-referential hierarchy; restrict cascade to avoid cycles
         modelBuilder.Entity<FcmsPage>()
@@ -255,7 +251,6 @@ public class FcmsDbContext : IdentityDbContext<FcmsUser, FcmsRole, Guid>
             .HasForeignKey(m => m.FolderId)
             .OnDelete(DeleteBehavior.SetNull);
 
-        // ── Translations (Phase 7) ────────────────────────────────────────────
 
         modelBuilder.Entity<FcmsPageTranslation>()
             .HasOne(t => t.Page)
@@ -287,7 +282,6 @@ public class FcmsDbContext : IdentityDbContext<FcmsUser, FcmsRole, Guid>
             .HasIndex(t => new { t.LanguageCode, t.Slug })
             .IsUnique();
 
-        // ── Pending message queue (Phase 8) ───────────────────────────────────
         // Index supports the Pending|Failed-with-retries-left scan that
         // MessageProcessorService runs every 30 seconds.
         modelBuilder.Entity<FcmsPendingMessage>()
@@ -296,7 +290,6 @@ public class FcmsDbContext : IdentityDbContext<FcmsUser, FcmsRole, Guid>
         modelBuilder.Entity<FcmsPendingMessage>()
             .HasIndex(m => m.BroadcastId);
 
-        // ── Notifications + widgets (Phase 9) ─────────────────────────────────
 
         // Bell-icon "unread for me" query → composite index.
         modelBuilder.Entity<FcmsNotification>()
@@ -306,7 +299,6 @@ public class FcmsDbContext : IdentityDbContext<FcmsUser, FcmsRole, Guid>
         modelBuilder.Entity<FcmsWidgetPlacement>()
             .HasIndex(p => new { p.Zone, p.Enabled, p.SortOrder });
 
-        // ── Chat (Phase 10) ────────────────────────────────────────────────────
 
         // Thread → messages cascade so resolving / hard-deleting a thread cleans up its messages.
         modelBuilder.Entity<FcmsChatMessage>()
@@ -327,12 +319,10 @@ public class FcmsDbContext : IdentityDbContext<FcmsUser, FcmsRole, Guid>
         modelBuilder.Entity<FcmsChatMessage>()
             .HasIndex(m => new { m.ThreadId, m.CreatedAt });
 
-        // ── Exports (Phase 12) ─────────────────────────────────────────────────
         // Processor scan: WHERE export_status = Pending ORDER BY created_at.
         modelBuilder.Entity<FcmsPendingExport>()
             .HasIndex(e => new { e.ExportStatus, e.CreatedAt });
 
-        // ── Auth hardening (Phase 13) ─────────────────────────────────────────
 
         // (UserId, IsRevoked) — "active sessions for me" admin/profile lookup.
         modelBuilder.Entity<FcmsUserSession>()
@@ -351,7 +341,6 @@ public class FcmsDbContext : IdentityDbContext<FcmsUser, FcmsRole, Guid>
         modelBuilder.Entity<FcmsLoginHistory>()
             .HasIndex(h => h.AttemptedUserName);
 
-        // ── Engagement / API (Phase 14) ───────────────────────────────────────
 
         modelBuilder.Entity<FcmsApiToken>().HasIndex(t => t.Hash).IsUnique();
         modelBuilder.Entity<FcmsApiToken>().HasIndex(t => t.UserId);
@@ -377,7 +366,6 @@ public class FcmsDbContext : IdentityDbContext<FcmsUser, FcmsRole, Guid>
             .HasIndex(m => new { m.EntityType, m.EntityId, m.Key })
             .IsUnique();
 
-        // ── Phase 15: SEO + Feature flags ─────────────────────────────────
         // (EntityType, EntityId) is the natural key — at most one SEO row per entity.
         modelBuilder.Entity<FcmsSeoMeta>()
             .HasIndex(s => new { s.EntityType, s.EntityId })
@@ -391,7 +379,6 @@ public class FcmsDbContext : IdentityDbContext<FcmsUser, FcmsRole, Guid>
             .HasIndex(l => l.Code)
             .IsUnique();
 
-        // ── Phase 16 ───────────────────────────────────────────────────────
         // Analytics report runs WHERE result_count = 0 AND created_at >= cutoff.
         modelBuilder.Entity<FcmsSearchQuery>()
             .HasIndex(s => new { s.ResultCount, s.CreatedAt });

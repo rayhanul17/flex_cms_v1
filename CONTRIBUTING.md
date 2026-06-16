@@ -99,7 +99,7 @@ Before opening a PR:
 - [ ] Linked to issue/discussion if applicable
 - [ ] No secrets committed (check `.env`, `setup.json`, `*.key`)
 - [ ] CancellationToken propagated to all new async methods
-- [ ] Architecture plan (`docs/plan.md`) updated if you introduce new patterns
+- [ ] [`docs/DEVELOPER_GUIDE.md`](docs/DEVELOPER_GUIDE.md) updated if you introduce new patterns
 
 ---
 

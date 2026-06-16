@@ -18,7 +18,6 @@ namespace FlexCms.Framework.Db;
 /// </summary>
 public interface IRepository<T> where T : class, IBaseEntity
 {
-    // ── Single-row reads ──────────────────────────────────────────────────────
 
     Task<T?> GetByIdAsync(
         Guid id,
@@ -34,7 +33,6 @@ public interface IRepository<T> where T : class, IBaseEntity
         bool includeInactive = true,
         params Expression<Func<T, object>>[] includes);
 
-    // ── Multi-row reads ───────────────────────────────────────────────────────
 
     Task<List<T>> GetAllAsync(
         CancellationToken ct = default,
@@ -56,7 +54,6 @@ public interface IRepository<T> where T : class, IBaseEntity
         bool includeInactive = true,
         params Expression<Func<T, object>>[] includes);
 
-    // ── Aggregates ────────────────────────────────────────────────────────────
 
     Task<bool> ExistsAsync(
         Expression<Func<T, bool>> predicate,
@@ -70,7 +67,6 @@ public interface IRepository<T> where T : class, IBaseEntity
         bool includeDeleted = false,
         bool includeInactive = true);
 
-    // ── Paging ────────────────────────────────────────────────────────────────
 
     /// <summary>
     /// Returns a page of results matching <paramref name="predicate"/> (pass <c>null</c> for all),
@@ -91,7 +87,6 @@ public interface IRepository<T> where T : class, IBaseEntity
 
     Task<PagedResponse<T>> FindPagedAsync(QueryFilter<T> filter, CancellationToken ct = default);
 
-    // ── Writes ────────────────────────────────────────────────────────────────
 
     Task AddAsync(T entity, CancellationToken ct = default);
     Task AddRangeAsync(IEnumerable<T> entities, CancellationToken ct = default);
@@ -108,7 +103,6 @@ public interface IRepository<T> where T : class, IBaseEntity
     /// </summary>
     Task DeleteRangeAsync(IEnumerable<T> entities, CancellationToken ct = default);
 
-    // ── Raw query ─────────────────────────────────────────────────────────────
 
     /// <summary>
     /// Returns a non-deleted <see cref="IQueryable{T}"/> for advanced LINQ

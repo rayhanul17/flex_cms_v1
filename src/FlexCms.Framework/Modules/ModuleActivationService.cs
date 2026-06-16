@@ -74,10 +74,8 @@ public class ModuleActivationService : IHostedService
             var module = loaded.Instance;
             var errors = new List<string>();
 
-            // ── 0. Sync wwwroot static assets ─────────────────────────────────
             _state.SyncWwwroot(loaded.FolderPath, _env.WebRootPath, module.ModuleId);
 
-            // ── 1. Run EF migrations ──────────────────────────────────────────
             var migrationCtx = module.CreateMigrationContext(_opts.ConnectionString, _opts.Provider);
             if (migrationCtx is not null)
             {
@@ -97,7 +95,6 @@ public class ModuleActivationService : IHostedService
                 }
             }
 
-            // ── 2. Ensure a FcmsModuleRecord exists ──────────────────────────
             var record = await repo.FirstOrDefaultAsync(r => r.ModuleId == module.ModuleId, ct);
             if (record is null)
             {
@@ -112,7 +109,6 @@ public class ModuleActivationService : IHostedService
                 await uow.SaveChangesAsync(ct);
             }
 
-            // ── 3. Permissions — upsert on every restart (idempotent) ────────
             try
             {
                 await permissionSeeder.SeedAsync(module, ct);
@@ -140,7 +136,6 @@ public class ModuleActivationService : IHostedService
                 errors.Add("menu: " + ex.Message);
             }
 
-            // ── 5. Seed data (first activation only) ─────────────────────────
             // Cap the retry-on-restart loop. Repeating a buggy SeedDataAsync
             // every reboot hides the real failure: the module never reaches
             // a usable state, but logs fill with the same exception and an
@@ -172,7 +167,6 @@ public class ModuleActivationService : IHostedService
                 errors.Add($"seed gave up after {MaxSeedAttempts} attempts — fix the module then click Retry seed in admin.");
             }
 
-            // ── 6. OnUpgrade — version changed since last successful seed ────
             if (record.SeedCompleted && record.Version != module.Version)
             {
                 try
@@ -190,7 +184,6 @@ public class ModuleActivationService : IHostedService
                 }
             }
 
-            // ── 7. Persist activation status + error message ──────────────────
             record.LastActivationAttemptAt = FcmsTime.Now;
             record.ActivationError = errors.Count == 0
                 ? null

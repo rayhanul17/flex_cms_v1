@@ -124,7 +124,6 @@ public sealed class ClosedXmlExcelService : IFcmsExcelService
         return output;
     }
 
-    // ── value conversion ──────────────────────────────────────────────────
 
     private static bool IsNullableType(Type t)
         => !t.IsValueType || Nullable.GetUnderlyingType(t) is not null;

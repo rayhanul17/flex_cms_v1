@@ -168,7 +168,6 @@ public static class FcmsSqlHelper
         }
     }
 
-    // ── internals ─────────────────────────────────────────────────────────
 
     private static async Task<IReadOnlyList<TDto>> ReadAllAsync<TDto>(DbDataReader reader, CancellationToken ct)
         where TDto : class, new()

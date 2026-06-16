@@ -1,6 +1,6 @@
 # Deployment Guide
 
-> Full production deployment recipe — see [`plan.md`](plan.md) **PART 0.9** for complete details (Docker compose, nginx, fail2ban, Cloudflare, backups).
+> Production deployment recipe — Docker compose, nginx, fail2ban, Cloudflare, backups.
 
 ---
 
@@ -156,4 +156,4 @@ Live-reload setting — no restart needed to toggle.
 
 ---
 
-For full details see [`docs/plan.md`](plan.md) **PART 0.5** (Production Hardening) + **PART 0.9** (Docker Deployment).
+For end-to-end developer setup see [`DEVELOPER_GUIDE.md`](DEVELOPER_GUIDE.md).

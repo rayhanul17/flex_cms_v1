@@ -12,7 +12,6 @@ namespace FlexCms.Framework.Helpers;
 /// </summary>
 public static class FcmsHelper
 {
-    // ── Entity naming ─────────────────────────────────────────────────────────
 
     /// <summary>
     /// Returns the table / collection name for an entity following the project
@@ -128,7 +127,6 @@ public static class FcmsHelper
         return word + "s";
     }
 
-    // ── Enum helpers ──────────────────────────────────────────────────────────
 
     /// <summary>
     /// Converts an enum to <c>Dictionary&lt;int, string&gt;</c> using
@@ -209,7 +207,6 @@ public static class FcmsHelper
         return list;
     }
 
-    // ── Display string helpers ─────────────────────────────────────────────
 
     /// <summary>Returns <paramref name="emptyString"/> when the value is null or whitespace.</summary>
     public static string GetDisplayString(string? value, string emptyString = "-")
@@ -227,7 +224,6 @@ public static class FcmsHelper
     public static string GetDisplayString(DateTime? value, string format = "yyyy-MM-dd", string emptyString = "-")
         => value is null ? emptyString : value.Value.ToString(format);
 
-    // ── String helpers ─────────────────────────────────────────────────────
 
     /// <summary>
     /// Inserts a space before each uppercase letter: "BlogPost" → "Blog Post".
@@ -236,7 +232,6 @@ public static class FcmsHelper
     public static string FormatName(string name)
         => Regex.Replace(name, "([A-Z])", " $1").Trim();
 
-    // ── Base64URL helpers ──────────────────────────────────────────────────
 
     /// <summary>URL-safe Base64 encode (no padding, URL-safe alphabet).</summary>
     public static string? Base64UrlEncode(string value)
@@ -253,7 +248,6 @@ public static class FcmsHelper
         catch { return null; }
     }
 
-    // ── Security helpers ───────────────────────────────────────────────────
 
     // Fixed purpose key — protects against rainbow tables for page passwords.
     // Changing this invalidates all stored PasswordHash values in FcmsPage.
@@ -271,7 +265,6 @@ public static class FcmsHelper
         return Convert.ToHexString(bytes).ToLowerInvariant();
     }
 
-    // ── Localized digits ─────────────────────────────────────────────────
 
     private static readonly char[] BengaliDigits = ['০','১','২','৩','৪','৫','৬','৭','৮','৯'];
     private static readonly char[] ArabicIndicDigits = ['٠','١','٢','٣','٤','٥','٦','٧','٨','٩'];
@@ -314,7 +307,6 @@ public static class FcmsHelper
     public static string ConvertDigits(long value, string? languageCode)
         => ConvertDigits(value.ToString(System.Globalization.CultureInfo.InvariantCulture), languageCode);
 
-    // ── DateTime helpers ───────────────────────────────────────────────────
 
     /// <summary>
     /// Returns midnight (00:00:00) of the given date converted to UTC using

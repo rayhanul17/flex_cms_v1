@@ -2766,7 +2766,6 @@ The external developer **never clones your CMS source** — they only need the p
 
 ## 📚 Further Reading
 
-- **Architecture details:** [`docs/plan.md`](plan.md) — full 14,500-line spec
 - **Module dev rules:** [`docs/MODULE_DEV.md`](MODULE_DEV.md)
 - **Production deploy details:** [`docs/DEPLOYMENT.md`](DEPLOYMENT.md)
 - **Contributing rules:** [`CONTRIBUTING.md`](../CONTRIBUTING.md)

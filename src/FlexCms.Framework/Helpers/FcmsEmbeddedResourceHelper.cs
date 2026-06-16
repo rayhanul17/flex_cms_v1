@@ -80,7 +80,6 @@ public static class FcmsEmbeddedResourceHelper
     public static IReadOnlyList<string> ListResources(Assembly assembly)
         => assembly.GetManifestResourceNames();
 
-    // ── internals ─────────────────────────────────────────────────────────
 
     private static string? ResolveName(Assembly assembly, string endsWith)
     {

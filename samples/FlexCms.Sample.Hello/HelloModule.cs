@@ -7,7 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace FlexCms.Sample.Hello;
 
 /// <summary>
-/// Sample module — demonstrates the full FlexCms module pattern end-to-end:
+/// Reference module — demonstrates the full FlexCms module pattern end-to-end:
 /// entity + EF migrations, permissions, menu items, admin CRUD controller,
 /// public JSON endpoint, and the seed / upgrade / drop lifecycle hooks.
 /// Copy this layout when starting a new module.
@@ -19,9 +19,6 @@ public class HelloModule : BaseModule
     public override string Version => "1.0.0";
     public override string TablePrefix => "hello";
 
-    // Attribute-marked services ([FcmsScoped]) are auto-registered by
-    // AttributeScanner — keep this empty unless you need typed HttpClients,
-    // options binding, or library setup that the attributes can't express.
     public override void RegisterServices(IServiceCollection services) { }
 
     public override DbContext? CreateMigrationContext(string connectionString, string provider)
@@ -44,9 +41,8 @@ public class HelloModule : BaseModule
 
     public override async Task SeedDataAsync(IServiceProvider sp, CancellationToken ct = default)
     {
-        // Module DbContexts aren't auto-registered in host DI — construct the
-        // same context the framework used to run migrations, so the seed lives
-        // on the exact schema we just applied.
+        // Module DbContexts aren't in host DI — rebuild from ModuleActivationOptions
+        // so the seed runs on the same schema migrations just applied.
         var opts = sp.GetRequiredService<FlexCms.Framework.Modules.ModuleActivationOptions>();
         var ctx = CreateMigrationContext(opts.ConnectionString, opts.Provider) as HelloDbContext;
         if (ctx is null) return;
@@ -96,8 +92,8 @@ public static class HelloPermissions
     public const string EditKey   = "greeting.edit";
     public const string DeleteKey = "greeting.delete";
 
-    // Fully-qualified keys — must mirror the {ModuleId}. prefix that
-    // ModulePermissionSeeder writes to fcms_permissions (lowercased).
+    // Fully-qualified keys — ModulePermissionSeeder prefixes with {ModuleId}. (lowercased)
+    // when writing to fcms_permissions, so these mirror what's stored + checked at runtime.
     public const string View   = "flexcms.sample.hello." + ViewKey;
     public const string Create = "flexcms.sample.hello." + CreateKey;
     public const string Edit   = "flexcms.sample.hello." + EditKey;

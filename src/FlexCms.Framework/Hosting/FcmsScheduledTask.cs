@@ -105,7 +105,6 @@ public sealed class FcmsScheduledTask
     /// <summary>Resets the once-per-minute guard. Useful in tests.</summary>
     public void Reset() => _lastRunAt = DateTime.MinValue;
 
-    // ── parsing ───────────────────────────────────────────────────────────
 
     private static int[] ParseField(string field, int min, int max)
     {

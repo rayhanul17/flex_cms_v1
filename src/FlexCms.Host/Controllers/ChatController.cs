@@ -215,7 +215,6 @@ public class ChatController : Controller
         return Json(new { isSuccess = true, threadId = thread.Id });
     }
 
-    // ── Internals ─────────────────────────────────────────────────────────────
 
     private async Task PushAsync(FcmsChatThread thread, FcmsChatMessage msg, CancellationToken ct)
     {

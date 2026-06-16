@@ -23,7 +23,6 @@ public class EfRepository<T> : IRepository<T> where T : BaseEfEntity
         _set = context.Set<T>();
     }
 
-    // ── Query builder ─────────────────────────────────────────────────────────
     //
     // Centralises the soft-delete + inactive + include logic so every read
     // method below behaves identically. Defaults:
@@ -63,7 +62,6 @@ public class EfRepository<T> : IRepository<T> where T : BaseEfEntity
         return q;
     }
 
-    // ── Single-row reads ──────────────────────────────────────────────────────
 
     public async Task<T?> GetByIdAsync(
         Guid id,
@@ -83,7 +81,6 @@ public class EfRepository<T> : IRepository<T> where T : BaseEfEntity
         => await BuildQuery(includeDeleted, includeInactive, includes)
             .FirstOrDefaultAsync(predicate, ct);
 
-    // ── Multi-row reads ───────────────────────────────────────────────────────
 
     public async Task<List<T>> GetAllAsync(
         CancellationToken ct = default,
@@ -113,7 +110,6 @@ public class EfRepository<T> : IRepository<T> where T : BaseEfEntity
             .Where(e => idList.Contains(e.Id)).ToListAsync(ct);
     }
 
-    // ── Aggregates ────────────────────────────────────────────────────────────
 
     public async Task<bool> ExistsAsync(
         Expression<Func<T, bool>> predicate,
@@ -134,7 +130,6 @@ public class EfRepository<T> : IRepository<T> where T : BaseEfEntity
             : await q.LongCountAsync(predicate, ct);
     }
 
-    // ── Paging ────────────────────────────────────────────────────────────────
 
     public async Task<PagedResponse<T>> FindPagedAsync(
         Expression<Func<T, bool>>? predicate,
@@ -164,7 +159,6 @@ public class EfRepository<T> : IRepository<T> where T : BaseEfEntity
         return PagedResponse<T>.Create(items, total, page, pageSize);
     }
 
-    // ── Writes ────────────────────────────────────────────────────────────────
 
     public async Task AddAsync(T entity, CancellationToken ct = default)
         => await _set.AddAsync(entity, ct);
@@ -213,7 +207,6 @@ public class EfRepository<T> : IRepository<T> where T : BaseEfEntity
         return Task.CompletedTask;
     }
 
-    // ── QueryFilter overloads ─────────────────────────────────────────────────
 
     public async Task<List<T>> FindAsync(QueryFilter<T> filter, CancellationToken ct = default)
     {
@@ -262,7 +255,6 @@ public class EfRepository<T> : IRepository<T> where T : BaseEfEntity
         return PagedResponse<T>.Create(items, total, page, pageSize > 0 ? pageSize : total);
     }
 
-    // ── Raw query ─────────────────────────────────────────────────────────────
 
     public IQueryable<T> Query() => BuildQuery(includeDeleted: false, includeInactive: true, includes: null);
 

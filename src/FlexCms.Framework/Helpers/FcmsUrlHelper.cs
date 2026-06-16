@@ -104,7 +104,6 @@ public static class FcmsUrlHelper
         => Uri.TryCreate(url, UriKind.Absolute, out var uri)
            && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps);
 
-    // ── internals ─────────────────────────────────────────────────────────
 
     private static string StripSchemeHostAndQuery(string url)
     {

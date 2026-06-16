@@ -110,7 +110,7 @@ public class __ShortName__Module : BaseModule
         {
             DefaultName = "__ShortName__",
             Icon = "bi bi-box",
-            Url = "/admin/mod_prefix",
+            Url = "/mod_prefix/admin",
             Order = 500,
             RequiredPermission = __ShortName__Permissions.View
         }

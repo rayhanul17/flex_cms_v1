@@ -112,12 +112,12 @@ public class LanguageMiddlewareTests
     public async Task Url_prefix_mode_unknown_first_segment_is_left_alone()
     {
         var (mw, _, settings) = Build(defaultLang: "en", mode: "url-prefix");
-        var ctx = Ctx("/admin/posts");   // "admin" is NOT a language → treated as content path
+        var ctx = Ctx("/blog/admin/posts");   // "admin" is NOT a language → treated as content path
 
         await mw.InvokeAsync(ctx, settings);
 
         Assert.Equal("en", ctx.Items[SupportedLanguages.ContextItemKey]);
-        Assert.Equal("/admin/posts", ctx.Request.Path.Value);
+        Assert.Equal("/blog/admin/posts", ctx.Request.Path.Value);
     }
 
     [Fact]

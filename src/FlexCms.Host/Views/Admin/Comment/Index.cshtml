@@ -143,7 +143,7 @@
             const id = btn.dataset.id;
             btn.disabled = true;
             try {
-                const r = await fetch(`/admin/comments/${id}/${action}`, {
+                const r = await fetch(`/blog/admin/comments/${id}/${action}`, {
                     method: 'POST',
                     headers: { 'X-FlexCms-Csrf': csrf() }
                 });

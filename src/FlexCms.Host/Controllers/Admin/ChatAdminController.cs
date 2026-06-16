@@ -10,7 +10,7 @@ namespace FlexCms.Host.Controllers.Admin;
 /// list/preview without a full reload. Detail loading uses
 /// <c>/chat/messages?threadId=...</c> from <c>ChatController</c>.
 /// </summary>
-[Route("admin/chat")]
+[Route("messaging/admin/chat")]
 public class ChatAdminController : BaseAdminController
 {
     private readonly IChatService _chat;

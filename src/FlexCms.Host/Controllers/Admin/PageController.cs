@@ -13,7 +13,7 @@ using Microsoft.AspNetCore.Mvc.Rendering;
 
 namespace FlexCms.Host.Controllers.Admin;
 
-[Route("admin/pages")]
+[Route("pages/admin")]
 public class PageController : BaseAdminController
 {
     private readonly IPageService _pages;

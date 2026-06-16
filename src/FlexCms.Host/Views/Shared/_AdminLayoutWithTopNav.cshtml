@@ -1,0 +1,25 @@
+@using Microsoft.AspNetCore.Html
+@{
+    Layout = "_AdminLayout";
+
+    var topNavPartial = ViewData["ModuleSubNavPartial"] as string;
+    var topNavHtml    = ViewData["ModuleSubNav"] as IHtmlContent;
+}
+
+@if (!string.IsNullOrEmpty(topNavPartial) || topNavHtml is not null)
+{
+    <div class="module-topnav border-bottom mb-3 bg-body-tertiary">
+        <div class="container-fluid px-3">
+            @if (!string.IsNullOrEmpty(topNavPartial))
+            {
+                @await Html.PartialAsync(topNavPartial)
+            }
+            else
+            {
+                @topNavHtml
+            }
+        </div>
+    </div>
+}
+
+@RenderBody()

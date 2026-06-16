@@ -125,7 +125,7 @@
     });
     conn.on('NewThreadActivity', () => {
         // Lazy: just reload the list
-        fetch('/admin/chat/threads').then(r => r.json()).then(j => {
+        fetch('/messaging/admin/chat/threads').then(r => r.json()).then(j => {
             if (!j.isSuccess) return;
             list.innerHTML = j.threads.map(t => `
                 <li class="list-group-item list-group-item-action thread-item" data-id="${t.id}" style="cursor:pointer">

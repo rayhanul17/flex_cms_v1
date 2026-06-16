@@ -9,7 +9,7 @@ using Microsoft.AspNetCore.Mvc.Rendering;
 
 namespace FlexCms.Host.Controllers.Admin;
 
-[Route("admin/categories")]
+[Route("blog/admin/categories")]
 public class CategoryController : BaseAdminController
 {
     private readonly ICategoryService _categories;

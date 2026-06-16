@@ -95,7 +95,7 @@ public sealed class CommentService : ICommentService
                     title: "New comment awaiting moderation",
                     body: $"{(string.IsNullOrEmpty(comment.AuthorName) ? "Anonymous" : comment.AuthorName)}: {preview}",
                     level: NotificationLevel.Info,
-                    url: "/admin/comments",
+                    url: "/blog/admin/comments",
                     icon: "bi bi-chat-left-text",
                     ct: ct);
             }

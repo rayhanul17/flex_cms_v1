@@ -14,7 +14,7 @@ namespace FlexCms.Host.Controllers.Admin;
 /// <see cref="FcmsPendingMessage"/> rows — the controller call only inserts
 /// rows + returns the broadcast id and recipient count.
 /// </summary>
-[Route("admin/broadcast")]
+[Route("messaging/admin/broadcast")]
 public class BroadcastController : BaseAdminController
 {
     private readonly IBroadcastService _broadcast;

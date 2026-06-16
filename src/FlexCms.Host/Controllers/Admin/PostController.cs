@@ -12,7 +12,7 @@ using Microsoft.AspNetCore.Mvc.Rendering;
 
 namespace FlexCms.Host.Controllers.Admin;
 
-[Route("admin/posts")]
+[Route("blog/admin/posts")]
 public class PostController : BaseAdminController
 {
     private readonly IPostService _posts;

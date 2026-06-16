@@ -177,7 +177,7 @@ public class FcmsRowActionsTagHelperTests
     {
         var (h, perm, _) = Build();
         h.EntityId = Guid.NewGuid();
-        h.BaseUrl = "/admin/posts";
+        h.BaseUrl = "/blog/admin/posts";
         h.Status = EntityStatus.Active;
 
         h.CustomActions.Add(new FcmsActionTagHelper.ActionData(
@@ -186,7 +186,7 @@ public class FcmsRowActionsTagHelperTests
             Icon: "bi-globe",
             Variant: "success",
             Permission: FcmsPermissions.PostsEdit,
-            Url: $"/admin/posts/{h.EntityId}/publish",
+            Url: $"/blog/admin/posts/{h.EntityId}/publish",
             ConfirmTitle: "Publish?",
             ConfirmMessage: null,
             ConfirmLabel: null));
@@ -208,7 +208,7 @@ public class FcmsRowActionsTagHelperTests
     {
         var (h, perm, _) = Build();
         h.EntityId = Guid.NewGuid();
-        h.BaseUrl = "/admin/posts";
+        h.BaseUrl = "/blog/admin/posts";
         h.Status = EntityStatus.Active;
 
         h.CustomActions.Add(new FcmsActionTagHelper.ActionData(

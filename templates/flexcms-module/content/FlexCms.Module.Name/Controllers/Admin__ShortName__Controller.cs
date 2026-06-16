@@ -19,7 +19,7 @@ namespace FlexCms.Module.Name.Controllers;
 /// — the helper constants on <see cref="__ShortName__Permissions"/> encode that.
 /// </para>
 /// </summary>
-[Route("admin/mod_prefix")]
+[Route("mod_prefix/admin")]
 [FcmsAuthorize(__ShortName__Permissions.View)]
 public class Admin__ShortName__Controller : Controller
 {

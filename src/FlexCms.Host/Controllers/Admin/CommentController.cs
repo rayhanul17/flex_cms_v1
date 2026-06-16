@@ -12,7 +12,7 @@ namespace FlexCms.Host.Controllers.Admin;
 /// trash. The frontend submission form lives elsewhere — this controller is
 /// purely for moderators.
 /// </summary>
-[Route("admin/comments")]
+[Route("blog/admin/comments")]
 public class CommentController : BaseAdminController
 {
     private readonly IRepository<FcmsComment> _repo;

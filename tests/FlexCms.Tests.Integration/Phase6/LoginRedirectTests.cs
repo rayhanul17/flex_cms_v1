@@ -69,12 +69,12 @@ public class LoginRedirectTests : IDisposable
     [Fact]
     public async Task Single_role_with_redirect_url_uses_that_url()
     {
-        await CreateRoleAsync("Editor", "/admin/posts", priority: 10);
+        await CreateRoleAsync("Editor", "/blog/admin/posts", priority: 10);
         var user = await CreateUserAsync("editor@test.com", "Editor");
 
         var url = await ResolveRedirectAsync(user);
 
-        Assert.Equal("/admin/posts", url);
+        Assert.Equal("/blog/admin/posts", url);
     }
 
     [Fact]

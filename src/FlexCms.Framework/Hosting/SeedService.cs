@@ -305,12 +305,12 @@ public class SeedService : IHostedService
 
         // Blog group
         new() { DefaultName = "Blog",       Icon = "bi bi-journal-richtext", Url = "#blog",   Order = 10 },
-        new() { DefaultName = "Posts",      Icon = "bi bi-newspaper",   Url = "/admin/posts",      Order = 11, ParentDefaultName = "Blog", RequiredPermission = FcmsPermissions.PostsEdit },
-        new() { DefaultName = "Categories", Icon = "bi bi-folder",      Url = "/admin/categories", Order = 12, ParentDefaultName = "Blog", RequiredPermission = FcmsPermissions.CategoriesEdit },
-        new() { DefaultName = "Comments",   Icon = "bi bi-chat-left-text", Url = "/admin/comments", Order = 13, ParentDefaultName = "Blog", RequiredPermission = FcmsPermissions.CommentsModerate },
+        new() { DefaultName = "Posts",      Icon = "bi bi-newspaper",   Url = "/blog/admin/posts",      Order = 11, ParentDefaultName = "Blog", RequiredPermission = FcmsPermissions.PostsEdit },
+        new() { DefaultName = "Categories", Icon = "bi bi-folder",      Url = "/blog/admin/categories", Order = 12, ParentDefaultName = "Blog", RequiredPermission = FcmsPermissions.CategoriesEdit },
+        new() { DefaultName = "Comments",   Icon = "bi bi-chat-left-text", Url = "/blog/admin/comments", Order = 13, ParentDefaultName = "Blog", RequiredPermission = FcmsPermissions.CommentsModerate },
 
         // Standalone content
-        new() { DefaultName = "Pages",      Icon = "bi bi-file-earmark", Url = "/admin/pages",     Order = 20, RequiredPermission = FcmsPermissions.PagesEdit },
+        new() { DefaultName = "Pages",      Icon = "bi bi-file-earmark", Url = "/pages/admin",     Order = 20, RequiredPermission = FcmsPermissions.PagesEdit },
         new() { DefaultName = "Media",      Icon = "bi bi-images",       Url = "/admin/media",     Order = 30, RequiredPermission = FcmsPermissions.MediaView },
         new() { DefaultName = "Trash",      Icon = "bi bi-trash",        Url = "/admin/trash",     Order = 35, RequiredPermission = FcmsPermissions.PostsEdit },
 
@@ -332,11 +332,11 @@ public class SeedService : IHostedService
 
         // Messaging group (Phase 8)
         new() { DefaultName = "Messaging",  Icon = "bi bi-envelope",                    Url = "#messaging",                 Order = 70 },
-        new() { DefaultName = "Broadcast",  Icon = "bi bi-megaphone",                   Url = "/admin/broadcast",           Order = 71, ParentDefaultName = "Messaging", RequiredPermission = FcmsPermissions.MessagingView },
+        new() { DefaultName = "Broadcast",  Icon = "bi bi-megaphone",                   Url = "/messaging/admin/broadcast", Order = 71, ParentDefaultName = "Messaging", RequiredPermission = FcmsPermissions.MessagingView },
         new() { DefaultName = "SMTP / SMS", Icon = "bi bi-gear-wide-connected",         Url = "/admin/messaging-settings",  Order = 72, ParentDefaultName = "Messaging", RequiredPermission = FcmsPermissions.SettingsManage },
 
         // Chat (Phase 10)
-        new() { DefaultName = "Chat", Icon = "bi bi-chat-dots", Url = "/admin/chat", Order = 75, ParentDefaultName = "Messaging", RequiredPermission = Chat.ChatPermissions.Reply },
+        new() { DefaultName = "Chat", Icon = "bi bi-chat-dots", Url = "/messaging/admin/chat", Order = 75, ParentDefaultName = "Messaging", RequiredPermission = Chat.ChatPermissions.Reply },
     ];
 
     private async Task SeedMenuItemsAsync(CancellationToken ct)

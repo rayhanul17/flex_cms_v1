@@ -33,7 +33,10 @@ public class MenuController : BaseAdminController
     [HttpGet("create")]
     [FcmsAuthorize(FcmsPermissions.SettingsManage)]
     public async Task<IActionResult> Create(CancellationToken ct)
-        => View("Edit", await BuildVmAsync(new FcmsMenuItem { ModuleId = "core" }, ct));
+        // Id explicitly zeroed — BaseEfEntity assigns a fresh GUID in its ctor,
+        // which would round-trip through the hidden Id field and make Save take
+        // the UPDATE branch on a row that does not exist yet (DbUpdateConcurrencyException).
+        => View("Edit", await BuildVmAsync(new FcmsMenuItem { Id = Guid.Empty, ModuleId = "core" }, ct));
 
     [HttpGet("{id:guid}/edit")]
     [FcmsAuthorize(FcmsPermissions.SettingsManage)]

@@ -27,6 +27,7 @@ public class CreateEditPageViewModel
     [Required, MaxLength(300), RegularExpression(@"^[a-z0-9\-]+$", ErrorMessage = "Slug may only contain lowercase letters, numbers, and hyphens.")]
     public string Slug { get; set; } = "";
 
+    [Required(ErrorMessage = "Content is required.")]
     public string Content { get; set; } = "";
 
     [MaxLength(300)]
@@ -107,6 +108,10 @@ public class CreateEditPostViewModel
     [MaxLength(500)]
     public string? Excerpt { get; set; }
 
+    // Required so a posted form with the editor stripped (JS broke, TinyMCE
+    // failed to load, etc.) returns a clean validation error instead of a
+    // NOT-NULL DbUpdateException 500 from EF.
+    [Required(ErrorMessage = "Content is required.")]
     public string Content { get; set; } = "";
 
     [MaxLength(300)]

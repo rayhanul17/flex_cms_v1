@@ -1,0 +1,115 @@
+@model IReadOnlyList<FlexCms.Framework.Notifications.FcmsNotification>
+@using FlexCms.Framework.Clock
+@{
+    ViewData["Title"] = "Notifications";
+    var unread = ViewBag.UnreadCount is int u ? u : 0;
+}
+
+<form id="csrf" style="display:none">@Html.AntiForgeryToken()</form>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="mb-0">
+        Notifications
+        @if (unread > 0)
+        {
+            <span class="badge text-bg-danger ms-2">@unread unread</span>
+        }
+    </h4>
+    @if (unread > 0)
+    {
+        <button type="button" class="btn btn-sm btn-outline-secondary" id="markAllReadBtn">
+            <i class="bi bi-check2-all"></i> Mark all read
+        </button>
+    }
+</div>
+
+@if (!Model.Any())
+{
+    <div class="alert alert-info">
+        <i class="bi bi-info-circle me-1"></i>
+        <strong>No notifications yet.</strong>
+        New alerts (failed jobs, content requiring review, system warnings) will appear here.
+    </div>
+}
+else
+{
+    <div class="list-group">
+    @foreach (var n in Model)
+    {
+        var icon = string.IsNullOrEmpty(n.Icon) ? "bi bi-bell" : n.Icon;
+        var badgeClass = n.Level switch
+        {
+            FlexCms.Framework.Notifications.NotificationLevel.Success => "text-bg-success",
+            FlexCms.Framework.Notifications.NotificationLevel.Warning => "text-bg-warning",
+            FlexCms.Framework.Notifications.NotificationLevel.Danger  => "text-bg-danger",
+            _                                                          => "text-bg-info-subtle text-info-emphasis"
+        };
+        <div class="list-group-item d-flex align-items-start gap-3 @(n.IsRead ? "" : "fw-semibold")" data-notification-id="@n.Id">
+            <span class="badge @badgeClass rounded-pill" style="min-width:2rem; padding-top:.4rem; padding-bottom:.4rem">
+                <i class="@icon"></i>
+            </span>
+            <div class="flex-grow-1">
+                <div class="d-flex justify-content-between align-items-start gap-2">
+                    <div>
+                        @if (!string.IsNullOrEmpty(n.Url))
+                        {
+                            <a href="@n.Url" class="text-decoration-none text-body">@n.Title</a>
+                        }
+                        else
+                        {
+                            <span>@n.Title</span>
+                        }
+                    </div>
+                    <small class="text-muted flex-shrink-0">@FcmsTime.Format(n.CreatedAt)</small>
+                </div>
+                @if (!string.IsNullOrEmpty(n.Body))
+                {
+                    <p class="mb-0 small text-muted">@n.Body</p>
+                }
+            </div>
+            @if (!n.IsRead)
+            {
+                <button type="button" class="btn btn-sm btn-link text-muted js-mark-read" title="Mark read">
+                    <i class="bi bi-check2"></i>
+                </button>
+            }
+        </div>
+    }
+    </div>
+}
+
+@section Scripts {
+<script>
+(function () {
+    const token = document.querySelector('#csrf input[name=__RequestVerificationToken]').value;
+
+    async function post(url) {
+        const r = await fetch(url, {
+            method: 'POST',
+            headers: { 'X-FlexCms-Csrf': token },
+            body: new URLSearchParams({ __RequestVerificationToken: token })
+        });
+        return r.json();
+    }
+
+    document.querySelectorAll('.js-mark-read').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const row = btn.closest('[data-notification-id]');
+            const id = row.dataset.notificationId;
+            const r = await post('/admin/notifications/mark-read/' + encodeURIComponent(id));
+            if (r.isSuccess) {
+                row.classList.remove('fw-semibold');
+                btn.remove();
+            }
+        });
+    });
+
+    document.getElementById('markAllReadBtn')?.addEventListener('click', async () => {
+        const r = await post('/admin/notifications/mark-all-read');
+        if (r.isSuccess) {
+            location.reload();
+        }
+    });
+})();
+</script>
+}

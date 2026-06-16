@@ -47,7 +47,11 @@
 </div>
 
 <script>
-(function () {
+// Defer until DOMContentLoaded — this partial is rendered inline ABOVE the
+// admin layout's bootstrap.bundle.min.js include, so `new bootstrap.Modal(...)`
+// at script-parse time throws "bootstrap is not defined". The DOMContentLoaded
+// handler fires after every script in <body> has loaded.
+function fcmsInitMediaPicker() {
     const modalEl = document.getElementById('fcmsMediaPickerModal');
     if (!modalEl) return;
     const modal  = new bootstrap.Modal(modalEl);
@@ -156,5 +160,11 @@
             setValue(btn.getAttribute('data-fcms-clear-image'), '');
         });
     });
-})();
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', fcmsInitMediaPicker);
+} else {
+    fcmsInitMediaPicker();
+}
 </script>

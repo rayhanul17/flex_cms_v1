@@ -23,6 +23,21 @@ public class NotificationController : BaseAdminController
         _users = users;
     }
 
+    [HttpGet("")]
+    public async Task<IActionResult> Index(CancellationToken ct)
+    {
+        var userId = await ResolveUserIdAsync();
+        if (userId == Guid.Empty) return RedirectToAction("Login", "Auth");
+
+        // Pull a generous slice (50) for the dedicated page; the bell dropdown
+        // uses /recent with max:10 for the popover.
+        var items = await _notifications.GetRecentAsync(userId, max: 50, ct);
+        var unread = await _notifications.GetUnreadCountAsync(userId, ct);
+
+        ViewBag.UnreadCount = unread;
+        return View(items);
+    }
+
     [HttpGet("recent")]
     public async Task<IActionResult> Recent(CancellationToken ct)
     {

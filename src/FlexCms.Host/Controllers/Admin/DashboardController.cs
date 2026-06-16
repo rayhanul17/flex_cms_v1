@@ -1,11 +1,11 @@
 using FlexCms.Framework.Auth;
+using FlexCms.Framework.Caching;
 using FlexCms.Framework.Cms;
 using FlexCms.Framework.Db;
 using FlexCms.Framework.Messaging;
 using FlexCms.Host.Models.Admin;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Caching.Memory;
 
 namespace FlexCms.Host.Controllers.Admin;
 
@@ -21,9 +21,10 @@ public class DashboardController : BaseAdminController
     private readonly IRepository<FcmsPendingMessage> _msgs;
     private readonly UserManager<FcmsUser> _users;
     private readonly RoleManager<FcmsRole> _roles;
-    private readonly IMemoryCache _cache;
+    private readonly IFcmsCacheService _cache;
 
     private const string CacheKey = "fcms:dashboard:stats";
+    private static readonly TimeSpan CacheTtl = TimeSpan.FromMinutes(5);
 
     public DashboardController(
         IRepository<FcmsPage> pages,
@@ -34,7 +35,7 @@ public class DashboardController : BaseAdminController
         IRepository<FcmsPendingMessage> msgs,
         UserManager<FcmsUser> users,
         RoleManager<FcmsRole> roles,
-        IMemoryCache cache)
+        IFcmsCacheService cache)
     {
         _pages = pages;
         _posts = posts;
@@ -50,14 +51,12 @@ public class DashboardController : BaseAdminController
     [HttpGet("")]
     public async Task<IActionResult> Index(CancellationToken ct)
     {
-        // Cache the heavy COUNT(*) sweep for 5 minutes — dashboard reload should
-        // not hammer the DB on every refresh.
-        var vm = await _cache.GetOrCreateAsync(CacheKey, async entry =>
-        {
-            entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5);
-            return await BuildAsync(ct);
-        }) ?? await BuildAsync(ct);
-
+        // IFcmsCacheService.GetOrCreateAsync is stampede-protected: on cold
+        // cache only ONE caller runs the COUNT(*) sweep — concurrent dashboard
+        // refreshes wait on a per-key semaphore and read the populated value
+        // when the first caller finishes. With raw IMemoryCache we hit the DB
+        // N times per concurrent refresh.
+        var vm = await _cache.GetOrCreateAsync(CacheKey, BuildAsync, CacheTtl, ct);
         return View(vm);
     }
 

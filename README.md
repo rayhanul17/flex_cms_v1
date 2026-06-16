@@ -3,6 +3,10 @@
 A modular, plug-and-play CMS built on .NET 10 — designed for Bangladesh market, Bangla-first, single-instance deployment-friendly.
 
 > **🚀 New developer? Start here:** [`docs/DEVELOPER_GUIDE.md`](docs/DEVELOPER_GUIDE.md) — step-by-step from clone to production deploy.
+>
+> **Writing a module?** [`docs/MODULE_DEV.md`](docs/MODULE_DEV.md) (concepts) +
+> [`docs/AGENT_MODULE_GUIDE.md`](docs/AGENT_MODULE_GUIDE.md) (quick action guide,
+> handy for an AI coding agent).
 
 ---
 

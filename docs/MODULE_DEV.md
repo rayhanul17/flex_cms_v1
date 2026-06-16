@@ -4,6 +4,10 @@ Build a module once, drop it into any FlexCMS host, restart — that's the contr
 This guide walks you through the mandatory contract, recommended structure, and
 every helper / hook you can lean on.
 
+> **Handing module work to an AI agent?** Start it with
+> [`AGENT_MODULE_GUIDE.md`](AGENT_MODULE_GUIDE.md) — a focused, action-oriented
+> distillation of the bits an AI needs to ship a working module from scratch.
+
 ---
 
 ## 1. What is a module?

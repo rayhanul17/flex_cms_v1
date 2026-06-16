@@ -32,11 +32,16 @@ public class GreetingService
         return (db, repo, uow);
     }
 
-    public async Task<List<HelloGreeting>> GetAllAsync(CancellationToken ct = default)
+    public async Task<List<HelloGreeting>> GetAllAsync(
+        CancellationToken ct = default,
+        bool includeDeleted = false,
+        bool includeInactive = true)
     {
         var (db, repo, _) = Open();
         await using (db)
-            return (await repo.FindAsync(g => true, ct))
+            return (await repo.FindAsync(g => true, ct,
+                        includeDeleted: includeDeleted,
+                        includeInactive: includeInactive))
                 .OrderByDescending(g => g.CreatedAt).ToList();
     }
 

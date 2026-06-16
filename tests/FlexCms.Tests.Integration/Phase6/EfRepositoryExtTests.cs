@@ -220,6 +220,72 @@ public class EfRepositoryExtTests : IDisposable
         Assert.False(await _repo.ExistsAsync(m => m.FileName == "ghost.pdf"));
     }
 
+    // ── includeInactive ───────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task GetAllAsync_includeInactive_default_surfaces_inactive_rows()
+    {
+        var a = await AddAsync("active.pdf");
+        var b = await AddAsync("inactive.pdf");
+        b.Status = EntityStatus.InActive;
+        await _db.SaveChangesAsync();
+
+        var rows = await _repo.GetAllAsync();
+
+        Assert.Equal(2, rows.Count);
+    }
+
+    [Fact]
+    public async Task GetAllAsync_includeInactive_false_hides_inactive_rows()
+    {
+        await AddAsync("active.pdf");
+        var b = await AddAsync("inactive.pdf");
+        b.Status = EntityStatus.InActive;
+        await _db.SaveChangesAsync();
+
+        var rows = await _repo.GetAllAsync(includeInactive: false);
+
+        Assert.Single(rows);
+        Assert.Equal("active.pdf", rows[0].FileName);
+    }
+
+    [Fact]
+    public async Task FindAsync_includeInactive_false_hides_inactive_rows()
+    {
+        await AddAsync("a.pdf");
+        var b = await AddAsync("b.pdf");
+        b.Status = EntityStatus.InActive;
+        await _db.SaveChangesAsync();
+
+        var rows = await _repo.FindAsync(m => true, includeInactive: false);
+
+        Assert.Single(rows);
+    }
+
+    [Fact]
+    public async Task CountAsync_respects_includeInactive_flag()
+    {
+        await AddAsync("a.pdf");
+        var b = await AddAsync("b.pdf");
+        b.Status = EntityStatus.InActive;
+        await _db.SaveChangesAsync();
+
+        Assert.Equal(2, await _repo.CountAsync());
+        Assert.Equal(1, await _repo.CountAsync(includeInactive: false));
+    }
+
+    [Fact]
+    public async Task Query_with_flags_surfaces_deleted_when_requested()
+    {
+        await AddAsync("a.pdf");
+        var b = await AddAsync("b.pdf");
+        b.Status = EntityStatus.Deleted;
+        await _db.SaveChangesAsync();
+
+        Assert.Equal(1, _repo.Query().Count());
+        Assert.Equal(2, _repo.Query(includeDeleted: true).Count());
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private async Task<FcmsMedia> AddAsync(string fileName, Guid? folderId = null)

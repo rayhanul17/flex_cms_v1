@@ -23,47 +23,148 @@ public class EfRepository<T> : IRepository<T> where T : BaseEfEntity
         _set = context.Set<T>();
     }
 
-    /// <summary>
-    /// Base query honoring soft-delete semantics for normal entities OR
-    /// returning the unfiltered set for append-only entities.
-    /// </summary>
-    private IQueryable<T> NotDeleted =>
-        IsAppendOnly ? _set : _set.Where(e => e.Status != EntityStatus.Deleted);
+    // ── Query builder ─────────────────────────────────────────────────────────
+    //
+    // Centralises the soft-delete + inactive + include logic so every read
+    // method below behaves identically. Defaults:
+    //   includeDeleted = false  → Status != Deleted (soft-delete filter applied)
+    //   includeInactive = true  → Active + InActive surfaced; flip to false to
+    //                             restrict to Status == Active (public-site
+    //                             queries, "is this usable" checks).
 
-    public async Task<T?> GetByIdAsync(Guid id, CancellationToken ct = default)
-        => IsAppendOnly
-            ? await _set.FirstOrDefaultAsync(e => e.Id == id, ct)
-            : await _set.FirstOrDefaultAsync(e => e.Id == id && e.Status != EntityStatus.Deleted, ct);
-
-    public async Task<List<T>> GetAllAsync(CancellationToken ct = default)
-        => await NotDeleted.ToListAsync(ct);
-
-    public async Task<List<T>> FindAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default, bool includeDeleted = false)
+    private IQueryable<T> BuildQuery(
+        bool includeDeleted,
+        bool includeInactive,
+        Expression<Func<T, object>>[]? includes)
     {
-        var query = (includeDeleted || IsAppendOnly)
-            ? _set.IgnoreQueryFilters()
-            : _set.Where(e => e.Status != EntityStatus.Deleted);
-        return await query.Where(predicate).ToListAsync(ct);
+        IQueryable<T> q = _set;
+
+        if (includeDeleted || IsAppendOnly)
+        {
+            // Bypass the global soft-delete query filter EF applies on save.
+            q = q.IgnoreQueryFilters();
+        }
+        else
+        {
+            // Belt-and-braces: the global filter already excludes Deleted, but
+            // an explicit Where keeps behaviour correct on contexts that don't
+            // have the global filter installed (raw DbContext from a module).
+            q = q.Where(e => e.Status != EntityStatus.Deleted);
+        }
+
+        // Only meaningful for non-append-only entities.
+        if (!IsAppendOnly && !includeInactive)
+            q = q.Where(e => e.Status == EntityStatus.Active);
+
+        if (includes is { Length: > 0 })
+            foreach (var inc in includes)
+                q = q.Include(inc);
+
+        return q;
     }
 
-    public async Task<T?> FirstOrDefaultAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default, bool includeDeleted = false)
+    // ── Single-row reads ──────────────────────────────────────────────────────
+
+    public async Task<T?> GetByIdAsync(
+        Guid id,
+        CancellationToken ct = default,
+        bool includeDeleted = false,
+        bool includeInactive = true,
+        params Expression<Func<T, object>>[] includes)
+        => await BuildQuery(includeDeleted, includeInactive, includes)
+            .FirstOrDefaultAsync(e => e.Id == id, ct);
+
+    public async Task<T?> FirstOrDefaultAsync(
+        Expression<Func<T, bool>> predicate,
+        CancellationToken ct = default,
+        bool includeDeleted = false,
+        bool includeInactive = true,
+        params Expression<Func<T, object>>[] includes)
+        => await BuildQuery(includeDeleted, includeInactive, includes)
+            .FirstOrDefaultAsync(predicate, ct);
+
+    // ── Multi-row reads ───────────────────────────────────────────────────────
+
+    public async Task<List<T>> GetAllAsync(
+        CancellationToken ct = default,
+        bool includeDeleted = false,
+        bool includeInactive = true,
+        params Expression<Func<T, object>>[] includes)
+        => await BuildQuery(includeDeleted, includeInactive, includes).ToListAsync(ct);
+
+    public async Task<List<T>> FindAsync(
+        Expression<Func<T, bool>> predicate,
+        CancellationToken ct = default,
+        bool includeDeleted = false,
+        bool includeInactive = true,
+        params Expression<Func<T, object>>[] includes)
+        => await BuildQuery(includeDeleted, includeInactive, includes)
+            .Where(predicate).ToListAsync(ct);
+
+    public async Task<List<T>> GetByIdsAsync(
+        IEnumerable<Guid> ids,
+        CancellationToken ct = default,
+        bool includeDeleted = false,
+        bool includeInactive = true,
+        params Expression<Func<T, object>>[] includes)
     {
-        var query = (includeDeleted || IsAppendOnly)
-            ? _set.IgnoreQueryFilters()
-            : _set.Where(e => e.Status != EntityStatus.Deleted);
-        return await query.FirstOrDefaultAsync(predicate, ct);
+        var idList = ids.ToList();
+        return await BuildQuery(includeDeleted, includeInactive, includes)
+            .Where(e => idList.Contains(e.Id)).ToListAsync(ct);
     }
 
-    public async Task<bool> ExistsAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default)
-        => await NotDeleted.AnyAsync(predicate, ct);
+    // ── Aggregates ────────────────────────────────────────────────────────────
 
-    public async Task<long> CountAsync(Expression<Func<T, bool>>? predicate = null, CancellationToken ct = default)
+    public async Task<bool> ExistsAsync(
+        Expression<Func<T, bool>> predicate,
+        CancellationToken ct = default,
+        bool includeDeleted = false,
+        bool includeInactive = true)
+        => await BuildQuery(includeDeleted, includeInactive, null).AnyAsync(predicate, ct);
+
+    public async Task<long> CountAsync(
+        Expression<Func<T, bool>>? predicate = null,
+        CancellationToken ct = default,
+        bool includeDeleted = false,
+        bool includeInactive = true)
     {
-        var query = NotDeleted;
+        var q = BuildQuery(includeDeleted, includeInactive, null);
         return predicate is null
-            ? await query.LongCountAsync(ct)
-            : await query.LongCountAsync(predicate, ct);
+            ? await q.LongCountAsync(ct)
+            : await q.LongCountAsync(predicate, ct);
     }
+
+    // ── Paging ────────────────────────────────────────────────────────────────
+
+    public async Task<PagedResponse<T>> FindPagedAsync(
+        Expression<Func<T, bool>>? predicate,
+        Expression<Func<T, object>> orderBy,
+        int page,
+        int pageSize,
+        bool descending = false,
+        CancellationToken ct = default,
+        bool includeDeleted = false,
+        bool includeInactive = true,
+        params Expression<Func<T, object>>[] includes)
+    {
+        var query = BuildQuery(includeDeleted, includeInactive, includes);
+        if (predicate is not null) query = query.Where(predicate);
+
+        var total = await query.CountAsync(ct);
+
+        query = descending
+            ? query.OrderByDescending(orderBy)
+            : query.OrderBy(orderBy);
+
+        var items = await query
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(ct);
+
+        return PagedResponse<T>.Create(items, total, page, pageSize);
+    }
+
+    // ── Writes ────────────────────────────────────────────────────────────────
 
     public async Task AddAsync(T entity, CancellationToken ct = default)
         => await _set.AddAsync(entity, ct);
@@ -92,43 +193,6 @@ public class EfRepository<T> : IRepository<T> where T : BaseEfEntity
         return Task.CompletedTask;
     }
 
-    public async Task<PagedResponse<T>> FindPagedAsync(
-        Expression<Func<T, bool>>? predicate,
-        Expression<Func<T, object>> orderBy,
-        int page,
-        int pageSize,
-        bool descending = false,
-        CancellationToken ct = default)
-    {
-        var query = NotDeleted;
-        if (predicate is not null) query = query.Where(predicate);
-
-        var total = await query.CountAsync(ct);
-
-        query = descending
-            ? query.OrderByDescending(orderBy)
-            : query.OrderBy(orderBy);
-
-        var items = await query
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .ToListAsync(ct);
-
-        return PagedResponse<T>.Create(items, total, page, pageSize);
-    }
-
-    // --- New: Batch fetch ---
-
-    public async Task<List<T>> GetByIdsAsync(IEnumerable<Guid> ids, CancellationToken ct = default)
-    {
-        var idList = ids.ToList();
-        return IsAppendOnly
-            ? await _set.Where(e => idList.Contains(e.Id)).ToListAsync(ct)
-            : await _set.Where(e => idList.Contains(e.Id) && e.Status != EntityStatus.Deleted).ToListAsync(ct);
-    }
-
-    // --- New: Bulk write ---
-
     public Task UpdateRangeAsync(IEnumerable<T> entities, CancellationToken ct = default)
     {
         _set.UpdateRange(entities);
@@ -149,11 +213,11 @@ public class EfRepository<T> : IRepository<T> where T : BaseEfEntity
         return Task.CompletedTask;
     }
 
-    // --- New: QueryFilter overloads ---
+    // ── QueryFilter overloads ─────────────────────────────────────────────────
 
     public async Task<List<T>> FindAsync(QueryFilter<T> filter, CancellationToken ct = default)
     {
-        IQueryable<T> query = NotDeleted;
+        IQueryable<T> query = BuildQuery(includeDeleted: false, includeInactive: true, includes: null);
 
         foreach (var cond in filter.Conditions)
             query = query.Where(cond);
@@ -173,7 +237,7 @@ public class EfRepository<T> : IRepository<T> where T : BaseEfEntity
 
     public async Task<PagedResponse<T>> FindPagedAsync(QueryFilter<T> filter, CancellationToken ct = default)
     {
-        IQueryable<T> query = NotDeleted;
+        IQueryable<T> query = BuildQuery(includeDeleted: false, includeInactive: true, includes: null);
 
         foreach (var cond in filter.Conditions)
             query = query.Where(cond);
@@ -198,5 +262,13 @@ public class EfRepository<T> : IRepository<T> where T : BaseEfEntity
         return PagedResponse<T>.Create(items, total, page, pageSize > 0 ? pageSize : total);
     }
 
-    public IQueryable<T> Query() => NotDeleted;
+    // ── Raw query ─────────────────────────────────────────────────────────────
+
+    public IQueryable<T> Query() => BuildQuery(includeDeleted: false, includeInactive: true, includes: null);
+
+    public IQueryable<T> Query(
+        bool includeDeleted = false,
+        bool includeInactive = true,
+        params Expression<Func<T, object>>[] includes)
+        => BuildQuery(includeDeleted, includeInactive, includes);
 }

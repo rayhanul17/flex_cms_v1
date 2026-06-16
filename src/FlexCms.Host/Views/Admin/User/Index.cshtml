@@ -1,6 +1,14 @@
 @model List<FlexCms.Host.Models.Admin.UserListItemViewModel>
 @{
     ViewData["Title"] = "Users";
+
+    string Initials(string s)
+    {
+        var parts = (s ?? "").Split(new[] { ' ', '.', '_', '-', '@' }, StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length >= 2) return (char.ToUpperInvariant(parts[0][0]).ToString() + char.ToUpperInvariant(parts[^1][0]));
+        if (parts.Length == 1) return parts[0].Length >= 2 ? (char.ToUpperInvariant(parts[0][0]).ToString() + char.ToUpperInvariant(parts[0][1])) : char.ToUpperInvariant(parts[0][0]).ToString();
+        return "U";
+    }
 }
 
 <div class="d-flex justify-content-between align-items-center mb-3">
@@ -16,6 +24,7 @@
         <table id="userTable" class="table table-hover mb-0 align-middle">
             <thead class="table-light">
                 <tr>
+                    <th style="width:48px;"></th>
                     <th>Name</th>
                     <th>Email</th>
                     <th>Roles</th>
@@ -36,10 +45,24 @@
                     };
                     <tr>
                         <td>
+                            @if (!string.IsNullOrWhiteSpace(u.ImageUrl))
+                            {
+                                <img src="@u.ImageUrl" alt="" class="rounded-circle" style="width:32px;height:32px;object-fit:cover;" />
+                            }
+                            else
+                            {
+                                <span class="rounded-circle d-inline-flex align-items-center justify-content-center bg-secondary-subtle text-secondary-emphasis fw-semibold" style="width:32px;height:32px;font-size:.75rem;">@Initials(u.ResolvedDisplayName)</span>
+                            }
+                        </td>
+                        <td>
                             <div class="fw-medium">@u.ResolvedDisplayName</div>
                             @if (!string.IsNullOrWhiteSpace(u.DisplayName) && u.DisplayName != u.FullName)
                             {
                                 <div class="text-muted small">@u.FullName</div>
+                            }
+                            @if (u.IsBlocked)
+                            {
+                                <span class="badge text-bg-danger mt-1" title="@u.BlockReason">Blocked until @u.BlockedUntil!.Value.ToString("yyyy-MM-dd HH:mm") UTC</span>
                             }
                         </td>
                         <td class="text-break">

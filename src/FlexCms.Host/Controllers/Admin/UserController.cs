@@ -1,4 +1,5 @@
 using FlexCms.Framework.Auth;
+using FlexCms.Framework.Sessions;
 using FlexCms.Host.Models.Admin;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -10,13 +11,15 @@ public class UserController : BaseAdminController
 {
     private readonly UserManager<FcmsUser> _userManager;
     private readonly RoleManager<FcmsRole> _roleManager;
+    private readonly ISessionService _sessions;
 
     // Uses UserManager.GetRolesAsync rather than a direct DbContext join — the
     // per-user N+1 cost is acceptable for typical admin user counts (<100).
-    public UserController(UserManager<FcmsUser> userManager, RoleManager<FcmsRole> roleManager)
+    public UserController(UserManager<FcmsUser> userManager, RoleManager<FcmsRole> roleManager, ISessionService sessions)
     {
         _userManager = userManager;
         _roleManager = roleManager;
+        _sessions = sessions;
     }
 
     // ── List ──────────────────────────────────────────────────────────────────
@@ -39,8 +42,11 @@ public class UserController : BaseAdminController
                 Email = u.Email ?? "",
                 FullName = u.FullName,
                 DisplayName = u.DisplayName,
+                ImageUrl = u.ImageUrl,
                 Status = u.Status,
                 ForcePasswordChange = u.ForcePasswordChange,
+                BlockedUntil = u.BlockedUntil,
+                BlockReason = u.BlockReason,
                 CreatedAt = u.CreatedAt,
                 Roles = roles.ToList()
             });
@@ -72,6 +78,7 @@ public class UserController : BaseAdminController
             EmailConfirmed = true,
             FullName = model.FullName.Trim(),
             DisplayName = string.IsNullOrWhiteSpace(model.DisplayName) ? null : model.DisplayName.Trim(),
+            ImageUrl = string.IsNullOrWhiteSpace(model.ImageUrl) ? null : model.ImageUrl.Trim(),
             ForcePasswordChange = model.ForcePasswordChange
         };
 
@@ -118,7 +125,10 @@ public class UserController : BaseAdminController
             Email = user.Email ?? "",
             FullName = user.FullName,
             DisplayName = user.DisplayName,
+            ImageUrl = user.ImageUrl,
             ForcePasswordChange = user.ForcePasswordChange,
+            BlockedUntil = user.BlockedUntil,
+            BlockReason = user.BlockReason,
             AvailableRoles = allRoles,
             SelectedRoleIds = selectedIds
         });
@@ -140,6 +150,7 @@ public class UserController : BaseAdminController
         user.UserName = model.Email;
         user.FullName = model.FullName.Trim();
         user.DisplayName = string.IsNullOrWhiteSpace(model.DisplayName) ? null : model.DisplayName.Trim();
+        user.ImageUrl = string.IsNullOrWhiteSpace(model.ImageUrl) ? null : model.ImageUrl.Trim();
         user.ForcePasswordChange = model.ForcePasswordChange;
         await _userManager.UpdateAsync(user);
 
@@ -186,6 +197,65 @@ public class UserController : BaseAdminController
         }
     }
 
+    // ── Block / Unblock (admin time-bound lockout) ────────────────────────────
+    // Block writes BlockedUntil + BlockReason on FcmsUser AND sets the Identity
+    // LockoutEnd so PasswordSignInAsync bounces login. Unblock clears both.
+    // FcmsSessionValidationMiddleware reads BlockedUntil to force-logout active
+    // sessions on the next request.
+
+    [HttpPost("{id:guid}/block")]
+    [ValidateAntiForgeryToken]
+    [FcmsAuthorize(FcmsPermissions.UsersEdit)]
+    [FcmsLog("users.block", "FcmsUser")]
+    public async Task<IActionResult> Block(Guid id, BlockUserViewModel model, CancellationToken ct)
+    {
+        if (!ModelState.IsValid)
+            return FcmsFail(string.Join(" ", ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage)));
+        if (model.BlockedUntil <= DateTime.UtcNow)
+            return FcmsFail("Blocked-until must be in the future.");
+
+        var user = await _userManager.FindByIdAsync(id.ToString());
+        if (user is null) return FcmsFail("User not found.");
+        if (user.Id == FcmsContext.UserId)
+            return FcmsFail("You cannot block your own account.");
+
+        user.BlockedUntil = model.BlockedUntil;
+        user.BlockReason = model.Reason.Trim();
+        await _userManager.UpdateAsync(user);
+        await _userManager.SetLockoutEndDateAsync(user, new DateTimeOffset(DateTime.SpecifyKind(model.BlockedUntil, DateTimeKind.Utc)));
+
+        // Revoke every active session so the user is force-logged-out on the
+        // next request — SetLockoutEndDateAsync only stops re-login, not the
+        // already-issued auth cookies.
+        await RevokeUserSessionsSafe(user.Id, "Admin block: " + user.BlockReason);
+
+        FcmsLogContext.SetEntityId(HttpContext, user.Id);
+        FcmsLogContext.SetValue(HttpContext, user);
+        return FcmsOk($"User blocked until {model.BlockedUntil:yyyy-MM-dd HH:mm} UTC.");
+    }
+
+    [HttpPost("{id:guid}/unblock")]
+    [ValidateAntiForgeryToken]
+    [FcmsAuthorize(FcmsPermissions.UsersEdit)]
+    [FcmsLog("users.unblock", "FcmsUser")]
+    public async Task<IActionResult> Unblock(Guid id)
+    {
+        var user = await _userManager.FindByIdAsync(id.ToString());
+        if (user is null) return FcmsFail("User not found.");
+
+        user.BlockedUntil = null;
+        user.BlockReason = null;
+        await _userManager.UpdateAsync(user);
+        // Only clear lockout if the user is currently Active — leave deactivated
+        // users locked out via the 100-year sentinel set by ToggleActive.
+        if (user.Status == FlexCms.Framework.Db.EntityStatus.Active)
+            await _userManager.SetLockoutEndDateAsync(user, null);
+
+        FcmsLogContext.SetEntityId(HttpContext, user.Id);
+        FcmsLogContext.SetValue(HttpContext, user);
+        return FcmsOk("User unblocked.");
+    }
+
     // ── Delete ────────────────────────────────────────────────────────────────
 
     [HttpPost("{id:guid}/delete")]
@@ -207,6 +277,12 @@ public class UserController : BaseAdminController
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
+
+    private async Task RevokeUserSessionsSafe(Guid userId, string reason)
+    {
+        try { await _sessions.RevokeAllForUserAsync(userId, FcmsContext.UserId, reason); }
+        catch { /* best-effort — block already saved, lockout end is the hard stop */ }
+    }
 
     private Task<List<RoleSelectItem>> GetRoleSelectItemsAsync()
     {

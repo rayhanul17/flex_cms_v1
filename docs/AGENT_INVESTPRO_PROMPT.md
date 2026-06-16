@@ -72,8 +72,24 @@ are involved and **commits must be split between them correctly**:
 
 If `D:\flex_cms_v1\src\FlexCms.Host\App_Data\setup.json` does NOT exist
 (or `IsSetupComplete: false`), the host redirects everything to `/Setup`.
-Drive the 3-step wizard via Playwright (preferred) or fill the form
-manually in a real browser:
+
+**⚠ Before driving the wizard — drop + recreate the database.** The
+wizard does NOT delete leftover tables; if a previous setup partially
+populated the schema, you'll hit confusing migration / duplicate-key
+errors during seed. Always start from an empty `flexcms` database:
+
+```bash
+# Drop + recreate the Postgres database (kills every table, role grant,
+# enum, sequence — clean slate). Run from any working directory.
+docker exec postgres psql -U dev -d postgres -c "DROP DATABASE IF EXISTS flexcms;"
+docker exec postgres psql -U dev -d postgres -c "CREATE DATABASE flexcms;"
+
+# Sanity check — should print 0 user tables.
+docker exec postgres psql -U dev -d flexcms -c "\dt" 2>&1 | tail -3
+```
+
+Now drive the 3-step wizard via Playwright (preferred — see § Playwright
+notes below) or fill the form manually in a real browser:
 
 1. **Step 1 — Database**: pick PostgreSQL, host `localhost`, port `5432`,
    database `flexcms`, user `dev`, password `Dev@123456`. Click
@@ -98,18 +114,27 @@ that email or fully reset (see § Reset below).
 
 ### Reset to a clean fresh setup
 
+Use this when an earlier wizard run left stale state (wrong admin email,
+half-finished setup, broken seed). Order matters — wipe filesystem state
+first, then drop the DB, so the host doesn't try to write to a vanishing
+database:
+
 ```bash
-# 1. Stop the host
-# 2. Drop + recreate the database (Postgres in Docker):
-docker exec postgres psql -U dev -d postgres -c "DROP DATABASE IF EXISTS flexcms;"
-docker exec postgres psql -U dev -d postgres -c "CREATE DATABASE flexcms;"
-# 3. Wipe the setup state and runtime artifacts:
+# 1. Stop the host (Ctrl+C the dotnet run shell).
+
+# 2. Wipe setup state + runtime artifacts:
 rm -f  D:\flex_cms_v1\src\FlexCms.Host\App_Data\setup.json
 rm -rf D:\flex_cms_v1\src\FlexCms.Host\App_Data\keys
 rm -rf D:\flex_cms_v1\src\FlexCms.Host\App_Data\logs
 rm -rf D:\flex_cms_v1\src\FlexCms.Host\modules\*       # keep .gitkeep
 rm -rf D:\flex_cms_v1\src\FlexCms.Host\wwwroot\uploads
-# 4. Start the host — `dotnet run` will land on /Setup, follow the wizard above.
+
+# 3. Drop + recreate the flexcms database (same commands as the wizard
+#    scenario above — DON'T skip this; the wizard won't drop tables itself):
+docker exec postgres psql -U dev -d postgres -c "DROP DATABASE IF EXISTS flexcms;"
+docker exec postgres psql -U dev -d postgres -c "CREATE DATABASE flexcms;"
+
+# 4. Start the host — `dotnet run` will land on /Setup. Drive the wizard.
 ```
 
 ## Initial setup (run once at the start)

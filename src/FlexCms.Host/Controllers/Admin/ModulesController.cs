@@ -198,10 +198,13 @@ public class ModulesController : BaseAdminController
         if (!file.FileName.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
             return FcmsFail("Module package must be a .zip file.");
 
-        var solutionRoot = FindSolutionRoot(_env.ContentRootPath);
-        if (solutionRoot is null) return FcmsFail("Could not locate the solution root.");
-
-        var modulesRoot = Path.Combine(solutionRoot, "modules");
+        // Uploaded packages must land in the SAME folder the runtime scans
+        // (App_Data's sibling), not the solution-root modules/ (that one is
+        // for source-controlled sample/dev modules). FcmsServiceExtensions
+        // computes modulesRoot as {AppDataPath}/../modules at boot — replicate
+        // here so uploads are discovered on the next restart without the
+        // operator hand-copying files.
+        var modulesRoot = Path.GetFullPath(Path.Combine(_env.ContentRootPath, "modules"));
         Directory.CreateDirectory(modulesRoot);
 
         // Stage to a temp folder first so a malformed ZIP doesn't pollute

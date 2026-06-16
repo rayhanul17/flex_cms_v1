@@ -32,7 +32,7 @@ public sealed class ModuleUpdateService : IModuleUpdateService
         if (string.IsNullOrWhiteSpace(newPackagePath) || !File.Exists(newPackagePath) && !Directory.Exists(newPackagePath))
             return new ModuleUpdateResult(false, null, null, "Package path does not exist.");
 
-        var modulesRoot = Path.Combine(_env.ContentRootPath, "modules");
+        var modulesRoot = Path.Combine(_env.ContentRootPath, "Modules");
         var moduleDir = Path.Combine(modulesRoot, moduleId);
         if (!Directory.Exists(moduleDir))
             return new ModuleUpdateResult(false, null, null, $"Module folder '{moduleId}' does not exist.");

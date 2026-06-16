@@ -217,16 +217,16 @@ public class ModulesController : BaseAdminController
             return FcmsFail("Module package must be a .zip file.");
 
         // Uploaded packages must land in the SAME folder the runtime scans
-        // (App_Data's sibling), not the solution-root modules/ (that one is
+        // (App_Data's sibling), not the solution-root Modules/ (that one is
         // for source-controlled sample/dev modules). FcmsServiceExtensions
-        // computes modulesRoot as {AppDataPath}/../modules at boot — replicate
+        // computes modulesRoot as {AppDataPath}/../Modules at boot — replicate
         // here so uploads are discovered on the next restart without the
         // operator hand-copying files.
-        var modulesRoot = Path.GetFullPath(Path.Combine(_env.ContentRootPath, "modules"));
+        var modulesRoot = Path.GetFullPath(Path.Combine(_env.ContentRootPath, "Modules"));
         Directory.CreateDirectory(modulesRoot);
 
         // Stage to a temp folder first so a malformed ZIP doesn't pollute
-        // modules/ with a half-extracted directory.
+        // Modules/ with a half-extracted directory.
         var stagingDir = Path.Combine(Path.GetTempPath(), "fcms_module_upload_" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(stagingDir);
 
@@ -332,11 +332,11 @@ public class ModulesController : BaseAdminController
             return View("Scaffold", model);
         }
 
-        // Drop the scaffolded project into the SOLUTION-ROOT modules/ folder
+        // Drop the scaffolded project into the SOLUTION-ROOT Modules/ folder
         // (sibling of src/, samples/, templates/) — same place the runtime now
-        // scans alongside src/FlexCms.Host/modules. Visual Studio sees the
+        // scans alongside src/FlexCms.Host/Modules. Visual Studio sees the
         // project as a top-level entry, not a file nested under the host.
-        var modulesRoot = Path.Combine(solutionRoot, "modules");
+        var modulesRoot = Path.Combine(solutionRoot, "Modules");
         Directory.CreateDirectory(modulesRoot);
         var dest = Path.Combine(modulesRoot, model.ModuleId);
 
@@ -358,17 +358,17 @@ public class ModulesController : BaseAdminController
         // Register the new csproj in FlexCms.slnx so it shows up in Visual
         // Studio / Rider / VS Code's solution explorer immediately.
         var slnxPath = Path.Combine(solutionRoot, "FlexCms.slnx");
-        try { AddProjectToSlnx(slnxPath, $"modules/{model.ModuleId}/{model.ModuleId}.csproj"); }
+        try { AddProjectToSlnx(slnxPath, $"Modules/{model.ModuleId}/{model.ModuleId}.csproj"); }
         catch { /* solution-file edit is best-effort — never block the scaffold */ }
 
-        TempData["Success"] = $"Module '{model.ModuleId}' scaffolded to modules/{model.ModuleId}/. " +
-                              "Run `dotnet build modules/" + model.ModuleId + "/" + model.ModuleId + ".csproj`, " +
+        TempData["Success"] = $"Module '{model.ModuleId}' scaffolded to Modules/{model.ModuleId}/. " +
+                              "Run `dotnet build Modules/" + model.ModuleId + "/" + model.ModuleId + ".csproj`, " +
                               "then restart the host so it discovers your module.";
         return RedirectToAction(nameof(Index));
     }
 
     /// <summary>
-    /// Append a project entry to FlexCms.slnx's /modules/ folder. Idempotent —
+    /// Append a project entry to FlexCms.slnx's /Modules/ folder. Idempotent —
     /// silently no-ops if the project is already listed.
     /// </summary>
     private static void AddProjectToSlnx(string slnxPath, string relativeProjectPath)
@@ -377,18 +377,18 @@ public class ModulesController : BaseAdminController
         var text = System.IO.File.ReadAllText(slnxPath);
         if (text.Contains(relativeProjectPath, StringComparison.OrdinalIgnoreCase)) return;
 
-        var modulesFolderLine = "<Folder Name=\"/modules/\">";
+        var modulesFolderLine = "<Folder Name=\"/Modules/\">";
         if (text.Contains(modulesFolderLine, StringComparison.Ordinal))
         {
-            // Append project entry inside the existing /modules/ folder block.
+            // Append project entry inside the existing /Modules/ folder block.
             text = text.Replace(modulesFolderLine,
                 $"{modulesFolderLine}\n    <Project Path=\"{relativeProjectPath}\" />");
         }
         else
         {
-            // Insert a fresh /modules/ folder block just before </Solution>.
+            // Insert a fresh /Modules/ folder block just before </Solution>.
             var block =
-                "  <Folder Name=\"/modules/\">\n" +
+                "  <Folder Name=\"/Modules/\">\n" +
                 $"    <Project Path=\"{relativeProjectPath}\" />\n" +
                 "  </Folder>\n";
             text = text.Replace("</Solution>", block + "</Solution>");

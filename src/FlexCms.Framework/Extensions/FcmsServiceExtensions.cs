@@ -290,13 +290,13 @@ public static class FcmsServiceExtensions
         services.AddSingleton<ModuleStateService>();
 
         // Scan two roots so scaffolded / source-controlled modules at the
-        // solution-root <c>modules/</c> folder are picked up alongside the
-        // packaged ones that landed in <c>src/FlexCms.Host/modules/</c> via
+        // solution-root <c>Modules/</c> folder are picked up alongside the
+        // packaged ones that landed in <c>src/FlexCms.Host/Modules/</c> via
         // the admin Upload flow. Solution-root scanned first so a dev's
         // in-tree copy wins over a stale uploaded build of the same id.
-        var hostModulesRoot = Path.GetFullPath(Path.Combine(options.AppDataPath, "..", "modules"));
+        var hostModulesRoot = Path.GetFullPath(Path.Combine(options.AppDataPath, "..", "Modules"));
         var solutionRoot = Directory.GetParent(hostModulesRoot)?.Parent?.Parent?.FullName;
-        var rootModulesRoot = solutionRoot is not null ? Path.Combine(solutionRoot, "modules") : null;
+        var rootModulesRoot = solutionRoot is not null ? Path.Combine(solutionRoot, "Modules") : null;
         var registry = BuildModuleRegistry(services,
             Directory.Exists(rootModulesRoot ?? "") ? new[] { rootModulesRoot!, hostModulesRoot } : new[] { hostModulesRoot });
         services.AddSingleton(registry);

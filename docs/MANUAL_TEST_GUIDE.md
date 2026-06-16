@@ -344,7 +344,7 @@ Before running through the journey:
       pre-deployed)
 - [ ] **Drop-in install:**
   - On the host, copy a built module folder (DLL + module.json) into
-    `src/FlexCms.Host/modules/<ModuleId>/`
+    `src/FlexCms.Host/Modules/<ModuleId>/`
   - Restart the app
   - Module appears in the list as "Active"
   - DB has a row in `fcms_module_records`

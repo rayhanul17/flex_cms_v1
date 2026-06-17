@@ -106,6 +106,7 @@ public static class FcmsServiceExtensions
 
         // File storage — local by default; swap for cloud implementation without changing services
         services.AddScoped<IFcmsFileStorage, LocalFileStorage>();
+        services.AddScoped<IFcmsFileUploadService, FcmsFileUploadService>();
 
         // CMS services — IFcmsUnitOfWork is injected by DI (registered below per provider)
         services.AddScoped<IPageService, PageService>();

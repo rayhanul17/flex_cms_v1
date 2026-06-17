@@ -5,7 +5,7 @@ using SkiaSharp;
 
 namespace FlexCms.Framework.Storage;
 
-[FcmsScoped]
+[FcmsScoped(typeof(IFcmsFileUploadService))]
 public sealed class FcmsFileUploadService : IFcmsFileUploadService
 {
     private readonly IFcmsFileStorage _storage;

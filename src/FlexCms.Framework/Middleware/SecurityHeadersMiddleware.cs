@@ -32,7 +32,11 @@ public class SecurityHeadersMiddleware
             "connect-src 'self' ws: wss:",
             "frame-ancestors 'none'"
         });
-        h["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()";
+        // camera=self lets admin pages (KYC capture, document upload) call
+        // navigator.mediaDevices.getUserMedia. Other origins embedding our
+        // pages in an iframe still cannot. Microphone + geolocation stay
+        // disabled — neither is used.
+        h["Permissions-Policy"] = "camera=(self), microphone=(), geolocation=()";
 
         await _next(context);
     }

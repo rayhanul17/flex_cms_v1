@@ -28,10 +28,30 @@
     }
   }
 
+  // ── Camera capability detection ─────────────────────────────────────
+  // Phones, tablets, laptops with webcam → getUserMedia works.
+  // Desktops with no webcam, locked-down browsers, FB/IG in-app browsers,
+  // and any non-HTTPS page → fall back to the hidden <input capture>
+  // file picker (mobile shows the camera, desktop shows file dialog).
+  const cameraCapability = (function () {
+    const hasApi = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+    const isSecure = window.isSecureContext === true
+      || location.hostname === 'localhost'
+      || location.hostname === '127.0.0.1';
+    return { hasApi, isSecure, supported: hasApi && isSecure };
+  })();
+
+  async function enumerateVideoInputs() {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return [];
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      return devices.filter(d => d.kind === 'videoinput');
+    } catch (_) { return []; }
+  }
+
   async function compressIfImage(file) {
     if (!file.type.startsWith('image/')) return file;
     if (file.size < COMPRESS_SKIP_BELOW) return file;
-    // GIF compression usually breaks animation; keep as-is.
     if (file.type === 'image/gif') return file;
 
     return new Promise((resolve) => {
@@ -47,7 +67,6 @@
         ctx.drawImage(img, 0, 0, w, h);
         canvas.toBlob((blob) => {
           if (!blob) { resolve(file); return; }
-          // Use original name with .jpg extension if compressed
           const baseName = file.name.replace(/\.[^/.]+$/, '');
           const compressed = new File([blob], baseName + '.jpg', { type: 'image/jpeg' });
           resolve(compressed);
@@ -58,9 +77,7 @@
     });
   }
 
-  function fmtKb(n) {
-    return (n / 1024).toFixed(1) + ' KB';
-  }
+  function fmtKb(n) { return (n / 1024).toFixed(1) + ' KB'; }
 
   function rowEl(file, item) {
     const div = document.createElement('div');
@@ -167,29 +184,78 @@
     }
   }
 
-  async function startCamera(root) {
+  // ── Live camera (getUserMedia) ──────────────────────────────────────
+  // Per uploader root we track:
+  //   _fcmsCamStream   active MediaStream
+  //   _fcmsCamFacing   'environment' | 'user'  (current active camera)
+  //   _fcmsCamDevices  array of MediaDeviceInfo (videoinput)
+
+  function setVideoMirror(video, isFront) {
+    // Selfie cam looks natural mirrored — back cam should NOT mirror.
+    video.style.transform = isFront ? 'scaleX(-1)' : 'none';
+  }
+
+  function nativeFallback(root) {
+    const fallback = root.querySelector('.fcms-uploader-camera-input');
+    if (fallback) fallback.click();
+  }
+
+  async function tryStream(facingMode) {
+    // Tries the exact facing mode first, then degrades to a soft preference,
+    // then to "any camera". Returns the MediaStream + the actual facing.
+    const attempts = [
+      { video: { facingMode: { exact: facingMode } }, audio: false },
+      { video: { facingMode: facingMode }, audio: false },
+      { video: true, audio: false },
+    ];
+    for (const constraints of attempts) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        return { stream, facing: facingMode };
+      } catch (_) { /* try next */ }
+    }
+    return null;
+  }
+
+  async function startCamera(root, facing) {
+    facing = facing || 'environment';
     const stage = root.querySelector('.fcms-uploader-camera-stage');
     const video = root.querySelector('.fcms-uploader-camera-video');
     if (!stage || !video) return;
 
-    // Modern browsers with getUserMedia → live preview + canvas capture.
-    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'environment' },
-          audio: false
-        });
-        video.srcObject = stream;
-        stage.classList.remove('d-none');
-        root._fcmsCamStream = stream;
-        return;
-      } catch (e) {
-        console.warn('getUserMedia denied, falling back to file input', e);
+    if (!cameraCapability.supported) {
+      if (!cameraCapability.isSecure) {
+        toast('Camera needs HTTPS. Using file picker instead.', 'info');
       }
+      nativeFallback(root);
+      return;
     }
-    // Fallback — trigger the native file picker with `capture` attribute.
-    const fallback = root.querySelector('.fcms-uploader-camera-input');
-    if (fallback) fallback.click();
+
+    // Stop any existing stream before starting a new one.
+    if (root._fcmsCamStream) stopCamera(root);
+
+    let attempt = await tryStream(facing);
+    if (!attempt && facing === 'environment') {
+      attempt = await tryStream('user'); // laptops / front-cam only devices
+    }
+
+    if (!attempt) {
+      toast('Could not start camera. Falling back to file picker.', 'info');
+      nativeFallback(root);
+      return;
+    }
+
+    video.srcObject = attempt.stream;
+    setVideoMirror(video, attempt.facing === 'user');
+    root._fcmsCamStream = attempt.stream;
+    root._fcmsCamFacing = attempt.facing;
+    stage.classList.remove('d-none');
+
+    // Show/hide flip button based on whether a second camera exists.
+    const devices = await enumerateVideoInputs();
+    root._fcmsCamDevices = devices;
+    const flipBtn = root.querySelector('.fcms-uploader-camera-flip');
+    if (flipBtn) flipBtn.classList.toggle('d-none', devices.length < 2);
   }
 
   function stopCamera(root) {
@@ -199,8 +265,13 @@
       root._fcmsCamStream.getTracks().forEach(t => t.stop());
       root._fcmsCamStream = null;
     }
-    if (video) video.srcObject = null;
+    if (video) { video.srcObject = null; video.style.transform = 'none'; }
     if (stage) stage.classList.add('d-none');
+  }
+
+  async function flipCamera(root) {
+    const next = root._fcmsCamFacing === 'user' ? 'environment' : 'user';
+    await startCamera(root, next);
   }
 
   async function snapCamera(root) {
@@ -211,6 +282,8 @@
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
     const ctx = canvas.getContext('2d');
+    // For a mirrored front-cam preview, the captured photo SHOULD still
+    // be un-mirrored so the saved image matches reality (text reads correctly).
     ctx.drawImage(video, 0, 0);
     canvas.toBlob(async (blob) => {
       if (!blob) return;
@@ -218,6 +291,21 @@
       stopCamera(root);
       await uploadOne(root, file);
     }, 'image/jpeg', COMPRESS_QUALITY);
+  }
+
+  function setupCameraButtons(root) {
+    const camBtn = root.querySelector('.fcms-uploader-camera-btn');
+    if (!camBtn) return;
+
+    // No live camera support? Still keep the button — clicking it triggers
+    // the native <input capture>. On phones that opens the system camera;
+    // on desktops it opens the file picker. Better than hiding the button
+    // and confusing users who expected to see it.
+    if (!cameraCapability.supported) {
+      camBtn.title = cameraCapability.isSecure
+        ? 'Live preview unavailable — opens file picker / system camera'
+        : 'Live preview needs HTTPS — opens file picker / system camera';
+    }
   }
 
   function wire(root) {
@@ -242,13 +330,17 @@
       });
     }
 
+    setupCameraButtons(root);
     const camBtn = root.querySelector('.fcms-uploader-camera-btn');
     const camSnap = root.querySelector('.fcms-uploader-camera-snap');
     const camCancel = root.querySelector('.fcms-uploader-camera-cancel');
+    const camFlip = root.querySelector('.fcms-uploader-camera-flip');
     const camFallback = root.querySelector('.fcms-uploader-camera-input');
-    if (camBtn) camBtn.addEventListener('click', () => startCamera(root));
+
+    if (camBtn) camBtn.addEventListener('click', () => startCamera(root, 'environment'));
     if (camSnap) camSnap.addEventListener('click', () => snapCamera(root));
     if (camCancel) camCancel.addEventListener('click', () => stopCamera(root));
+    if (camFlip) camFlip.addEventListener('click', () => flipCamera(root));
     if (camFallback) camFallback.addEventListener('change', (e) => {
       handleFiles(root, e.target.files);
       e.target.value = '';
@@ -262,6 +354,12 @@
         if (id && row) removeFile(root, id, row);
       }
     });
+
+    // Stop the stream if the user navigates away or hides the tab.
+    window.addEventListener('pagehide', () => stopCamera(root));
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) stopCamera(root);
+    });
   }
 
   function init() {
@@ -274,5 +372,5 @@
     init();
   }
 
-  window.fcmsUploader = { init: init };
+  window.fcmsUploader = { init: init, _capability: cameraCapability };
 })();

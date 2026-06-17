@@ -50,12 +50,14 @@ public sealed class ModulePermissionSeeder
 
         var inserted = 0;
         var updated = 0;
+        var declaredKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var def in defs)
         {
             if (string.IsNullOrWhiteSpace(def.Key)) continue;
 
             var fullKey = prefix + def.Key.Trim().ToLowerInvariant();
+            declaredKeys.Add(fullKey);
             var group = string.IsNullOrWhiteSpace(def.Group) ? defaultGroup : def.Group;
             var display = string.IsNullOrWhiteSpace(def.DisplayName) ? fullKey : def.DisplayName;
 
@@ -81,12 +83,23 @@ public sealed class ModulePermissionSeeder
             }
         }
 
-        if (inserted > 0 || updated > 0)
+        // Soft-delete keys this module previously declared but doesn't any more
+        // (renames / removals). We use the prefix to scope so we don't touch
+        // another module's rows or framework-core permissions.
+        var stale = existing.Values
+            .Where(p => p.Key.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)
+                        && !declaredKeys.Contains(p.Key)
+                        && p.Status != EntityStatus.Deleted)
+            .ToList();
+        foreach (var p in stale)
+            await _permissions.SoftDeleteAsync(p, ct);
+
+        if (inserted > 0 || updated > 0 || stale.Count > 0)
         {
             await _uow.SaveChangesAsync(ct);
             _logger.LogInformation(
-                "Module {Id}: permissions seeded — {Inserted} added, {Updated} updated.",
-                module.ModuleId, inserted, updated);
+                "Module {Id}: permissions seeded — {Inserted} added, {Updated} updated, {Pruned} pruned.",
+                module.ModuleId, inserted, updated, stale.Count);
         }
     }
 }

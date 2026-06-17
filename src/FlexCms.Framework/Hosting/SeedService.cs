@@ -20,15 +20,18 @@ public class SeedService : IHostedService
 {
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly SetupHelper _setupHelper;
+    private readonly IHostEnvironment _env;
     private readonly ILogger<SeedService> _logger;
 
     public SeedService(
         IServiceScopeFactory scopeFactory,
         SetupHelper setupHelper,
+        IHostEnvironment env,
         ILogger<SeedService> logger)
     {
         _scopeFactory = scopeFactory;
         _setupHelper = setupHelper;
+        _env = env;
         _logger = logger;
     }
 
@@ -400,7 +403,16 @@ public class SeedService : IHostedService
         foreach (var perm in VisitorPermissions)
             await permService.AssignAsync(role.Id, perm, ct);
 
-        // Ensure demo visitor account exists
+        // Demo visitor account — Development only. The credentials are
+        // hard-coded so this would be a known-password account in any
+        // production deploy. The role + permissions above are still seeded
+        // so an admin can create a real visitor user manually.
+        if (!_env.IsDevelopment())
+        {
+            _logger.LogInformation("SeedService: skipping demo Visitor account (non-Development environment).");
+            return;
+        }
+
         const string visitorEmail = "visitor@flexcms.local";
         const string visitorPass = "Visitor@123";
         var visitor = await userManager.FindByEmailAsync(visitorEmail);

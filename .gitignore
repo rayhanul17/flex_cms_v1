@@ -62,6 +62,9 @@ App_Data/
 # Uploaded media
 **/wwwroot/uploads/
 !**/wwwroot/uploads/.gitkeep
+**/wwwroot/investpro/
+**/wwwroot/media/
+**/wwwroot/thumbs/
 
 # DataProtection keyring
 **/keys/

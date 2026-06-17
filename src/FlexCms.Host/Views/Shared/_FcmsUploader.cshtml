@@ -97,15 +97,19 @@
 
                 <div class="fcms-uploader-camera-stage d-none mt-3">
                     <video class="fcms-uploader-camera-video w-100 rounded bg-dark" autoplay playsinline muted style="max-height:60vh;object-fit:contain"></video>
-                    <div class="d-flex gap-2 mt-2 flex-wrap">
+                    <div class="d-flex gap-2 mt-2 flex-wrap align-items-center">
                         <button type="button" class="btn btn-sm btn-primary fcms-uploader-camera-snap">
                             <i class="bi bi-camera-fill"></i> Capture
                         </button>
                         <button type="button" class="btn btn-sm btn-outline-secondary fcms-uploader-camera-flip d-none">
                             <i class="bi bi-arrow-repeat"></i> Flip Camera
                         </button>
+                        @if (multi)
+                        {
+                            <span class="small text-muted ms-2 d-none d-sm-inline">Tap Capture multiple times — Done when finished.</span>
+                        }
                         <button type="button" class="btn btn-sm btn-outline-secondary fcms-uploader-camera-cancel ms-auto">
-                            Cancel
+                            @(multi ? "Done" : "Cancel")
                         </button>
                     </div>
                 </div>

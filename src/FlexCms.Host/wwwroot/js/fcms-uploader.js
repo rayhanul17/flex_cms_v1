@@ -278,6 +278,22 @@
     const video = root.querySelector('.fcms-uploader-camera-video');
     if (!video || !video.videoWidth) return;
 
+    const multi = root.getAttribute('data-multi') === '1';
+    const maxCount = parseInt(root.getAttribute('data-max-count') || '20', 10);
+    const existing = root.querySelectorAll('[data-fcms-uploader-row]').length;
+
+    // Single-mode guard: if the slot is already taken, refuse the capture
+    // instead of silently overwriting. User has to remove the existing
+    // file first.
+    if (!multi && existing >= 1) {
+      toast('Only one file allowed. Remove the existing one first.', 'error');
+      return;
+    }
+    if (existing >= maxCount) {
+      toast('Maximum ' + maxCount + ' files reached.', 'error');
+      return;
+    }
+
     const canvas = document.createElement('canvas');
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
@@ -285,12 +301,26 @@
     // For a mirrored front-cam preview, the captured photo SHOULD still
     // be un-mirrored so the saved image matches reality (text reads correctly).
     ctx.drawImage(video, 0, 0);
+
+    // Single mode: close the camera right after the snap. Multi mode: keep
+    // the preview running so the user can shoot the next page / document /
+    // photo in one session without re-clicking the Camera button each time.
     canvas.toBlob(async (blob) => {
       if (!blob) return;
       const file = new File([blob], 'capture-' + Date.now() + '.jpg', { type: 'image/jpeg' });
-      stopCamera(root);
+      if (!multi) stopCamera(root);
       await uploadOne(root, file);
+      if (multi) flashCaptureFeedback(root);
     }, 'image/jpeg', COMPRESS_QUALITY);
+  }
+
+  // Brief visual flash on the video element so the user sees the snap
+  // actually happened when the camera stage stays open in multi mode.
+  function flashCaptureFeedback(root) {
+    const video = root.querySelector('.fcms-uploader-camera-video');
+    if (!video) return;
+    video.style.outline = '4px solid #198754';
+    setTimeout(() => { video.style.outline = ''; }, 200);
   }
 
   function setupCameraButtons(root) {

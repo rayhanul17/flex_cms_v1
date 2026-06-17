@@ -74,6 +74,15 @@ public class ModuleStateService
     /// Copy <c>{moduleFolder}/wwwroot/</c> → <c>{webRootPath}/modules/{moduleId}/</c>.
     /// Called on activation so module CSS/JS are reachable at runtime.
     /// No-op when the module has no wwwroot folder.
+    /// <para>
+    /// The <c>uploads/</c> subfolder is deliberately skipped — uploads are
+    /// runtime user data, written directly under
+    /// <c>modules/&lt;id&gt;/wwwroot/uploads/</c> by
+    /// <c>IFcmsFileUploadService</c> and served from there by
+    /// <c>UseFcmsModuleStaticFiles</c>. Copying them into the host wwwroot
+    /// would double the disk footprint and create a stale copy that
+    /// silently diverges from the authoritative one.
+    /// </para>
     /// </summary>
     public void SyncWwwroot(string moduleFolder, string webRootPath, string moduleId)
     {
@@ -81,7 +90,7 @@ public class ModuleStateService
         if (!Directory.Exists(src)) return;
 
         var dest = Path.Combine(webRootPath, "modules", moduleId);
-        CopyDirectory(src, dest);
+        CopyDirectory(src, dest, skipTopLevel: "uploads");
         _logger.LogInformation("Module {Id}: wwwroot synced to {Dest}", moduleId, dest);
     }
 
@@ -105,12 +114,17 @@ public class ModuleStateService
         }
     }
 
-    private static void CopyDirectory(string src, string dest)
+    private static void CopyDirectory(string src, string dest, string? skipTopLevel = null)
     {
         Directory.CreateDirectory(dest);
         foreach (var file in Directory.GetFiles(src))
             File.Copy(file, Path.Combine(dest, Path.GetFileName(file)), overwrite: true);
         foreach (var dir in Directory.GetDirectories(src))
-            CopyDirectory(dir, Path.Combine(dest, Path.GetFileName(dir)));
+        {
+            var name = Path.GetFileName(dir);
+            if (skipTopLevel is not null && string.Equals(name, skipTopLevel, StringComparison.OrdinalIgnoreCase))
+                continue;
+            CopyDirectory(dir, Path.Combine(dest, name));
+        }
     }
 }

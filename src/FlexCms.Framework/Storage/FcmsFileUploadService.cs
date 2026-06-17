@@ -8,12 +8,12 @@ namespace FlexCms.Framework.Storage;
 [FcmsScoped(typeof(IFcmsFileUploadService))]
 public sealed class FcmsFileUploadService : IFcmsFileUploadService
 {
-    private readonly IFcmsFileStorage _storage;
+    private readonly IFcmsModuleStorageResolver _resolver;
     private readonly ILogger<FcmsFileUploadService> _logger;
 
-    public FcmsFileUploadService(IFcmsFileStorage storage, ILogger<FcmsFileUploadService> logger)
+    public FcmsFileUploadService(IFcmsModuleStorageResolver resolver, ILogger<FcmsFileUploadService> logger)
     {
-        _storage = storage;
+        _resolver = resolver;
         _logger = logger;
     }
 
@@ -22,29 +22,44 @@ public sealed class FcmsFileUploadService : IFcmsFileUploadService
         ".jpg", ".jpeg", ".png", ".webp"
     };
 
-    public async Task<UploadResult> SaveAsync(IFormFile file, string folder, ImageCompressionOptions? compress = null, CancellationToken ct = default)
+    public async Task<UploadResult> SaveAsync(
+        IFormFile file,
+        string? moduleId,
+        string subfolder,
+        ImageCompressionOptions? compress = null,
+        CancellationToken ct = default)
     {
         if (file is null || file.Length == 0)
             throw new ArgumentException("Empty file.", nameof(file));
 
+        var target = _resolver.Resolve(moduleId);
         var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
         var safeBase = MakeSafeName(Path.GetFileNameWithoutExtension(file.FileName));
         var year = DateTime.UtcNow.Year;
         var month = DateTime.UtcNow.Month.ToString("D2");
         var unique = $"{Guid.NewGuid():N}_{safeBase}{ext}";
-        var rel = $"{folder.Trim('/')}/{year}/{month}/{unique}";
+
+        var cleanSub = (subfolder ?? string.Empty).Trim('/');
+        var relativeUnderUploads = string.IsNullOrEmpty(cleanSub)
+            ? $"{year}/{month}/{unique}"
+            : $"{cleanSub}/{year}/{month}/{unique}";
+
+        var physicalFolder = string.IsNullOrEmpty(cleanSub)
+            ? Path.Combine(target.PhysicalDirectory, year.ToString(), month)
+            : Path.Combine(target.PhysicalDirectory, cleanSub, year.ToString(), month);
+        Directory.CreateDirectory(physicalFolder);
+        var physicalPath = Path.Combine(physicalFolder, unique);
+        var publicUrl = $"{target.PublicUrlBase.TrimEnd('/')}/{relativeUnderUploads}";
 
         bool didCompress = false;
         int? width = null, height = null;
         long writtenSize = file.Length;
         string? contentType = file.ContentType;
-        Stream payload;
 
         if (compress is not null
             && ImageExtensions.Contains(ext)
             && file.Length >= compress.SkipBelowBytes)
         {
-            // Read into memory once, decode, resize, re-encode.
             using var src = new MemoryStream();
             await file.CopyToAsync(src, ct);
             src.Position = 0;
@@ -71,47 +86,39 @@ public sealed class FcmsFileUploadService : IFcmsFileUploadService
                         height = resized.Height;
 
                         using var image = SKImage.FromBitmap(resized);
-                        // JPEG yields the best ratio for photos; we keep the
-                        // original extension so callers see the same URL shape.
                         using var data = image.Encode(SKEncodedImageFormat.Jpeg, compress.JpegQuality);
-                        var ms = new MemoryStream();
-                        data.SaveTo(ms);
-                        ms.Position = 0;
-                        payload = ms;
-                        writtenSize = ms.Length;
+                        await using var fs = File.Create(physicalPath);
+                        data.SaveTo(fs);
+                        writtenSize = fs.Length;
                         contentType = "image/jpeg";
                         didCompress = true;
                     }
                     else
                     {
-                        src.Position = 0;
-                        payload = src;
+                        await SaveStreamAsync(src, physicalPath, ct);
                     }
                 }
                 else
                 {
-                    src.Position = 0;
-                    payload = src;
+                    await SaveStreamAsync(src, physicalPath, ct);
                 }
             }
             catch (Exception ex)
             {
                 _logger.LogWarning(ex, "Compression failed for {File}; saving original.", file.FileName);
                 src.Position = 0;
-                payload = src;
+                await SaveStreamAsync(src, physicalPath, ct);
             }
         }
         else
         {
-            payload = file.OpenReadStream();
+            await using var stream = file.OpenReadStream();
+            await SaveStreamAsync(stream, physicalPath, ct);
         }
 
-        var url = await _storage.SaveAsync(rel, payload, ct);
-        await payload.DisposeAsync();
-
         return new UploadResult(
-            RelativePath: rel,
-            PublicUrl: url,
+            RelativePath: relativeUnderUploads,
+            PublicUrl: publicUrl,
             FileName: file.FileName,
             ContentType: contentType,
             FileSize: writtenSize,
@@ -120,8 +127,39 @@ public sealed class FcmsFileUploadService : IFcmsFileUploadService
             Height: height);
     }
 
-    public Task DeleteAsync(string relativePath, CancellationToken ct = default)
-        => _storage.DeleteAsync(relativePath, ct);
+    public Task DeleteAsync(string? moduleId, string publicUrl, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(publicUrl)) return Task.CompletedTask;
+
+        var target = _resolver.Resolve(moduleId);
+        var prefix = target.PublicUrlBase.TrimEnd('/') + "/";
+        if (!publicUrl.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+        {
+            // URL doesn't belong to this module's storage — silently skip so
+            // legacy /investpro/... URLs aren't accidentally probed under
+            // /modules/investpro/uploads/.
+            _logger.LogDebug("Skipping delete for {Url} — outside module {Mod} storage root.", publicUrl, moduleId);
+            return Task.CompletedTask;
+        }
+        var relative = publicUrl[prefix.Length..].TrimStart('/');
+        var physical = Path.Combine(target.PhysicalDirectory, relative.Replace('/', Path.DirectorySeparatorChar));
+        try
+        {
+            if (File.Exists(physical)) File.Delete(physical);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to delete {Path}.", physical);
+        }
+        return Task.CompletedTask;
+    }
+
+    private static async Task SaveStreamAsync(Stream source, string physicalPath, CancellationToken ct)
+    {
+        source.Position = 0;
+        await using var fs = File.Create(physicalPath);
+        await source.CopyToAsync(fs, ct);
+    }
 
     private static string MakeSafeName(string raw)
     {

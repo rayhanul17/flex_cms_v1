@@ -177,6 +177,10 @@ try
     // middleware would serve /uploads/* and we'd never see the request.
     app.UseMiddleware<FlexCms.Framework.Middleware.HotlinkProtectionMiddleware>();
     app.UseStaticFiles();
+    // Per-module wwwroot served at /modules/{id-lowercase}/* directly from
+    // each module's source folder. Modules ship their own CSS / JS / uploads
+    // without anything being copied into the host wwwroot at activation.
+    app.UseFcmsModuleStaticFiles();
     // CORS runs before routing + auth so preflight OPTIONS replies fast even
     // when the eventual endpoint requires authentication.
     app.UseMiddleware<FlexCms.Framework.Middleware.CorsFromSettingsMiddleware>();

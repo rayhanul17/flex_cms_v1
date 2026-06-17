@@ -68,6 +68,21 @@ public class ModuleManager
                 loaded.Add(module);
                 _logger.LogInformation("Loaded module {Id} v{Version} (deactivated={Off}) from {Path}",
                     module.ModuleId, module.Manifest.Version, disabled, dll);
+
+                // Warn when the folder name doesn't match ModuleId. Admin-uploaded
+                // updates land in modules/{ModuleId}/ (see ModuleUpdateService), so
+                // a dev-cloned folder with a different name would create a sibling
+                // folder on first upload — both with valid DLLs, the load order
+                // becomes the deciding factor. Matching the names eliminates the
+                // footgun.
+                var folderName = Path.GetFileName(moduleFolder.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+                if (!string.Equals(folderName, module.ModuleId, StringComparison.OrdinalIgnoreCase))
+                {
+                    _logger.LogWarning(
+                        "Module {Id} loaded from folder '{Folder}' (mismatch). " +
+                        "Admin uploads land in modules/<Id>/ — rename the folder to avoid duplicate-load.",
+                        module.ModuleId, folderName);
+                }
                 break; // one module per subfolder
             }
         }

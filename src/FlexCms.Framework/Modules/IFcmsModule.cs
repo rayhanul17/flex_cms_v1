@@ -32,6 +32,19 @@ public interface IFcmsModule
     /// <summary>
     /// Register the module's services with the host DI container.
     /// Called by the framework once during startup, before the container is built.
+    ///
+    /// <para>
+    /// <strong>DI isolation contract:</strong> all modules share the same root
+    /// <see cref="IServiceCollection"/>. There is NO per-module sandbox — one
+    /// module can resolve any other module's registered services and any
+    /// framework-core service. Modules are trusted in-tree code.
+    /// </para>
+    /// <para>
+    /// If you intend to load untrusted third-party modules, treat them as
+    /// running with full host-process privileges: file system, network, all
+    /// DI services, and the same DB connection string as every other module.
+    /// Vet them before dropping them into <c>modules/</c>.
+    /// </para>
     /// </summary>
     void RegisterServices(IServiceCollection services);
 

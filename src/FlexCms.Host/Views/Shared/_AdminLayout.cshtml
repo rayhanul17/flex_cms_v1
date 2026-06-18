@@ -115,6 +115,20 @@
     <!-- Scroll wrapper so long menus scroll while the user widget stays
          pinned at the sidebar bottom. -->
     <div class="sidebar-scroll">
+    @{
+        // Module-owned sidebar override (e.g. InvestPro). A module layout
+        // sets ViewData["SidebarMenuPartial"] = "_InvestProSidebar" and that
+        // partial fully replaces the host's permission-filtered menu —
+        // gives the module its own left nav while still inheriting the
+        // host's chrome (topbar, theme, scripts).
+        var sidebarPartial = ViewData["SidebarMenuPartial"] as string;
+    }
+    @if (!string.IsNullOrEmpty(sidebarPartial))
+    {
+        <partial name="@sidebarPartial" />
+    }
+    else
+    {
     <ul class="nav flex-column py-2">
         @foreach (var item in topLevel)
         {
@@ -157,6 +171,7 @@
             }
         }
     </ul>
+    }
     </div>
 
     <!-- Pinned bottom: user menu (avatar + name + email). The notification

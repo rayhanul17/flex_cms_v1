@@ -160,6 +160,14 @@ try
     // shows defaults for fields the admin already filled in.
     builder.Services.AddHostedService<FlexCms.Host.Hosting.SiteSettingsBootstrapService>();
 
+    // Sample heartbeat BackgroundService — pairs with the InvestPro
+    // module's InvestProDailySummaryService to demonstrate that both
+    // the host AND external modules can register IHostedServices via
+    // the standard DI flow. Cheap (one log line every 5 minutes) but
+    // immediately visible in the log so operators can confirm hosted
+    // services run.
+    builder.Services.AddHostedService<FlexCms.Host.Hosting.HostHeartbeatService>();
+
     Log.Information("[BOOT] builder.Build()");
     var app = builder.Build();
     Log.Information("[BOOT] Build complete — wiring middleware");

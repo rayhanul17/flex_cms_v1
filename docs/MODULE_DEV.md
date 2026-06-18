@@ -75,10 +75,14 @@ Restart `dotnet watch run` and the module appears under **Admin → Modules**.
 
 When you're **actively editing** a module and want breakpoints in `.cs` files
 to hit during a normal host F5, clone the module source under
-`modules/<ModuleId>/` and reference its `.csproj` from a **local-only**
-solution file. The host's module loader picks up the freshly built
-`bin/Debug/net10.0/*.dll` automatically — same DLL Visual Studio attached
-its debugger to, so symbols line up and breakpoints work out of the box.
+`modules/<ModuleId>/` and reference its `.csproj` from `FlexCms.dev.slnx` — a
+**local-only** Visual Studio solution. The host's module loader picks up the
+freshly built `bin/Debug/net10.0/*.dll` automatically — same DLL Visual
+Studio attached its debugger to, so symbols line up and breakpoints work out
+of the box.
+
+A baseline template (`FlexCms.dev.slnx.example`) ships with the repo. Bootstrap
+your local copy once:
 
 ```bash
 # 1. Clone the module source side-by-side with the host source
@@ -86,13 +90,12 @@ cd flex_cms_v1/modules
 git clone https://github.com/<org>/FlexCms.Module.Investment.git
 cd ..
 
-# 2. Create a local dev solution that includes the module
-#    (git-ignored — FlexCms.dev.slnx + FlexCms.*.dev.slnx)
-cp FlexCms.slnx FlexCms.dev.slnx
+# 2. Copy the tracked template into your active (git-ignored) dev solution
+cp FlexCms.dev.slnx.example FlexCms.dev.slnx
 ```
 
-Then add a `<Folder Name="/modules/">` block to `FlexCms.dev.slnx` with one
-`<Project>` line per module you have cloned, e.g.:
+Edit `FlexCms.dev.slnx` and uncomment / add a `<Project>` entry inside the
+`/modules/` folder for each module you have cloned:
 
 ```xml
 <Folder Name="/modules/">
@@ -101,8 +104,10 @@ Then add a `<Folder Name="/modules/">` block to `FlexCms.dev.slnx` with one
 ```
 
 Open `FlexCms.dev.slnx` in Visual Studio → F5. Breakpoints in module `.cs`
-files now hit. The `.slnx` is git-ignored so dropping or adding modules
-locally never affects teammates whose checkout has different modules cloned.
+files now hit. The active `.slnx` is git-ignored so dropping or adding
+modules locally never dirties git and never affects teammates whose
+checkout has different modules cloned. The `.example` baseline stays
+tracked so new contributors get it on clone.
 
 Module-side `bin/Debug/` is **fine** in this flow — the host scans
 `modules/<id>/bin/Debug/net*/` (after `modules/<id>/*.dll` at the folder

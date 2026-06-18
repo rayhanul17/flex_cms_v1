@@ -93,11 +93,15 @@ modules/*
 src/FlexCms.Host/modules/*
 !src/FlexCms.Host/modules/.gitkeep
 
-# Local-only solution that includes in-tree module csproj references
-# so VS F5 debugs module source directly. Each dev opens this file
-# instead of FlexCms.slnx when working on a module.
+# Local dev solution that includes in-tree module csproj references
+# so VS F5 debugs module source directly. Each dev copies
+# FlexCms.dev.slnx.example → FlexCms.dev.slnx once, then edits locally
+# to add whichever modules they currently have cloned. The active
+# .slnx is ignored so local edits don't pollute git; the .example
+# baseline is tracked so new devs get it on clone.
 FlexCms.dev.slnx
 FlexCms.*.dev.slnx
+!FlexCms.dev.slnx.example
 
 # Environment
 .env

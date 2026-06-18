@@ -1,0 +1,53 @@
+<Solution>
+  <!--
+    Dev-mode solution template — committed as a starting point.
+    Copy this file to FlexCms.dev.slnx (git-ignored) and add a
+    <Project> entry under <Folder Name="/modules/"> for every module
+    you currently have cloned into modules/<ModuleId>/.
+
+    Why a separate solution?
+      - FlexCms.slnx (canonical, git-tracked) must NOT reference module
+        projects — modules are independent repos, and a hard-coded
+        <Project> path would error on every checkout that doesn't have
+        that exact module cloned.
+      - FlexCms.dev.slnx is your personal working copy. Editing it
+        never dirties git and never affects teammates.
+      - Open FlexCms.dev.slnx in Visual Studio for module breakpoints
+        (F5 → host runs → module DLL loads from bin/Debug/net10.0/
+        with PDB symbols → breakpoints in module .cs files hit).
+
+    First-time setup:
+      cp FlexCms.dev.slnx.example FlexCms.dev.slnx
+      # then uncomment/edit the <Project> lines below to match your clones.
+
+    See docs/MODULE_DEV.md §3.C for the full debug-friendly workflow.
+  -->
+
+  <Folder Name="/src/">
+    <Project Path="src/FlexCms.Core/FlexCms.Core.csproj" />
+    <Project Path="src/FlexCms.Framework/FlexCms.Framework.csproj" />
+    <Project Path="src/FlexCms.Host/FlexCms.Host.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/FlexCms.Tests.Integration/FlexCms.Tests.Integration.csproj" />
+    <Project Path="tests/FlexCms.Tests.Unit/FlexCms.Tests.Unit.csproj" />
+  </Folder>
+  <Folder Name="/samples/">
+    <Project Path="samples/FlexCms.Sample.Hello/FlexCms.Sample.Hello.csproj" />
+  </Folder>
+  <Folder Name="/templates/">
+    <Project Path="templates/flexcms-module/FlexCms.Templates.csproj" />
+  </Folder>
+
+  <!--
+    Add your locally-cloned module projects here. Examples:
+
+    <Folder Name="/modules/">
+      <Project Path="modules/FlexCms.InvestPro/FlexCms.InvestPro.csproj" />
+      <Project Path="modules/FlexCms.MyOther/FlexCms.MyOther.csproj" />
+    </Folder>
+
+    Leave the block empty (or remove it entirely) if you're working
+    only on framework/host code without any module cloned.
+  -->
+</Solution>

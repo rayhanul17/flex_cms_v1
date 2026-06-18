@@ -24,6 +24,27 @@ public class ModulesController : BaseAdminController
         User.IsInRole(FcmsRoles.SuperAdmin)
         || User.IsInRole(FcmsRoles.SuperAdmin.ToUpperInvariant());
 
+    // ── Module-upload safety caps ───────────────────────────────────────
+    // 50 MB upload limit covers the largest realistic module (PDF
+    // generators, image libs, etc.) by an order of magnitude.
+    // 200 MB uncompressed defeats zip-bombs that expand 1000:1.
+    // 5000 entries blocks pathologically-deep tarred-up node_modules.
+    private const long MaxModulePackageBytes = 50L * 1024 * 1024;
+    private const long MaxModuleUncompressedBytes = 200L * 1024 * 1024;
+    private const int MaxModuleZipEntries = 5000;
+
+    // Extensions allowed inside the module zip. Anything else is rejected
+    // outright — keeps `.env`, `.pfx`, `.key`, `.so`, `.exe`, `.bat`,
+    // `.sh`, etc. out of the host process tree even if a misbehaving
+    // build script tries to bundle them.
+    private static readonly HashSet<string> AllowedModuleExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".dll", ".pdb", ".json", ".cshtml", ".css", ".js", ".map",
+        ".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".ico",
+        ".woff", ".woff2", ".ttf", ".otf", ".eot",
+        ".txt", ".md", ".html", ".htm",
+    };
+
     private readonly ModuleRegistry _registry;
     private readonly ModuleStateService _state;
     private readonly IRepository<FcmsModuleRecord> _records;
@@ -224,6 +245,8 @@ public class ModulesController : BaseAdminController
         if (file is null || file.Length == 0) return FcmsFail("No file uploaded.");
         if (!file.FileName.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
             return FcmsFail("Module package must be a .zip file.");
+        if (file.Length > MaxModulePackageBytes)
+            return FcmsFail($"Module package is too large (max {MaxModulePackageBytes / 1024 / 1024} MB).");
 
         // Land in the SAME folder FcmsServiceExtensions scans at boot
         // ({AppDataPath}/../modules), not the solution-root modules/ (dev source tree).
@@ -236,15 +259,31 @@ public class ModulesController : BaseAdminController
 
         try
         {
-            await using (var fs = System.IO.File.Create(Path.Combine(stagingDir, file.FileName), 81920, FileOptions.Asynchronous))
+            // Sanitize the filename — caller-controlled bytes are dangerous
+            // path components otherwise.
+            var safeFileName = Path.GetFileName(file.FileName);
+            await using (var fs = System.IO.File.Create(Path.Combine(stagingDir, safeFileName), 81920, FileOptions.Asynchronous))
                 await file.CopyToAsync(fs, ct);
 
-            using var archive = System.IO.Compression.ZipFile.OpenRead(Path.Combine(stagingDir, file.FileName));
+            using var archive = System.IO.Compression.ZipFile.OpenRead(Path.Combine(stagingDir, safeFileName));
             var extractDir = Path.Combine(stagingDir, "extracted");
             Directory.CreateDirectory(extractDir);
 
+            long totalUncompressed = 0;
+            int entryCount = 0;
+
             foreach (var entry in archive.Entries)
             {
+                // ── Zip-bomb + entry-count caps ─────────────────────────
+                entryCount++;
+                if (entryCount > MaxModuleZipEntries)
+                    return FcmsFail($"Module package contains too many files (max {MaxModuleZipEntries}).");
+
+                totalUncompressed += entry.Length;
+                if (totalUncompressed > MaxModuleUncompressedBytes)
+                    return FcmsFail($"Module package uncompressed size exceeds {MaxModuleUncompressedBytes / 1024 / 1024} MB.");
+
+                // ── Path safety ─────────────────────────────────────────
                 if (entry.FullName.Contains("..") || Path.IsPathRooted(entry.FullName))
                     return FcmsFail($"Refusing unsafe path in archive: {entry.FullName}");
 
@@ -252,7 +291,24 @@ public class ModulesController : BaseAdminController
                 if (!dest.StartsWith(Path.GetFullPath(extractDir) + Path.DirectorySeparatorChar, StringComparison.Ordinal))
                     return FcmsFail($"Refusing escape from extract dir: {entry.FullName}");
 
+                // Directory entries are name-less and ok to create.
                 if (string.IsNullOrEmpty(entry.Name)) { Directory.CreateDirectory(dest); continue; }
+
+                // ── File-name + extension safety ────────────────────────
+                // Block obvious secret-bearing names regardless of folder.
+                // Most attacker scenarios stuff one of these into wwwroot/
+                // and rely on the static-file middleware to expose them.
+                var leaf = entry.Name.ToLowerInvariant();
+                if (leaf == ".env" || leaf.StartsWith(".env.") ||
+                    leaf.StartsWith("appsettings") && leaf.EndsWith(".json") ||
+                    leaf.EndsWith(".pfx") || leaf.EndsWith(".pem") || leaf.EndsWith(".key") ||
+                    leaf.EndsWith(".so") || leaf.EndsWith(".exe") || leaf.EndsWith(".bat") || leaf.EndsWith(".sh"))
+                    return FcmsFail($"Module package contains a sensitive file name: {entry.FullName}");
+
+                var ext = Path.GetExtension(entry.Name);
+                if (!string.IsNullOrEmpty(ext) && !AllowedModuleExtensions.Contains(ext))
+                    return FcmsFail($"Module package contains a disallowed file type: {entry.FullName}");
+
                 Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
                 ZipFileExtensions.ExtractToFile(entry, dest, overwrite: true);
             }

@@ -140,7 +140,12 @@ try
         // Site options — setup.json first, appsettings.json fallback
         TimeZoneId = setup?.TimeZoneId ?? cfg.GetValue<string>("FlexCms:TimeZoneId") ?? "Asia/Dhaka",
         EnforceIpFilter = cfg.GetValue<bool>("FlexCms:EnforceIpFilter"),
-        AllowedIps = cfg.GetSection("FlexCms:AllowedIps").Get<string[]>() ?? []
+        AllowedIps = cfg.GetSection("FlexCms:AllowedIps").Get<string[]>() ?? [],
+
+        // Dev-only: also scan the solution-root modules/ folder for in-tree
+        // module clones (F5 debug workflow). Production runs MUST keep this
+        // off so a leftover source tree can't override a signed upload.
+        EnableDevelopmentModuleRootScan = builder.Environment.IsDevelopment(),
     });
 
     // One-shot IHostedService that copies wizard-collected values from setup.json

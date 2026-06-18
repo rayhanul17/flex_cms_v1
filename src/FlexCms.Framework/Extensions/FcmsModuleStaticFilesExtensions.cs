@@ -40,6 +40,13 @@ public static class FcmsModuleStaticFilesExtensions
                 FileProvider = new PhysicalFileProvider(moduleWwwroot),
                 RequestPath = $"/modules/{slug}",
                 ContentTypeProvider = provider,
+                // Defence-in-depth: if a malformed module ZIP somehow lands a
+                // file with no recognised content type under wwwroot/ (e.g.
+                // .env, .key, .pem), ServeUnknownFileTypes=false means the
+                // static-file middleware returns 404 instead of serving the
+                // bytes with application/octet-stream. The upload validator
+                // already blocks these by extension; this is the second wall.
+                ServeUnknownFileTypes = false,
             });
         }
         return app;

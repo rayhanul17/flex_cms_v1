@@ -287,10 +287,26 @@ public static class FcmsServiceExtensions
         // Solution-root scanned first so a dev's in-tree copy wins over a
         // stale uploaded build of the same id.
         var hostModulesRoot = Path.GetFullPath(Path.Combine(options.AppDataPath, "..", "modules"));
-        var solutionRoot = Directory.GetParent(hostModulesRoot)?.Parent?.Parent?.FullName;
-        var rootModulesRoot = solutionRoot is not null ? Path.Combine(solutionRoot, "modules") : null;
-        var registry = BuildModuleRegistry(services,
-            Directory.Exists(rootModulesRoot ?? "") ? new[] { rootModulesRoot!, hostModulesRoot } : new[] { hostModulesRoot });
+
+        // Solution-root scan is dev-only — in production it would let a
+        // leftover source tree silently override the operator's signed
+        // upload. The host opts in via EnableDevelopmentModuleRootScan
+        // when IsDevelopment(). See security-audit-fix-plan §4.4.
+        string[] moduleRoots;
+        if (options.EnableDevelopmentModuleRootScan)
+        {
+            var solutionRoot = Directory.GetParent(hostModulesRoot)?.Parent?.Parent?.FullName;
+            var rootModulesRoot = solutionRoot is not null ? Path.Combine(solutionRoot, "modules") : null;
+            moduleRoots = Directory.Exists(rootModulesRoot ?? "")
+                ? new[] { rootModulesRoot!, hostModulesRoot }
+                : new[] { hostModulesRoot };
+        }
+        else
+        {
+            moduleRoots = new[] { hostModulesRoot };
+        }
+
+        var registry = BuildModuleRegistry(services, moduleRoots);
         services.AddSingleton(registry);
 
         // Smart "cookie or bearer" authentication.
@@ -610,6 +626,16 @@ public class FlexCmsOptions
     public int TrashRetentionDays { get; set; } = 30;
     /// <summary>IANA or Windows timezone ID. Default: Asia/Dhaka (+06:00).</summary>
     public string TimeZoneId { get; set; } = "Asia/Dhaka";
+
+    /// <summary>
+    /// When true, also scan the solution-root <c>modules/</c> folder (where
+    /// dev clones live) IN ADDITION to the host's runtime modules folder.
+    /// A solution-root copy of the same ModuleId wins over a runtime/uploaded
+    /// copy — useful for F5 debugging but UNSAFE in production: a leftover
+    /// source tree would silently override the operator's signed upload.
+    /// The host wires this from <c>builder.Environment.IsDevelopment()</c>.
+    /// </summary>
+    public bool EnableDevelopmentModuleRootScan { get; set; }
 
     public bool UsesRelationalDb => UseMySQL || UseMsSql || UsePostgreSQL;
 }

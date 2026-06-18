@@ -26,9 +26,14 @@ public static class FcmsLogChain
     /// </summary>
     public static string Compute(FcmsLog row)
     {
+        // 6 fractional digits — matches Postgres/MySQL microsecond precision
+        // so a hash computed at write time reproduces exactly after a DB
+        // round-trip. .NET DateTime has 100-ns tick precision (7 digits);
+        // if we hashed all 7, the 7th would be quantized away in storage
+        // and the verifier would never match.
         var data =
             (row.PrevHash ?? string.Empty) +
-            "|" + row.CreatedAt.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffffffZ", System.Globalization.CultureInfo.InvariantCulture) +
+            "|" + row.CreatedAt.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.ffffffZ", System.Globalization.CultureInfo.InvariantCulture) +
             "|" + (row.UserId?.ToString() ?? "") +
             "|" + row.Action +
             "|" + row.EntityType +

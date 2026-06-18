@@ -456,9 +456,17 @@ public class FcmsDbContext : IdentityDbContext<FcmsUser, FcmsRole, Guid>
         {
             if (entry.State == EntityState.Added)
             {
-                entry.Entity.CreatedAt = now;
+                // Only stamp CreatedAt when the caller hasn't already set
+                // one — audit-chain rows (FcmsLog) are written by
+                // FcmsAuditInterceptor with an intentional per-row tick
+                // offset to keep the chain order deterministic; clobbering
+                // them here re-collapses the batch to a single timestamp
+                // and breaks the verifier walk.
+                if (entry.Entity.CreatedAt == default)
+                    entry.Entity.CreatedAt = now;
                 entry.Entity.CreatedBy ??= userId;
-                entry.Entity.UpdatedAt = now;
+                if (entry.Entity.UpdatedAt == default)
+                    entry.Entity.UpdatedAt = entry.Entity.CreatedAt;
                 entry.Entity.UpdatedBy = userId;
             }
             else if (entry.State == EntityState.Modified)

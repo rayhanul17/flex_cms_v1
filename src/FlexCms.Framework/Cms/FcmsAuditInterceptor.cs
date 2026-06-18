@@ -107,20 +107,32 @@ public sealed class FcmsAuditInterceptor : SaveChangesInterceptor
         var ua = $"{_ctx.Browser} / {_ctx.Os}";
 
         // Chain head — read once before the batch and roll forward locally
-        // so all rows in this SaveChanges land on a deterministic chain
-        // even though they share a single CreatedAt timestamp. See
-        // security-audit-fix-plan §5.3.
+        // so all rows in this SaveChanges land on a deterministic chain.
+        // See security-audit-fix-plan §5.3.
+        //
+        // Each row in the batch gets a microsecond-incrementing CreatedAt
+        // (now, now + 1 tick, now + 2 ticks, ...) so the verifier's
+        // OrderBy(CreatedAt).ThenBy(Id) walk reproduces the exact write
+        // order. Without this offset, multiple rows would share CreatedAt
+        // and the secondary Id ordering wouldn't match the chainPrev
+        // sequence — the chain would always look broken even though each
+        // individual hash is valid.
         string? chainPrev = null;
         try { chainPrev = await FcmsLogChain.ReadLatestHashAsync(ctx, ct); }
         catch { chainPrev = null; }
 
+        // Postgres + MySQL store microsecond precision (10 .NET ticks = 1µs).
+        // Step by 10 ticks per row so the timestamp survives the round-trip
+        // and the verifier's CreatedAt-ordered walk lines up with insertion
+        // order even at batches of thousands of rows per second.
+        long tickOffset = 0;
         foreach (var entry in state.Pending)
         {
             try
             {
                 var row = new FcmsLog
                 {
-                    CreatedAt = now,
+                    CreatedAt = now.AddTicks(tickOffset),
                     UserId = userId,
                     UserName = userName,
                     UserIp = ip,
@@ -135,6 +147,7 @@ public sealed class FcmsAuditInterceptor : SaveChangesInterceptor
                 };
                 row.Hash = FcmsLogChain.Compute(row);
                 chainPrev = row.Hash;
+                tickOffset += 10;
                 ctx.Set<FcmsLog>().Add(row);
             }
             catch (Exception ex)

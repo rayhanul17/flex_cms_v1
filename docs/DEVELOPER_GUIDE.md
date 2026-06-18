@@ -535,7 +535,7 @@ Everything is implemented. No test suite written yet for Phase 2 specifically (m
 - `ForcePasswordChangeMiddleware` — redirects to `/auth/change-password` if flag set on user
 - `IpFilterMiddleware` — admin whitelist + global blacklist with wildcard support
 - Rate limiting — IP-partitioned: `login` policy (10/min/IP), `otp` policy (5/min/IP)
-- `AuthController` — Login, Logout, ForgotPassword, ResetPassword, VerifyOtp, ChangePassword
+- `AuthController` — Login, Logout, ForgotPassword, ResetPassword, TwoFactorVerify, ChangePassword
 - `FcmsValidator` — BD mobile regex, email regex, normalization to `+8801XXXXXXXXX`
 - `FcmsPasswordValidator`, `FcmsValidator` — in `FlexCms.Framework/Validators/`
 

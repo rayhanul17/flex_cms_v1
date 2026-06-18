@@ -342,9 +342,27 @@ public static class FcmsServiceExtensions
                             AutoReplenishment = true
                         });
 
-                // "otp" policy: 5 attempts/min per IP
+                // "otp-resend" policy: 3 / 5 min per IP. Stricter than the
+                // general OTP policy because each resend bills SMS/email and
+                // refreshes the active code. Listed BEFORE the generic
+                // /auth/two-factor rule so it matches first.
+                if (ctx.Request.Method == "POST" &&
+                    ctx.Request.Path.StartsWithSegments("/auth/two-factor/resend"))
+                    return RateLimitPartition.GetFixedWindowLimiter($"otp-resend:{ip}", _ =>
+                        new FixedWindowRateLimiterOptions
+                        {
+                            Window = TimeSpan.FromMinutes(5),
+                            PermitLimit = 3,
+                            AutoReplenishment = true
+                        });
+
+                // "otp" policy: 5 attempts/min per IP. Covers the modern
+                // /auth/two-factor verification and the password-reset
+                // request/finish endpoints. Legacy /auth/verify-otp endpoint
+                // was deleted in 2026-06 (passwordless backdoor); leaving its
+                // path here would create a confusing dead rule.
                 if (ctx.Request.Path.StartsWithSegments("/auth/forgot-password") ||
-                    ctx.Request.Path.StartsWithSegments("/auth/verify-otp") ||
+                    ctx.Request.Path.StartsWithSegments("/auth/two-factor") ||
                     ctx.Request.Path.StartsWithSegments("/auth/reset-password"))
                     return RateLimitPartition.GetFixedWindowLimiter($"otp:{ip}", _ =>
                         new FixedWindowRateLimiterOptions

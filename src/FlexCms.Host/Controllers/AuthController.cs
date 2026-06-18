@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using System.Text.Json;
 using FlexCms.Framework.Auth;
 using FlexCms.Framework.Auth.History;
 using FlexCms.Framework.Auth.TwoFactor;
@@ -6,6 +7,7 @@ using FlexCms.Framework.Messaging;
 using FlexCms.Framework.Sessions;
 using FlexCms.Host.Models.Auth;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 
@@ -20,6 +22,7 @@ public class AuthController : Controller
     private readonly ILoginHistoryService _history;
     private readonly ISessionService _sessions;
     private readonly IOtpChallengeService _otp;
+    private readonly IDataProtector _pending2FaProtector;
 
     public AuthController(
         UserManager<FcmsUser> userManager,
@@ -28,7 +31,8 @@ public class AuthController : Controller
         IFcmsBackgroundQueue queue,
         ILoginHistoryService history,
         ISessionService sessions,
-        IOtpChallengeService otp)
+        IOtpChallengeService otp,
+        IDataProtectionProvider dataProtection)
     {
         _userManager = userManager;
         _signInManager = signInManager;
@@ -37,6 +41,7 @@ public class AuthController : Controller
         _history = history;
         _sessions = sessions;
         _otp = otp;
+        _pending2FaProtector = dataProtection.CreateProtector("FlexCms.Auth.PendingTwoFactor.v1");
     }
 
     [HttpGet]
@@ -208,33 +213,11 @@ public class AuthController : Controller
         return View(model);
     }
 
-    [HttpGet]
-    public IActionResult VerifyOtp() => View();
-
-    [HttpPost]
-    [ValidateAntiForgeryToken]
-    public async Task<IActionResult> VerifyOtp(VerifyOtpViewModel model)
-    {
-        if (!ModelState.IsValid) return View(model);
-
-        var user = await _userManager.FindByIdAsync(model.UserId);
-        if (user is null)
-        {
-            ModelState.AddModelError(string.Empty, "Invalid OTP.");
-            return View(model);
-        }
-
-        var valid = await _userManager.VerifyTwoFactorTokenAsync(
-            user, TokenOptions.DefaultPhoneProvider, model.Otp);
-        if (!valid)
-        {
-            ModelState.AddModelError(string.Empty, "Invalid or expired OTP.");
-            return View(model);
-        }
-
-        await _signInManager.SignInAsync(user, isPersistent: false);
-        return RedirectToAction("Index", "Home");
-    }
+    // Legacy /VerifyOtp endpoint removed — it signed in via UserId + OTP with
+    // no prior password validation, no protected pending-challenge cookie,
+    // and no fcms.session_id claim (so session revocation couldn't enforce
+    // the resulting login). The modern 2FA flow at /auth/two-factor is the
+    // only supported path.
 
     [HttpGet("auth/change-password")]
     [HttpGet("Auth/ChangePassword")]
@@ -360,10 +343,21 @@ public class AuthController : Controller
 
     private void StashPendingTwoFactor(Guid userId, bool rememberMe, string? returnUrl)
     {
-        // Short-lived HttpOnly cookie (10 min). Not Session: Session can outlive a browser restart.
-        var payload = $"{userId:N}|{(rememberMe ? "1" : "0")}|{Uri.EscapeDataString(returnUrl ?? "")}";
-        var bytes = System.Text.Encoding.UTF8.GetBytes(payload);
-        Response.Cookies.Append(PendingTwoFactorCookie, Convert.ToBase64String(bytes), new CookieOptions
+        // Short-lived HttpOnly cookie (10 min). Not Session: Session can outlive
+        // a browser restart. The payload is JSON, then ASP.NET DataProtection
+        // signed+encrypted so a client can't tamper with userId / rememberMe /
+        // returnUrl. Previously Base64-only — see security-audit-fix-plan §1.2.
+        var state = new PendingTwoFactorState
+        {
+            UserId = userId,
+            RememberMe = rememberMe,
+            ReturnUrl = returnUrl ?? "",
+            IssuedAtUtc = DateTimeOffset.UtcNow,
+        };
+        var json = JsonSerializer.Serialize(state);
+        var protectedValue = _pending2FaProtector.Protect(json);
+
+        Response.Cookies.Append(PendingTwoFactorCookie, protectedValue, new CookieOptions
         {
             HttpOnly = true,
             Secure = Request.IsHttps,
@@ -379,14 +373,22 @@ public class AuthController : Controller
             return null;
         try
         {
-            var payload = System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(raw));
-            var parts = payload.Split('|', 3);
-            if (parts.Length < 2 || !Guid.TryParse(parts[0], out var uid)) return null;
-            return new PendingTwoFactor(uid, parts[1] == "1",
-                parts.Length >= 3 ? Uri.UnescapeDataString(parts[2]) : "");
+            var json = _pending2FaProtector.Unprotect(raw);
+            var state = JsonSerializer.Deserialize<PendingTwoFactorState>(json);
+            if (state is null) return null;
+
+            // 10-minute hard ceiling matches the cookie's Expires header; we
+            // also enforce it server-side because cookie expiration is a
+            // client-side hint a determined attacker can simply ignore.
+            if (DateTimeOffset.UtcNow - state.IssuedAtUtc > TimeSpan.FromMinutes(10))
+                return null;
+
+            return new PendingTwoFactor(state.UserId, state.RememberMe, state.ReturnUrl ?? "");
         }
         catch
         {
+            // Tampered / corrupt / replayed-from-an-old-key cookie: treat as no
+            // pending challenge and bounce the caller back to /auth/login.
             return null;
         }
     }
@@ -395,6 +397,14 @@ public class AuthController : Controller
         => Response.Cookies.Delete(PendingTwoFactorCookie, new CookieOptions { Path = "/auth/two-factor" });
 
     private sealed record PendingTwoFactor(Guid UserId, bool RememberMe, string ReturnUrl);
+
+    private sealed class PendingTwoFactorState
+    {
+        public Guid UserId { get; set; }
+        public bool RememberMe { get; set; }
+        public string ReturnUrl { get; set; } = "";
+        public DateTimeOffset IssuedAtUtc { get; set; }
+    }
 
     /// <summary>SuperAdmin → /admin; else highest-Priority role's LoginRedirectUrl (fallback "/").</summary>
     private async Task<string> ResolveLoginRedirectAsync(FcmsUser user)

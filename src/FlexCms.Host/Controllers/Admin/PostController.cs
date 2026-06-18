@@ -28,11 +28,13 @@ public class PostController : BaseAdminController
 
 
     [HttpGet("")]
+    [FcmsAuthorize(FcmsPermissions.PostsView)]
     public IActionResult Index() => View();
 
 
     [HttpPost("datatable")]
     [ValidateAntiForgeryToken]
+    [FcmsAuthorize(FcmsPermissions.PostsView)]
     public Task<IActionResult> DataTable(DataTablesRequest req, CancellationToken ct)
     {
         var orderColumns = new Expression<Func<FcmsPost, object>>[]

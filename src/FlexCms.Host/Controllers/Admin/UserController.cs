@@ -21,6 +21,7 @@ public class UserController : BaseAdminController
     }
 
     [HttpGet("")]
+    [FcmsAuthorize(FcmsPermissions.UsersView)]
     public async Task<IActionResult> Index(CancellationToken ct)
     {
         var users = _userManager.Users

@@ -12,14 +12,17 @@ namespace FlexCms.Framework.Auth;
 /// </remarks>
 public static class FcmsPermissions
 {
+    public const string PagesView = "pages.view";
     public const string PagesCreate = "pages.create";
     public const string PagesEdit = "pages.edit";
     public const string PagesDelete = "pages.delete";
 
+    public const string PostsView = "posts.view";
     public const string PostsCreate = "posts.create";
     public const string PostsEdit = "posts.edit";
     public const string PostsDelete = "posts.delete";
 
+    public const string CategoriesView = "categories.view";
     public const string CategoriesCreate = "categories.create";
     public const string CategoriesEdit = "categories.edit";
     public const string CategoriesDelete = "categories.delete";
@@ -34,12 +37,14 @@ public static class FcmsPermissions
     public const string RedirectsEdit = "redirects.edit";
     public const string RedirectsDelete = "redirects.delete";
 
+    public const string RolesView = "roles.view";
     public const string RolesCreate = "roles.create";
     public const string RolesEdit = "roles.edit";
     public const string RolesDelete = "roles.delete";
     public const string RolesManage = "roles.manage";
     public const string RolesPermissions = "roles.permissions";
 
+    public const string UsersView = "users.view";
     public const string UsersCreate = "users.create";
     public const string UsersEdit = "users.edit";
     public const string UsersDelete = "users.delete";
@@ -66,4 +71,14 @@ public static class FcmsPermissions
     public const string SubscribersManage = "subscribers.manage";
 
     public const string SystemManage = "system.manage";
+
+    // Runtime module operations are code execution, not generic system
+    // settings — split them off from system.manage so an operator can
+    // hold "manage host settings" without being able to upload arbitrary
+    // DLLs. ModulesUpload is the gate for the upload + scaffold actions;
+    // ModulesManage covers everything non-destructive (list, activate,
+    // deactivate, retry-seed). Destructive ops (uninstall with drop,
+    // restart) require SuperAdmin in code, not a permission key.
+    public const string ModulesManage = "modules.manage";
+    public const string ModulesUpload = "modules.upload";
 }

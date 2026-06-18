@@ -12,10 +12,18 @@ using Microsoft.Extensions.Logging;
 
 namespace FlexCms.Host.Controllers.Admin;
 
-[FcmsAuthorize(FcmsPermissions.SystemManage)]
+// Class-level gate is the read view + non-destructive operations.
+// Upload (DLL → code execution) needs the dedicated ModulesUpload
+// permission; destructive actions (uninstall + restart + scaffold)
+// require SuperAdmin in code. See security-audit-fix-plan §3.2.
+[FcmsAuthorize(FcmsPermissions.ModulesManage)]
 [Route("admin/modules")]
 public class ModulesController : BaseAdminController
 {
+    private bool IsSuperAdmin() =>
+        User.IsInRole(FcmsRoles.SuperAdmin)
+        || User.IsInRole(FcmsRoles.SuperAdmin.ToUpperInvariant());
+
     private readonly ModuleRegistry _registry;
     private readonly ModuleStateService _state;
     private readonly IRepository<FcmsModuleRecord> _records;
@@ -118,6 +126,11 @@ public class ModulesController : BaseAdminController
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Uninstall(string id, [FromForm] string confirmName, [FromForm] bool dropTables, CancellationToken ct)
     {
+        // Uninstall is destructive — drops the module folder, optionally drops
+        // every table the module owns. Restrict to SuperAdmin even when caller
+        // has modules.manage.
+        if (!IsSuperAdmin()) return Forbid();
+
         var module = _registry.FindById(id);
         if (module is null) return FcmsFail("Module not found.");
 
@@ -185,6 +198,11 @@ public class ModulesController : BaseAdminController
     [ValidateAntiForgeryToken]
     public IActionResult Restart()
     {
+        // Restarting the process is destructive — every active request is
+        // cut off, every cached secret is reloaded from disk. SuperAdmin
+        // only.
+        if (!IsSuperAdmin()) return Forbid();
+
         Response.OnCompleted(() =>
         {
             _lifetime.StopApplication();
@@ -200,6 +218,7 @@ public class ModulesController : BaseAdminController
     /// </summary>
     [HttpPost("upload")]
     [ValidateAntiForgeryToken]
+    [FcmsAuthorize(FcmsPermissions.ModulesUpload)]
     public async Task<IActionResult> Upload(IFormFile? file, bool overwrite = false, CancellationToken ct = default)
     {
         if (file is null || file.Length == 0) return FcmsFail("No file uploaded.");

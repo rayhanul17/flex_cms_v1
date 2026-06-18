@@ -23,11 +23,13 @@ public class CategoryController : BaseAdminController
 
 
     [HttpGet("")]
+    [FcmsAuthorize(FcmsPermissions.CategoriesView)]
     public IActionResult Index() => View();
 
 
     [HttpPost("datatable")]
     [ValidateAntiForgeryToken]
+    [FcmsAuthorize(FcmsPermissions.CategoriesView)]
     public Task<IActionResult> DataTable(DataTablesRequest req, CancellationToken ct)
     {
         var orderColumns = new Expression<Func<FcmsCategory, object>>[]

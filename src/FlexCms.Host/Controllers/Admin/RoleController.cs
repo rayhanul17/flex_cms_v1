@@ -29,6 +29,7 @@ public class RoleController : BaseAdminController
 
 
     [HttpGet("")]
+    [FcmsAuthorize(FcmsPermissions.RolesView)]
     public async Task<IActionResult> Index(CancellationToken ct)
     {
         var roles = _roleManager.Roles.OrderByDescending(r => r.Priority).ThenBy(r => r.Name).ToList();
@@ -150,6 +151,7 @@ public class RoleController : BaseAdminController
 
 
     [HttpGet("{id:guid}")]
+    [FcmsAuthorize(FcmsPermissions.RolesView)]
     public async Task<IActionResult> Detail(Guid id, CancellationToken ct)
     {
         var role = await _roleManager.FindByIdAsync(id.ToString());

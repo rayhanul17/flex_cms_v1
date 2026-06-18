@@ -103,8 +103,42 @@ public class FcmsLogService : IFcmsLogService
             Severity = severity
         };
 
+        // Chain link (security-audit-fix-plan §5.3). Best-effort: if reading
+        // the previous hash throws we still write the row (a security event
+        // must never be dropped), just with PrevHash/Hash = null. The
+        // verifier treats null-hash rows as un-chained legacy entries and
+        // resumes checking from the next chained row.
+        try
+        {
+            var prevHash = await ReadLatestHashViaRepoAsync(ct);
+            log.PrevHash = prevHash;
+            log.Hash = FcmsLogChain.Compute(log);
+        }
+        catch
+        {
+            log.PrevHash = null;
+            log.Hash = null;
+        }
+
         await _logs.AddAsync(log, ct);
         await _uow.SaveChangesAsync(ct);
+    }
+
+    /// <summary>
+    /// Most-recent <see cref="FcmsLog.Hash"/> by CreatedAt + Id, or null
+    /// when the table is empty / the previous row predates §5.3.
+    /// Implemented over <see cref="IRepository{T}"/> for portability across
+    /// EF and Mongo backings — at large scale this should move to a
+    /// dedicated IQueryable<FcmsLog>.OrderByDescending(...).Take(1) shortcut.
+    /// </summary>
+    private async Task<string?> ReadLatestHashViaRepoAsync(CancellationToken ct)
+    {
+        var all = await _logs.GetAllAsync(ct);
+        return all
+            .OrderByDescending(l => l.CreatedAt)
+            .ThenByDescending(l => l.Id)
+            .Select(l => l.Hash)
+            .FirstOrDefault();
     }
 
     public async Task<int> ArchiveOlderThanAsync(TimeSpan age, CancellationToken ct = default)
@@ -136,7 +170,14 @@ public class FcmsLogService : IFcmsLogService
                 EntityId = log.EntityId,
                 Value = log.Value,
                 Module = log.Module,
-                Severity = log.Severity
+                Severity = log.Severity,
+                // Preserve the chain across the move so the archive remains
+                // independently verifiable. The live table's chain head
+                // resets to the oldest remaining row; that's expected and
+                // the verifier treats null PrevHash on the first row as
+                // the new genesis.
+                PrevHash = log.PrevHash,
+                Hash = log.Hash,
             }).ToList();
 
             await _archives.AddRangeAsync(archiveEntries, ct);

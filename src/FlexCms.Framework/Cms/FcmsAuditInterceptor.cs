@@ -106,11 +106,19 @@ public sealed class FcmsAuditInterceptor : SaveChangesInterceptor
         var ip = _ctx.IpAddress;
         var ua = $"{_ctx.Browser} / {_ctx.Os}";
 
+        // Chain head — read once before the batch and roll forward locally
+        // so all rows in this SaveChanges land on a deterministic chain
+        // even though they share a single CreatedAt timestamp. See
+        // security-audit-fix-plan §5.3.
+        string? chainPrev = null;
+        try { chainPrev = await FcmsLogChain.ReadLatestHashAsync(ctx, ct); }
+        catch { chainPrev = null; }
+
         foreach (var entry in state.Pending)
         {
             try
             {
-                ctx.Set<FcmsLog>().Add(new FcmsLog
+                var row = new FcmsLog
                 {
                     CreatedAt = now,
                     UserId = userId,
@@ -123,7 +131,11 @@ public sealed class FcmsAuditInterceptor : SaveChangesInterceptor
                     Value = entry.Snapshot,
                     Module = entry.Module,
                     Severity = entry.Severity,
-                });
+                    PrevHash = chainPrev,
+                };
+                row.Hash = FcmsLogChain.Compute(row);
+                chainPrev = row.Hash;
+                ctx.Set<FcmsLog>().Add(row);
             }
             catch (Exception ex)
             {

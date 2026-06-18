@@ -19,6 +19,10 @@
     <!-- Phase 15 / Issue 88: lets operators add Seq / Elasticsearch /
          AppInsights sinks via appsettings.json + the matching sink package. -->
     <PackageReference Include="Serilog.Settings.Configuration" Version="10.0.0" />
+    <!-- Used by ModulesController.VerifyEmbeddedManifest to read the
+         module.json resource out of a candidate DLL via reflection-only
+         load (no module code executes during upload validation). -->
+    <PackageReference Include="System.Reflection.MetadataLoadContext" Version="9.0.0" />
   </ItemGroup>
 
   <PropertyGroup>

@@ -22,4 +22,10 @@ public class FcmsLogArchive : BaseEfEntity, Db.IAppendOnlyEntity
     public string? Value { get; set; }
     public string Module { get; set; } = "core";
     public FcmsLogSeverity Severity { get; set; } = FcmsLogSeverity.Info;
+
+    /// <summary>Copied from <see cref="FcmsLog.PrevHash"/> when the row was archived.</summary>
+    public string? PrevHash { get; set; }
+
+    /// <summary>Copied from <see cref="FcmsLog.Hash"/> when the row was archived.</summary>
+    public string? Hash { get; set; }
 }

@@ -54,4 +54,14 @@ public class FcmsModuleRecord : BaseEfEntity
     /// reset this counter by clicking "Retry seed" in the admin UI.
     /// </summary>
     public int SeedAttemptCount { get; set; }
+
+    /// <summary>
+    /// SHA-256 of the module DLL recorded when the package was uploaded.
+    /// On every startup the activator recomputes the DLL hash and refuses
+    /// to register the module's services if the new hash differs — catches
+    /// the case where someone swaps the DLL on disk after upload (file-
+    /// system tampering, malicious co-tenant, etc.). See
+    /// security-audit-fix-plan §4.3.
+    /// </summary>
+    public string? PackageHashSha256 { get; set; }
 }

@@ -2,6 +2,7 @@ using System.Linq.Expressions;
 using FlexCms.Framework.Auth;
 using FlexCms.Framework.Cms;
 using FlexCms.Framework.Db;
+using FlexCms.Framework.Db.Ef;
 using FlexCms.Framework.Models;
 using Microsoft.AspNetCore.Mvc;
 
@@ -13,17 +14,21 @@ public class AuditLogController : BaseAdminController
     private readonly IFcmsLogService _auditLog;
     private readonly IRepository<FcmsLog> _logs;
     private readonly IRepository<FcmsLogArchive> _archives;
+    private readonly FcmsDbContext _db;
 
-    // Inject IRepository<> instead of FcmsDbContext directly so the
-    // controller stays decoupled from the concrete EF provider.
+    // IRepository<> keeps the DataTable endpoints provider-agnostic; the
+    // direct FcmsDbContext is only used by the chain verifier (which needs
+    // a DbSet to iterate in CreatedAt order).
     public AuditLogController(
         IFcmsLogService auditLog,
         IRepository<FcmsLog> logs,
-        IRepository<FcmsLogArchive> archives)
+        IRepository<FcmsLogArchive> archives,
+        FcmsDbContext db)
     {
         _auditLog = auditLog;
         _logs = logs;
         _archives = archives;
+        _db = db;
     }
 
     [HttpGet("")]
@@ -124,5 +129,24 @@ public class AuditLogController : BaseAdminController
     {
         await _auditLog.ClearArchiveAsync(ct);
         return FcmsOk("Archive cleared.");
+    }
+
+    /// <summary>
+    /// Walk the audit-log hash chain and report whether it's intact. Caps
+    /// at 50k rows per call (paged scans are a follow-up). Returns the id
+    /// of the first broken row so an admin can pivot directly to it. See
+    /// security-audit-fix-plan §5.3.
+    /// </summary>
+    [HttpPost("verify-chain")]
+    [ValidateAntiForgeryToken]
+    [FcmsAuthorize(FcmsPermissions.AuditManage)]
+    public async Task<IActionResult> VerifyChain(CancellationToken ct)
+    {
+        var (intact, firstBrokenRowId, rowsChecked) = await FcmsLogChain.VerifyAsync(_db, limit: 50_000, ct);
+        if (intact)
+            return FcmsOk($"Audit chain intact across {rowsChecked} row{(rowsChecked == 1 ? "" : "s")}.",
+                new { rowsChecked, intact = true });
+        return FcmsFail($"Audit chain broken — first inconsistent row Id = {firstBrokenRowId}. " +
+                        $"Checked {rowsChecked} row{(rowsChecked == 1 ? "" : "s")}.");
     }
 }

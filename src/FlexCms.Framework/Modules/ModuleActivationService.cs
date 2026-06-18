@@ -76,6 +76,32 @@ public class ModuleActivationService : IHostedService
 
             _state.SyncWwwroot(loaded.FolderPath, _env.WebRootPath, module.ModuleId);
 
+            // ── DLL tamper check (security-audit-fix-plan §4.3) ────────
+            // ModulesController.Upload stored the SHA-256 of the
+            // {ModuleId}.dll at upload time. Recompute on every startup;
+            // a mismatch means somebody swapped the DLL on disk and the
+            // host is now running un-approved code. We can't *prevent*
+            // that — by the time we get here the DLL has already been
+            // loaded — but we surface it loudly so an operator can
+            // restore from backup and review the audit log.
+            var existingRecord = await repo.FirstOrDefaultAsync(r => r.ModuleId == module.ModuleId, ct);
+            if (existingRecord is not null && !string.IsNullOrEmpty(existingRecord.PackageHashSha256))
+            {
+                var dllPath = Path.Combine(loaded.FolderPath, $"{module.ModuleId}.dll");
+                if (File.Exists(dllPath))
+                {
+                    var currentHash = await ComputeSha256Async(dllPath, ct);
+                    if (!string.Equals(currentHash, existingRecord.PackageHashSha256, StringComparison.OrdinalIgnoreCase))
+                    {
+                        var msg = $"DLL tampering detected: stored hash {existingRecord.PackageHashSha256[..12]}…, current {currentHash[..12]}…";
+                        _logger.LogError("Module {Id}: {Msg}", module.ModuleId, msg);
+                        errors.Add("integrity: " + msg);
+                        await PersistActivationStateAsync(repo, uow, module, errors, false, ct);
+                        continue;
+                    }
+                }
+            }
+
             // Refuse to migrate + seed if the module's manifest doesn't
             // declare support for the host's configured DB provider.
             // Surfaces in admin UI as a clear "provider mismatch" instead of
@@ -214,6 +240,17 @@ public class ModuleActivationService : IHostedService
 
     private static string Truncate(string s, int max)
         => s.Length <= max ? s : s[..max];
+
+    /// <summary>SHA-256 of a file's contents as lowercase hex. Mirrors the
+    /// computation in <c>ModulesController.ComputeSha256Async</c> so an
+    /// upload-time hash will match a startup-time recompute byte-for-byte.</summary>
+    private static async Task<string> ComputeSha256Async(string path, CancellationToken ct)
+    {
+        using var sha = System.Security.Cryptography.SHA256.Create();
+        await using var fs = File.OpenRead(path);
+        var bytes = await sha.ComputeHashAsync(fs, ct);
+        return Convert.ToHexString(bytes).ToLowerInvariant();
+    }
 
     /// <summary>
     /// Find-or-create the module record and stamp its activation status. Used

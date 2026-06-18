@@ -66,6 +66,13 @@ public sealed class FrameworkSchemaUpgrader : IHostedService
             ("fcms_module_records", "LastActivationAttemptAt", "datetime(6) NULL"),
             ("fcms_module_records", "ActivationError",         "varchar(2000) NULL"),
             ("fcms_module_records", "SeedAttemptCount",        "int NOT NULL DEFAULT 0"),
+            // Phase 4.3 — module DLL tamper-detection. SHA-256 hex = 64 chars.
+            ("fcms_module_records", "PackageHashSha256",       "varchar(64) NULL"),
+            // Phase 5.3 — audit-log tamper-evident hash chain.
+            ("fcms_logs",           "PrevHash",                "varchar(64) NULL"),
+            ("fcms_logs",           "Hash",                    "varchar(64) NULL"),
+            ("fcms_log_archives",   "PrevHash",                "varchar(64) NULL"),
+            ("fcms_log_archives",   "Hash",                    "varchar(64) NULL"),
             ("fcms_users",          "ImageUrl",                "varchar(500) NULL"),
             ("fcms_users",          "BlockedUntil",            "datetime(6) NULL"),
             ("fcms_users",          "BlockReason",             "varchar(500) NULL"),

@@ -333,14 +333,57 @@ public class ModulesController : BaseAdminController
             if (moduleId.Contains('/') || moduleId.Contains('\\') || moduleId.Contains(".."))
                 return FcmsFail($"ModuleId contains invalid characters: {moduleId}");
 
+            // ── Manifest-match check (security-audit-fix-plan §4.2) ─────
+            // Verify that the loose module.json on disk and the module.json
+            // embedded inside the DLL agree on ModuleId. Defeats a class of
+            // attack where the loose manifest claims one ModuleId (e.g. an
+            // existing trusted module's id, triggering an overwrite) but
+            // the DLL actually contains different code. MetadataLoadContext
+            // is reflection-only — it never executes module code.
+            var verify = VerifyEmbeddedManifest(moduleSrcDir, moduleId);
+            if (!verify.ok) return FcmsFail("Manifest verification failed: " + verify.error);
+
             var dest2 = Path.Combine(modulesRoot, moduleId);
             if (Directory.Exists(dest2) && !overwrite)
                 return FcmsFail($"A module folder named \"{moduleId}\" already exists. Re-upload with the overwrite option to replace it.");
             if (Directory.Exists(dest2)) Directory.Delete(dest2, recursive: true);
 
             CopyDirectory(moduleSrcDir, dest2);
+
+            // ── Compute + record DLL hash (security-audit-fix-plan §4.3) ─
+            // The activator will recompute on every startup and refuse to
+            // register the module's services if the hash drifts. We hash
+            // the canonical module DLL only — accompanying files (Resources,
+            // wwwroot) are policy, not code execution, so a drift there
+            // doesn't constitute tampering for this purpose.
+            var dllAtDest = Path.Combine(dest2, $"{moduleId}.dll");
+            string? packageHash = null;
+            if (System.IO.File.Exists(dllAtDest))
+            {
+                packageHash = await ComputeSha256Async(dllAtDest, ct);
+                var record = (await _records.GetAllAsync(ct))
+                    .FirstOrDefault(r => string.Equals(r.ModuleId, moduleId, StringComparison.OrdinalIgnoreCase));
+                if (record is null)
+                {
+                    await _records.AddAsync(new FcmsModuleRecord
+                    {
+                        ModuleId = moduleId,
+                        Version = "",
+                        ActivationStatus = "Inactive",
+                        PackageHashSha256 = packageHash,
+                    }, ct);
+                }
+                else
+                {
+                    record.PackageHashSha256 = packageHash;
+                    await _records.UpdateAsync(record, ct);
+                }
+                await _uow.SaveChangesAsync(ct);
+            }
+
             await OpLog.LogAsync(FcmsAuditActions.ModuleUploaded, nameof(FcmsModuleRecord), moduleId,
-                value: new { moduleId, fileName = file.FileName, overwrite }, module: moduleId, ct: ct);
+                value: new { moduleId, fileName = file.FileName, overwrite, packageHashSha256 = packageHash },
+                module: moduleId, ct: ct);
             return FcmsOk($"Module \"{moduleId}\" uploaded. Restart the app to load it.", new { moduleId });
         }
         catch (InvalidDataException)
@@ -355,6 +398,93 @@ public class ModulesController : BaseAdminController
         {
             try { Directory.Delete(stagingDir, recursive: true); } catch { /* best effort */ }
         }
+    }
+
+    /// <summary>
+    /// Verify the module's <c>module.json</c> embedded as an assembly
+    /// resource matches the loose <c>module.json</c> the uploader supplied
+    /// on disk, AND that ModuleId on both matches the caller-claimed value.
+    /// Uses <see cref="System.Reflection.MetadataLoadContext"/> so we never
+    /// load module code into the host's AssemblyLoadContext just to check
+    /// it. Multiple module-shaped DLLs in the package is also rejected.
+    /// </summary>
+    private static (bool ok, string error) VerifyEmbeddedManifest(string moduleSrcDir, string claimedModuleId)
+    {
+        // Find DLLs sitting at the package root (matches the runtime
+        // loader's first-pass scan). We don't recurse into sub-folders —
+        // those are normally NuGet deps copied alongside the module, not
+        // additional modules.
+        var dllPaths = Directory.GetFiles(moduleSrcDir, "*.dll", SearchOption.TopDirectoryOnly);
+
+        // Use the host's own runtime DLLs as the metadata resolver context
+        // so MetadataLoadContext can resolve references like System.Runtime.
+        var runtimeAssemblies = Directory.GetFiles(
+            System.Runtime.InteropServices.RuntimeEnvironment.GetRuntimeDirectory(),
+            "*.dll");
+        var resolverPaths = new List<string>(runtimeAssemblies);
+        resolverPaths.AddRange(dllPaths);
+
+        var resolver = new System.Reflection.PathAssemblyResolver(resolverPaths);
+        using var mlc = new System.Reflection.MetadataLoadContext(resolver);
+
+        string? embeddedId = null;
+        string? owningDll = null;
+
+        foreach (var dllPath in dllPaths)
+        {
+            System.Reflection.Assembly asm;
+            try { asm = mlc.LoadFromAssemblyPath(dllPath); }
+            catch { continue; }  // Not a managed DLL we can read — fine, skip.
+
+            string[] resourceNames;
+            try { resourceNames = asm.GetManifestResourceNames(); }
+            catch { continue; }
+
+            var moduleJsonRes = resourceNames.FirstOrDefault(n =>
+                n.EndsWith("module.json", StringComparison.OrdinalIgnoreCase));
+            if (moduleJsonRes is null) continue;
+
+            // Found a candidate module DLL.
+            using var stream = asm.GetManifestResourceStream(moduleJsonRes);
+            if (stream is null) continue;
+            using var reader = new StreamReader(stream);
+            var embeddedJson = reader.ReadToEnd();
+
+            string? id;
+            try
+            {
+                using var doc = System.Text.Json.JsonDocument.Parse(embeddedJson);
+                id = doc.RootElement.TryGetProperty("ModuleId", out var v) ? v.GetString() : null;
+            }
+            catch (Exception ex) { return (false, $"embedded module.json in {Path.GetFileName(dllPath)} is invalid JSON: {ex.Message}"); }
+
+            if (string.IsNullOrWhiteSpace(id))
+                return (false, $"embedded module.json in {Path.GetFileName(dllPath)} is missing ModuleId.");
+
+            if (embeddedId is not null)
+                return (false, $"package contains multiple module DLLs ('{owningDll}' and '{Path.GetFileName(dllPath)}'); only one is allowed.");
+
+            embeddedId = id;
+            owningDll = Path.GetFileName(dllPath);
+        }
+
+        if (embeddedId is null)
+            return (false, "no module DLL with an embedded module.json was found in the package root.");
+
+        if (!string.Equals(embeddedId, claimedModuleId, StringComparison.Ordinal))
+            return (false, $"loose module.json claims ModuleId '{claimedModuleId}' but DLL '{owningDll}' embeds ModuleId '{embeddedId}'.");
+
+        return (true, "");
+    }
+
+    /// <summary>SHA-256 of a file's contents as lowercase hex. Used to detect
+    /// DLL tampering after upload (security-audit-fix-plan §4.3).</summary>
+    private static async Task<string> ComputeSha256Async(string path, CancellationToken ct)
+    {
+        using var sha = System.Security.Cryptography.SHA256.Create();
+        await using var fs = System.IO.File.OpenRead(path);
+        var bytes = await sha.ComputeHashAsync(fs, ct);
+        return Convert.ToHexString(bytes).ToLowerInvariant();
     }
 
     private static void CopyDirectory(string src, string dest)

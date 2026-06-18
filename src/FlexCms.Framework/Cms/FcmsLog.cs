@@ -33,4 +33,20 @@ public class FcmsLog : BaseEfEntity, Db.IAppendOnlyEntity
     public string Module { get; set; } = "core";
 
     public FcmsLogSeverity Severity { get; set; } = FcmsLogSeverity.Info;
+
+    /// <summary>
+    /// SHA-256 of the previous (newest existing) row at the moment this row
+    /// was written. <c>null</c> on the first row of the chain. Together with
+    /// <see cref="Hash"/> forms a tamper-evident chain: any in-place edit or
+    /// deletion downstream invalidates every following hash. See
+    /// security-audit-fix-plan §5.3.
+    /// </summary>
+    public string? PrevHash { get; set; }
+
+    /// <summary>
+    /// SHA-256 of <c>PrevHash + CreatedAt + UserId + Action + EntityType +
+    /// EntityId + Value</c> for this row, as lowercase hex. Computed at
+    /// write time and never updated.
+    /// </summary>
+    public string? Hash { get; set; }
 }

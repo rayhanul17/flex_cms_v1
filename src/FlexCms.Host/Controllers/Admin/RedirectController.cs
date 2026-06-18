@@ -23,6 +23,7 @@ public class RedirectController : BaseAdminController
     }
 
     [HttpGet("")]
+    [FcmsAuthorize(FcmsPermissions.RedirectsView)]
     public async Task<IActionResult> Index(CancellationToken ct)
     {
         var redirects = (await _redirects.GetAllAsync(ct))

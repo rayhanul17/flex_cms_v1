@@ -33,9 +33,13 @@ public static class FcmsPermissions
     public const string MediaDelete = "media.delete";
     public const string MediaFolders = "media.folders";
 
+    public const string RedirectsView = "redirects.view";
     public const string RedirectsCreate = "redirects.create";
     public const string RedirectsEdit = "redirects.edit";
     public const string RedirectsDelete = "redirects.delete";
+
+    public const string NotificationsView = "notifications.view";
+    public const string NotificationsManage = "notifications.manage";
 
     public const string RolesView = "roles.view";
     public const string RolesCreate = "roles.create";

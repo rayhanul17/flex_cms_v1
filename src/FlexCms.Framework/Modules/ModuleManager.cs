@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text.Json;
 using Microsoft.Extensions.Logging;
 
 namespace FlexCms.Framework.Modules;
@@ -17,11 +19,16 @@ public class ModuleManager
 
     private readonly ModuleLoader _loader;
     private readonly ILogger<ModuleManager> _logger;
+    private readonly IModuleTrustStore _trust;
 
     public ModuleManager(ModuleLoader loader, ILogger<ModuleManager> logger)
+        : this(loader, logger, NullModuleTrustStore.Instance) { }
+
+    public ModuleManager(ModuleLoader loader, ILogger<ModuleManager> logger, IModuleTrustStore trust)
     {
         _loader = loader;
         _logger = logger;
+        _trust = trust;
     }
 
     /// <summary>
@@ -63,6 +70,20 @@ public class ModuleManager
 
             foreach (var dll in candidates)
             {
+                // ── Pre-load integrity gate (security-audit-recheck §8.1) ──
+                // Read the embedded module.json + compute the DLL hash via
+                // reflection-only metadata APIs BEFORE Assembly.LoadFrom
+                // executes any module code. A tampered DLL whose hash
+                // doesn't match the trust store's approved hash is
+                // refused outright — no Assembly.LoadFrom, no module
+                // type instantiation, no DI registration downstream.
+                if (!PreLoadIntegrityCheck(dll, out var declaredId, out var precomputedHash))
+                {
+                    _logger.LogError(
+                        "Module DLL at '{Path}' failed pre-load integrity check — refusing to load.", dll);
+                    continue;
+                }
+
                 var module = _loader.LoadFromPath(dll, moduleFolder, disabled);
                 if (module is null) continue;
                 loaded.Add(module);
@@ -88,6 +109,97 @@ public class ModuleManager
         }
 
         return SortByDependencies(loaded);
+    }
+
+    /// <summary>
+    /// Reflection-only check of a candidate module DLL. Returns true when
+    /// the DLL has an embedded <c>module.json</c> AND its file hash matches
+    /// the approved hash for that ModuleId in the trust store (or no
+    /// stored hash exists yet — trust-on-first-use).
+    /// </summary>
+    /// <remarks>
+    /// Uses <see cref="System.Reflection.MetadataLoadContext"/> so the DLL
+    /// is never loaded into the host's AssemblyLoadContext just to peek at
+    /// its manifest. The full assembly load only happens later, after this
+    /// check passes — see security-audit-recheck §8.1.
+    /// </remarks>
+    private bool PreLoadIntegrityCheck(string dllPath, out string declaredModuleId, out string fileHash)
+    {
+        declaredModuleId = "";
+        fileHash = "";
+
+        // 1. Compute the file hash up front. Cheap and provider-independent.
+        try
+        {
+            using var fs = File.OpenRead(dllPath);
+            fileHash = Convert.ToHexString(SHA256.HashData(fs)).ToLowerInvariant();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "PreLoadIntegrityCheck: could not hash {Path}", dllPath);
+            return false;
+        }
+
+        // 2. Read embedded module.json without executing any code from the DLL.
+        var runtimeAssemblies = Directory.GetFiles(
+            System.Runtime.InteropServices.RuntimeEnvironment.GetRuntimeDirectory(), "*.dll");
+        var resolverPaths = new List<string>(runtimeAssemblies) { dllPath };
+        try
+        {
+            var resolver = new System.Reflection.PathAssemblyResolver(resolverPaths);
+            using var mlc = new System.Reflection.MetadataLoadContext(resolver);
+            var asm = mlc.LoadFromAssemblyPath(dllPath);
+
+            var resourceName = asm.GetManifestResourceNames()
+                .FirstOrDefault(n => n.EndsWith("module.json", StringComparison.OrdinalIgnoreCase));
+            if (resourceName is null)
+            {
+                // Not a module DLL at all — likely a transitive dep sitting
+                // in bin/Debug/. Let it pass; the loader will skip it later.
+                return true;
+            }
+
+            using var stream = asm.GetManifestResourceStream(resourceName);
+            if (stream is null) return true;
+            using var doc = JsonDocument.Parse(stream);
+            if (doc.RootElement.TryGetProperty("ModuleId", out var idProp))
+                declaredModuleId = idProp.GetString() ?? "";
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "PreLoadIntegrityCheck: metadata read failed for {Path}", dllPath);
+            return false;
+        }
+
+        if (string.IsNullOrEmpty(declaredModuleId))
+        {
+            // Module DLL without a usable ModuleId — let the loader's own
+            // logging surface the error. Skip integrity check (nothing to
+            // compare against).
+            return true;
+        }
+
+        // 3. Compare against the trust store. Missing entry = trust on
+        // first use; the activator will record the hash for next boot.
+        var approved = _trust.GetApprovedHash(declaredModuleId);
+        if (approved is null)
+        {
+            if (_trust.IsAvailable)
+                _logger.LogInformation(
+                    "PreLoadIntegrityCheck: no approved hash recorded yet for {Id}; trust-on-first-use.",
+                    declaredModuleId);
+            return true;
+        }
+
+        if (!string.Equals(approved, fileHash, StringComparison.OrdinalIgnoreCase))
+        {
+            _logger.LogError(
+                "PreLoadIntegrityCheck: DLL tampering detected for {Id} — approved {Approved}, current {Current}.",
+                declaredModuleId, approved[..Math.Min(12, approved.Length)], fileHash[..12]);
+            return false;
+        }
+
+        return true;
     }
 
     /// <summary>

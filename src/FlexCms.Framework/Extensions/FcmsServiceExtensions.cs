@@ -253,17 +253,23 @@ public static class FcmsServiceExtensions
         // Seed admin user + SuperAdmin role on first production-mode startup
         services.AddHostedService<SeedService>();
 
+        // Connection string + provider derived once — also passed into
+        // BuildModuleRegistry so the pre-load integrity gate can read
+        // approved module hashes without DI being available yet.
+        var activationConnString = options.UseMySQL ? options.MySqlConnectionString
+            : options.UseMsSql ? options.MsSqlConnectionString
+            : options.UsePostgreSQL ? options.PostgreSqlConnectionString
+            : "";
+        var activationProvider = options.UseMySQL ? "mysql"
+            : options.UseMsSql ? "mssql"
+            : options.UsePostgreSQL ? "postgresql"
+            : "";
+
         // Run module EF migrations + SeedDataAsync on every startup (idempotent)
         services.AddSingleton(new ModuleActivationOptions
         {
-            ConnectionString = options.UseMySQL ? options.MySqlConnectionString
-                : options.UseMsSql ? options.MsSqlConnectionString
-                : options.UsePostgreSQL ? options.PostgreSqlConnectionString
-                : "",
-            Provider = options.UseMySQL ? "mysql"
-                : options.UseMsSql ? "mssql"
-                : options.UsePostgreSQL ? "postgresql"
-                : ""
+            ConnectionString = activationConnString,
+            Provider = activationProvider,
         });
         services.AddScoped<ModulePermissionSeeder>();
         // Schema upgrader runs FIRST so any column the module activator/seeder
@@ -306,7 +312,7 @@ public static class FcmsServiceExtensions
             moduleRoots = new[] { hostModulesRoot };
         }
 
-        var registry = BuildModuleRegistry(services, moduleRoots);
+        var registry = BuildModuleRegistry(services, moduleRoots, activationProvider, activationConnString);
         services.AddSingleton(registry);
 
         // Smart "cookie or bearer" authentication.
@@ -567,14 +573,26 @@ public static class FcmsServiceExtensions
     /// into the host: call its <c>RegisterServices</c>, scan its assembly
     /// for attribute-marked types, and add it as an MVC ApplicationPart.
     /// </summary>
-    private static ModuleRegistry BuildModuleRegistry(IServiceCollection services, IReadOnlyList<string> modulesRoots)
+    private static ModuleRegistry BuildModuleRegistry(
+        IServiceCollection services,
+        IReadOnlyList<string> modulesRoots,
+        string provider = "",
+        string connectionString = "")
     {
         // We can't pull a logger from DI here (container isn't built yet);
         // the manager / loader log via NullLogger when invoked statically.
         var loaderLog = Microsoft.Extensions.Logging.Abstractions.NullLogger<ModuleLoader>.Instance;
         var managerLog = Microsoft.Extensions.Logging.Abstractions.NullLogger<ModuleManager>.Instance;
         var loader = new ModuleLoader(loaderLog);
-        var manager = new ModuleManager(loader, managerLog);
+
+        // Build a trust store BEFORE any Assembly.LoadFrom. The store reads
+        // fcms_module_records.PackageHashSha256 via raw ADO.NET — it doesn't
+        // need DI because module discovery runs during DI registration.
+        // If the schema upgrader hasn't run yet (fresh install) the store
+        // reports unavailable and load falls back to trust-on-first-use.
+        var trust = AdoModuleTrustStore.Build(provider, connectionString);
+
+        var manager = new ModuleManager(loader, managerLog, trust);
 
         // Walk every root in order; the first occurrence of a given ModuleId wins,
         // so solution-root scaffolds take precedence over uploaded packages.

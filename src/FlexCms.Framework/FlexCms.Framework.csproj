@@ -40,6 +40,10 @@
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
     <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="9.0.15" />
+    <!-- Reflection-only assembly inspection — used by ModuleManager.PreLoadIntegrityCheck
+         to read a module DLL's embedded module.json + compute its hash BEFORE
+         Assembly.LoadFrom executes any module code. -->
+    <PackageReference Include="System.Reflection.MetadataLoadContext" Version="9.0.0" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="9.0.15" />
     <!-- Pin Microsoft.Data.SqlClient to a recent stable. EF Core 9.0.15 still
          transitively brings 5.x; 5.x pulls Microsoft.IdentityModel.* 6.x +

@@ -24,6 +24,7 @@ public class NotificationController : BaseAdminController
     }
 
     [HttpGet("")]
+    [FcmsAuthorize(FcmsPermissions.NotificationsView)]
     public async Task<IActionResult> Index(CancellationToken ct)
     {
         var userId = await ResolveUserIdAsync();
@@ -39,6 +40,7 @@ public class NotificationController : BaseAdminController
     }
 
     [HttpGet("recent")]
+    [FcmsAuthorize(FcmsPermissions.NotificationsView)]
     public async Task<IActionResult> Recent(CancellationToken ct)
     {
         var userId = await ResolveUserIdAsync();
@@ -67,6 +69,7 @@ public class NotificationController : BaseAdminController
 
     [HttpPost("mark-read/{id:guid}")]
     [ValidateAntiForgeryToken]
+    [FcmsAuthorize(FcmsPermissions.NotificationsManage)]
     public async Task<IActionResult> MarkRead(Guid id, CancellationToken ct)
     {
         var userId = await ResolveUserIdAsync();
@@ -77,6 +80,7 @@ public class NotificationController : BaseAdminController
 
     [HttpPost("mark-all-read")]
     [ValidateAntiForgeryToken]
+    [FcmsAuthorize(FcmsPermissions.NotificationsManage)]
     public async Task<IActionResult> MarkAllRead(CancellationToken ct)
     {
         var userId = await ResolveUserIdAsync();

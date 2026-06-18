@@ -48,4 +48,16 @@ public class ModuleManifest
     /// </summary>
     /// <example>["filesystem.read", "outbound.http", "send.email"]</example>
     public string[] RequestedCapabilities { get; set; } = [];
+
+    /// <summary>
+    /// DB providers this module's migrations have been tested against.
+    /// Default = all three: <c>mysql</c>, <c>mssql</c>, <c>postgresql</c>.
+    /// The activator refuses to apply migrations + seed if the host's
+    /// configured provider isn't in this list, surfacing a clear error
+    /// in the admin module list instead of a cryptic migration failure
+    /// at startup. Override in <c>module.json</c> when a module uses
+    /// provider-specific SQL or only ships migrations for one provider.
+    /// See security-audit-fix-plan §6.1.
+    /// </summary>
+    public string[] SupportedDbProviders { get; set; } = ["mysql", "mssql", "postgresql"];
 }

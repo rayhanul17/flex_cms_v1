@@ -142,6 +142,38 @@ public sealed class FcmsAuditInterceptor : SaveChangesInterceptor
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "FcmsAuditInterceptor: failed to persist audit log rows.");
+
+            // Last-resort fallback: write the dropped rows to an append-only
+            // JSONL file under App_Data/logs/ so the trail isn't lost. We
+            // resolve the sink lazily so a missing IFcmsAuditFallbackSink
+            // registration (e.g. unit-test contexts) doesn't crash the
+            // main path. See security-audit-fix-plan §5.2.
+            try
+            {
+                var sink = _sp.GetService<IFcmsAuditFallbackSink>();
+                if (sink is not null)
+                {
+                    foreach (var entry in state.Pending)
+                    {
+                        await sink.WriteAsync(new FcmsAuditFallbackEntry(
+                            CreatedAtUtc: now.ToUniversalTime(),
+                            Action: entry.Action,
+                            EntityType: entry.EntityType,
+                            EntityId: entry.EntityId,
+                            UserId: userId?.ToString(),
+                            UserName: userName,
+                            UserIp: ip,
+                            Module: entry.Module,
+                            Severity: entry.Severity.ToString(),
+                            Value: entry.Snapshot,
+                            Reason: ex.GetType().Name + ": " + ex.Message), ct);
+                    }
+                }
+            }
+            catch (Exception sinkEx)
+            {
+                _logger.LogError(sinkEx, "FcmsAuditInterceptor: fallback sink also failed.");
+            }
         }
         finally
         {

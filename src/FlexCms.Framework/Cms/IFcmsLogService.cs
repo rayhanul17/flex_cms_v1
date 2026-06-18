@@ -32,6 +32,23 @@ public interface IFcmsLogService
         CancellationToken ct = default);
 
     /// <summary>
+    /// Write a log entry even when <c>AuditConfig.Enabled = false</c>.
+    /// Reserved for security-sensitive control-plane events that MUST
+    /// leave a trail regardless of the operator's audit-toggle choice —
+    /// notably the audit-toggle itself, role / permission changes, and
+    /// module install / uninstall. Always uses
+    /// <see cref="FcmsLogSeverity.Warning"/> or higher.
+    /// </summary>
+    Task LogSecurityEventBypassSettingsAsync(
+        string action,
+        string entityType,
+        string entityId,
+        object? value = null,
+        string module = "core",
+        FcmsLogSeverity severity = FcmsLogSeverity.Warning,
+        CancellationToken ct = default);
+
+    /// <summary>
     /// Moves all logs older than <paramref name="age"/> to the archive table
     /// (hard delete from main). Returns the number of rows actually moved so
     /// callers can surface "0 archived" vs "12 archived" honestly in the UI.

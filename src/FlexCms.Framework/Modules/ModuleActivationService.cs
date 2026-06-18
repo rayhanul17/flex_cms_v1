@@ -76,6 +76,22 @@ public class ModuleActivationService : IHostedService
 
             _state.SyncWwwroot(loaded.FolderPath, _env.WebRootPath, module.ModuleId);
 
+            // Refuse to migrate + seed if the module's manifest doesn't
+            // declare support for the host's configured DB provider.
+            // Surfaces in admin UI as a clear "provider mismatch" instead of
+            // a cryptic EF error mid-migration. See security-audit-fix-plan §6.1.
+            if (!string.IsNullOrEmpty(_opts.Provider) &&
+                loaded.Manifest.SupportedDbProviders.Length > 0 &&
+                !loaded.Manifest.SupportedDbProviders.Contains(_opts.Provider, StringComparer.OrdinalIgnoreCase))
+            {
+                var msg = $"provider: module {module.ModuleId} does not declare support for '{_opts.Provider}' " +
+                          $"(declared: {string.Join(", ", loaded.Manifest.SupportedDbProviders)})";
+                _logger.LogError("Module {Id}: skipping activation — {Msg}", module.ModuleId, msg);
+                errors.Add(msg);
+                await PersistActivationStateAsync(repo, uow, module, errors, false, ct);
+                continue;
+            }
+
             var migrationCtx = module.CreateMigrationContext(_opts.ConnectionString, _opts.Provider);
             if (migrationCtx is not null)
             {
@@ -198,6 +214,38 @@ public class ModuleActivationService : IHostedService
 
     private static string Truncate(string s, int max)
         => s.Length <= max ? s : s[..max];
+
+    /// <summary>
+    /// Find-or-create the module record and stamp its activation status. Used
+    /// for the early-bail paths (e.g. provider-mismatch §6.1) so the admin
+    /// module list shows the error instead of just silently skipping.
+    /// </summary>
+    private static async Task PersistActivationStateAsync(
+        Db.IRepository<FcmsModuleRecord> repo,
+        Db.IFcmsUnitOfWork uow,
+        IFcmsModule module,
+        List<string> errors,
+        bool active,
+        CancellationToken ct)
+    {
+        var record = await repo.FirstOrDefaultAsync(r => r.ModuleId == module.ModuleId, ct);
+        if (record is null)
+        {
+            record = new FcmsModuleRecord
+            {
+                ModuleId = module.ModuleId,
+                Version = module.Version,
+                ActivationStatus = active ? "Active" : "Error",
+                ActivatedAt = active ? FcmsTime.Now : null,
+            };
+            await repo.AddAsync(record, ct);
+        }
+        record.LastActivationAttemptAt = FcmsTime.Now;
+        record.ActivationStatus = active ? "Active" : "Error";
+        record.ActivationError = errors.Count == 0 ? null : Truncate(string.Join(" | ", errors), 2000);
+        await repo.UpdateAsync(record, ct);
+        await uow.SaveChangesAsync(ct);
+    }
 }
 
 /// <summary>Holds DB connection info needed by <see cref="ModuleActivationService"/>.</summary>

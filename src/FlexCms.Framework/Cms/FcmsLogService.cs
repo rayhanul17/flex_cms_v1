@@ -66,6 +66,28 @@ public class FcmsLogService : IFcmsLogService
         var cfg = await _settings.GetAsync<AuditConfig>(AuditLogSettings.Key, ct: ct);
         if (!cfg.Enabled) return;
 
+        await WriteRowAsync(action, entityType, entityId, value, module, severity, ct);
+    }
+
+    public Task LogSecurityEventBypassSettingsAsync(
+        string action,
+        string entityType,
+        string entityId,
+        object? value = null,
+        string module = "core",
+        FcmsLogSeverity severity = FcmsLogSeverity.Warning,
+        CancellationToken ct = default)
+        => WriteRowAsync(action, entityType, entityId, value, module, severity, ct);
+
+    private async Task WriteRowAsync(
+        string action,
+        string entityType,
+        string entityId,
+        object? value,
+        string module,
+        FcmsLogSeverity severity,
+        CancellationToken ct)
+    {
         var log = new FcmsLog
         {
             CreatedAt = FcmsTime.Now,

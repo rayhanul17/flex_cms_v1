@@ -66,12 +66,27 @@ public class SettingsController : BaseAdminController
 
     [HttpPost("audit/toggle")]
     [ValidateAntiForgeryToken]
-    [FcmsAuthorize(FcmsPermissions.SettingsManage)]
+    [FcmsAuthorize(FcmsPermissions.AuditManage)]
     public async Task<IActionResult> ToggleAudit(CancellationToken ct)
     {
         var cfg = await _settings.GetAsync<AuditEnabledDto>(AuditLogSettings.Key, ct: ct);
-        cfg.Enabled = !cfg.Enabled;
+        var previouslyEnabled = cfg.Enabled;
+        cfg.Enabled = !previouslyEnabled;
         await _settings.SaveAsync(AuditLogSettings.Key, cfg, ct);
+
+        // ALWAYS leave a trail for this — even when the operator is in the
+        // act of disabling audit logging — so the action remains
+        // attributable. Uses the dedicated bypass channel that ignores
+        // AuditConfig.Enabled. See security-audit-fix-plan §5.1.
+        await OpLog.LogSecurityEventBypassSettingsAsync(
+            action: cfg.Enabled ? "Audit.Enabled" : "Audit.Disabled",
+            entityType: "AuditConfig",
+            entityId: AuditLogSettings.Key,
+            value: new { previouslyEnabled, nowEnabled = cfg.Enabled },
+            module: "core",
+            severity: FcmsLogSeverity.Warning,
+            ct: ct);
+
         return FcmsOk(cfg.Enabled ? "Audit logging enabled." : "Audit logging disabled.", new { enabled = cfg.Enabled });
     }
 

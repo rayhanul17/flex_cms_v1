@@ -71,9 +71,45 @@ modules/
 
 Restart `dotnet watch run` and the module appears under **Admin → Modules**.
 
-> Don't put your `bin/Debug/` output directly under `modules/` — copy the
-> publish output, or use the `+ Create New Module` scaffold which sets the
-> right layout for you.
+### C. Debug-friendly dev workflow (VS / F5 / breakpoints)
+
+When you're **actively editing** a module and want breakpoints in `.cs` files
+to hit during a normal host F5, clone the module source under
+`modules/<ModuleId>/` and reference its `.csproj` from a **local-only**
+solution file. The host's module loader picks up the freshly built
+`bin/Debug/net10.0/*.dll` automatically — same DLL Visual Studio attached
+its debugger to, so symbols line up and breakpoints work out of the box.
+
+```bash
+# 1. Clone the module source side-by-side with the host source
+cd flex_cms_v1/modules
+git clone https://github.com/<org>/FlexCms.Module.Investment.git
+cd ..
+
+# 2. Create a local dev solution that includes the module
+#    (git-ignored — FlexCms.dev.slnx + FlexCms.*.dev.slnx)
+cp FlexCms.slnx FlexCms.dev.slnx
+```
+
+Then add a `<Folder Name="/modules/">` block to `FlexCms.dev.slnx` with one
+`<Project>` line per module you have cloned, e.g.:
+
+```xml
+<Folder Name="/modules/">
+  <Project Path="modules/FlexCms.Module.Investment/FlexCms.Module.Investment.csproj" />
+</Folder>
+```
+
+Open `FlexCms.dev.slnx` in Visual Studio → F5. Breakpoints in module `.cs`
+files now hit. The `.slnx` is git-ignored so dropping or adding modules
+locally never affects teammates whose checkout has different modules cloned.
+
+Module-side `bin/Debug/` is **fine** in this flow — the host scans
+`modules/<id>/bin/Debug/net*/` (after `modules/<id>/*.dll` at the folder
+root) so a `dotnet build` of the module produces a DLL the host loads
+immediately. The "don't put bin/Debug here" warning above applies only
+when you're **shipping** a built module to another machine — for that,
+use the upload path (A) or the module's `build-package.sh` script.
 
 ---
 

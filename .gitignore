@@ -93,6 +93,12 @@ modules/*
 src/FlexCms.Host/modules/*
 !src/FlexCms.Host/modules/.gitkeep
 
+# Local-only solution that includes in-tree module csproj references
+# so VS F5 debugs module source directly. Each dev opens this file
+# instead of FlexCms.slnx when working on a module.
+FlexCms.dev.slnx
+FlexCms.*.dev.slnx
+
 # Environment
 .env
 .env.local

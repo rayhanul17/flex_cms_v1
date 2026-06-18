@@ -63,10 +63,10 @@ public sealed class FcmsApiTokenAuthenticationHandler : AuthenticationHandler<Fc
         {
             new(ClaimTypes.NameIdentifier, user.Id.ToString()),
             new(ClaimTypes.Name, user.UserName ?? ""),
-            new("fcms.api_token_id", token.Id.ToString())
+            new(FcmsClaimTypes.ApiTokenId, token.Id.ToString())
         };
         foreach (var scope in (token.Scopes ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-            claims.Add(new Claim("fcms.api_scope", scope));
+            claims.Add(new Claim(FcmsClaimTypes.ApiScope, scope));
 
         // Pull the user's role list so existing [Authorize(Roles=...)] checks work.
         var roles = await _users.GetRolesAsync(user);

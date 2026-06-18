@@ -65,11 +65,15 @@ internal sealed class FcmsAuthorizeFilter : IAsyncAuthorizationFilter
             return;
         }
 
-        // SuperAdmin bypasses all permission checks.
-        // Check both the standard ClaimTypes.Role claim and the normalized-uppercase variant
-        // (UserManager.AddToRoleAsync normalizes role names).
-        if (user.IsInRole(FcmsRoles.SuperAdmin) ||
-            user.IsInRole(FcmsRoles.SuperAdmin.ToUpperInvariant())) return;
+        // SuperAdmin bypasses all permission checks — but ONLY for browser
+        // cookie sessions. API-token requests (fcms.api_token_id claim
+        // present) still go through PermissionService so token scopes are
+        // enforced; otherwise a leaked SuperAdmin token would be a master
+        // key. See security-audit-fix-plan §2.2.
+        var isApiToken = user.HasClaim(c => c.Type == FcmsClaimTypes.ApiTokenId);
+        if (!isApiToken &&
+            (user.IsInRole(FcmsRoles.SuperAdmin) ||
+             user.IsInRole(FcmsRoles.SuperAdmin.ToUpperInvariant()))) return;
 
         if (_permission is null) return;
 

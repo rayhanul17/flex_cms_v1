@@ -49,10 +49,18 @@ public class PermissionService : IPermissionService
         string permissionExpr,
         CancellationToken ct = default)
     {
-        if (user.IsInRole(FcmsRoles.SuperAdmin)) return true;
+        // API-token callers carry an fcms.api_token_id claim. Their final
+        // authorization is the INTERSECTION of (a) their underlying user's
+        // role permissions and (b) the scopes minted into the token —
+        // never the union. Critically, a SuperAdmin role does NOT bypass
+        // scopes for tokens; otherwise a leaked SuperAdmin token would be
+        // a master key. See security-audit-fix-plan §2.2.
+        var isApiToken = user.HasClaim(c => c.Type == FcmsClaimTypes.ApiTokenId);
+
+        if (!isApiToken && user.IsInRole(FcmsRoles.SuperAdmin)) return true;
 
         var roleNames = user.FindAll(ClaimTypes.Role).Select(c => c.Value).ToList();
-        if (roleNames.Count == 0) return false;
+        if (roleNames.Count == 0 && !isApiToken) return false;
 
         var roleIds = new List<Guid>(roleNames.Count);
         foreach (var rn in roleNames)
@@ -60,7 +68,6 @@ public class PermissionService : IPermissionService
             var rid = await ResolveRoleIdAsync(rn, ct);
             if (rid != Guid.Empty) roleIds.Add(rid);
         }
-        if (roleIds.Count == 0) return false;
 
         var userPerms = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var missing = new List<Guid>();
@@ -89,7 +96,29 @@ public class PermissionService : IPermissionService
             }
         }
 
-        return PermissionExpression.Evaluate(permissionExpr, userPerms);
+        // For SuperAdmin API tokens, the role-side permission set is empty
+        // (SuperAdmin bypass is gated above), so we synthesise role-side
+        // allowance for them. The scope-side check below still applies.
+        bool roleAllowed;
+        if (isApiToken && user.IsInRole(FcmsRoles.SuperAdmin))
+            roleAllowed = true;
+        else
+            roleAllowed = PermissionExpression.Evaluate(permissionExpr, userPerms);
+
+        if (!isApiToken) return roleAllowed;
+
+        // Token scopes are minted as individual fcms.api_scope claims. The
+        // token holder may only invoke a permission expression that both
+        // (a) the underlying user could invoke via roles, AND (b) the token
+        // scopes admit. Empty scope set = deny (don't accidentally hand a
+        // token everything its user has).
+        var apiScopes = user.FindAll(FcmsClaimTypes.ApiScope)
+            .Select(c => c.Value)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (apiScopes.Count == 0) return false;
+
+        var scopeAllowed = PermissionExpression.Evaluate(permissionExpr, apiScopes);
+        return roleAllowed && scopeAllowed;
     }
 
     public async Task<IReadOnlySet<string>> GetRolePermissionKeysAsync(Guid roleId, CancellationToken ct = default)

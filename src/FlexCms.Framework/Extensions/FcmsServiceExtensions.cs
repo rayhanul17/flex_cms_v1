@@ -233,11 +233,9 @@ public static class FcmsServiceExtensions
 
         services.AddSingleton<IFcmsModuleApiRegistry, FcmsModuleApiRegistry>();
 
-        // Bearer scheme registered alongside the existing cookie scheme so
-        // [Authorize]'d controllers accept BOTH session cookies and API tokens.
-        services.AddAuthentication()
-            .AddScheme<FcmsApiTokenAuthenticationOptions, FcmsApiTokenAuthenticationHandler>(
-                FcmsApiTokenAuthenticationHandler.SchemeName, _ => { });
+        // API token scheme is registered down below in the smart policy
+        // scheme block, so [Authorize] picks it up for Bearer requests and
+        // falls back to the Identity cookie for normal browser sessions.
 
         // Group-aware cache service — enables bulk invalidation by group (settings/permissions/menu)
         services.AddMemoryCache();
@@ -295,14 +293,41 @@ public static class FcmsServiceExtensions
             Directory.Exists(rootModulesRoot ?? "") ? new[] { rootModulesRoot!, hostModulesRoot } : new[] { hostModulesRoot });
         services.AddSingleton(registry);
 
-        // Cookie authentication (8h sliding window).
-        // Scheme name MUST be IdentityConstants.ApplicationScheme so that
-        // SignInManager.PasswordSignInAsync (which targets that scheme) works
-        // with AddIdentityCore (which does NOT auto-register Identity cookies).
+        // Smart "cookie or bearer" authentication.
+        //
+        // We register ONE default scheme (FcmsSmart) that inspects the
+        // Authorization header at request time and forwards to either the
+        // Identity cookie scheme (browser sessions) or the API token scheme
+        // (Bearer fcms_...). Previously two separate AddAuthentication()
+        // calls were used and the second one silently overrode the first,
+        // leaving Bearer tokens unauthenticated for default-scheme
+        // [Authorize]'d routes — see security-audit-fix-plan §2.1.
+        //
+        // Identity's cookie scheme name MUST be IdentityConstants.
+        // ApplicationScheme so SignInManager.PasswordSignInAsync (which
+        // targets that scheme) keeps working with AddIdentityCore (which
+        // does NOT auto-register Identity cookies).
         services.Configure<SecurityStampValidatorOptions>(o =>
             o.ValidationInterval = TimeSpan.FromMinutes(30));
 
-        services.AddAuthentication(IdentityConstants.ApplicationScheme)
+        services.AddAuthentication(opts =>
+            {
+                opts.DefaultScheme = FcmsAuthSchemes.Smart;
+                opts.DefaultAuthenticateScheme = FcmsAuthSchemes.Smart;
+                opts.DefaultChallengeScheme = FcmsAuthSchemes.Smart;
+            })
+            .AddPolicyScheme(FcmsAuthSchemes.Smart, "Cookie or API Token", o =>
+            {
+                o.ForwardDefaultSelector = ctx =>
+                {
+                    var auth = ctx.Request.Headers.Authorization.ToString();
+                    return auth.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)
+                        ? FcmsApiTokenAuthenticationHandler.SchemeName
+                        : IdentityConstants.ApplicationScheme;
+                };
+            })
+            .AddScheme<FcmsApiTokenAuthenticationOptions, FcmsApiTokenAuthenticationHandler>(
+                FcmsApiTokenAuthenticationHandler.SchemeName, _ => { })
             .AddCookie(IdentityConstants.ApplicationScheme, opts =>
             {
                 opts.Cookie.HttpOnly = true;

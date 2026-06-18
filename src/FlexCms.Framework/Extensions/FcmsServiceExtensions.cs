@@ -312,7 +312,8 @@ public static class FcmsServiceExtensions
             moduleRoots = new[] { hostModulesRoot };
         }
 
-        var registry = BuildModuleRegistry(services, moduleRoots, activationProvider, activationConnString);
+        var registry = BuildModuleRegistry(services, moduleRoots,
+            activationProvider, activationConnString, options.AllowModuleTrustOnFirstUse);
         services.AddSingleton(registry);
 
         // Smart "cookie or bearer" authentication.
@@ -577,7 +578,8 @@ public static class FcmsServiceExtensions
         IServiceCollection services,
         IReadOnlyList<string> modulesRoots,
         string provider = "",
-        string connectionString = "")
+        string connectionString = "",
+        bool allowTrustOnFirstUse = false)
     {
         // We can't pull a logger from DI here (container isn't built yet);
         // the manager / loader log via NullLogger when invoked statically.
@@ -589,10 +591,13 @@ public static class FcmsServiceExtensions
         // fcms_module_records.PackageHashSha256 via raw ADO.NET — it doesn't
         // need DI because module discovery runs during DI registration.
         // If the schema upgrader hasn't run yet (fresh install) the store
-        // reports unavailable and load falls back to trust-on-first-use.
+        // reports unavailable. allowTrustOnFirstUse controls what happens
+        // for module DLLs the store has no record for — true in dev so
+        // the activator can record the hash; false in production so unknown
+        // modules are refused outright.
         var trust = AdoModuleTrustStore.Build(provider, connectionString);
 
-        var manager = new ModuleManager(loader, managerLog, trust);
+        var manager = new ModuleManager(loader, managerLog, trust, allowTrustOnFirstUse);
 
         // Walk every root in order; the first occurrence of a given ModuleId wins,
         // so solution-root scaffolds take precedence over uploaded packages.
@@ -654,6 +659,18 @@ public class FlexCmsOptions
     /// The host wires this from <c>builder.Environment.IsDevelopment()</c>.
     /// </summary>
     public bool EnableDevelopmentModuleRootScan { get; set; }
+
+    /// <summary>
+    /// When true, module DLLs with no recorded approved hash are allowed
+    /// to load (the activator records the hash on success so the NEXT
+    /// boot enforces). This is required for fresh installs and dev F5
+    /// flows. Set false in production — unknown modules will be refused
+    /// outright until the operator uploads them through the admin flow,
+    /// which records an approved hash. The host wires this from
+    /// <c>builder.Environment.IsDevelopment()</c>. See
+    /// security-audit-recheck-2 §4.1.
+    /// </summary>
+    public bool AllowModuleTrustOnFirstUse { get; set; }
 
     public bool UsesRelationalDb => UseMySQL || UseMsSql || UsePostgreSQL;
 }

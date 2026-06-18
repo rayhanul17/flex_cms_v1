@@ -146,6 +146,13 @@ try
         // module clones (F5 debug workflow). Production runs MUST keep this
         // off so a leftover source tree can't override a signed upload.
         EnableDevelopmentModuleRootScan = builder.Environment.IsDevelopment(),
+
+        // Trust-on-first-use: required for fresh installs / dev F5 so a
+        // module DLL without a recorded approved hash can still load (the
+        // activator records the hash on success). Production must refuse
+        // unknown modules — the operator must upload them through admin
+        // (which records the hash) before they're allowed to load.
+        AllowModuleTrustOnFirstUse = builder.Environment.IsDevelopment(),
     });
 
     // One-shot IHostedService that copies wizard-collected values from setup.json

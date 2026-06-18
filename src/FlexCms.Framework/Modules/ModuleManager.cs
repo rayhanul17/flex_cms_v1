@@ -20,15 +20,32 @@ public class ModuleManager
     private readonly ModuleLoader _loader;
     private readonly ILogger<ModuleManager> _logger;
     private readonly IModuleTrustStore _trust;
+    private readonly bool _allowTrustOnFirstUse;
 
     public ModuleManager(ModuleLoader loader, ILogger<ModuleManager> logger)
-        : this(loader, logger, NullModuleTrustStore.Instance) { }
+        : this(loader, logger, NullModuleTrustStore.Instance, allowTrustOnFirstUse: true) { }
 
     public ModuleManager(ModuleLoader loader, ILogger<ModuleManager> logger, IModuleTrustStore trust)
+        : this(loader, logger, trust, allowTrustOnFirstUse: true) { }
+
+    /// <summary>
+    /// Construct the manager with full control over the trust policy.
+    /// <paramref name="allowTrustOnFirstUse"/> = <c>true</c> lets the
+    /// gate load a module DLL whose hash hasn't been recorded yet (the
+    /// activator records it on success so the next boot enforces). Set
+    /// <c>false</c> in production to refuse unknown modules outright —
+    /// only previously-approved hashes load. See security-audit-recheck-2 §4.1.
+    /// </summary>
+    public ModuleManager(
+        ModuleLoader loader,
+        ILogger<ModuleManager> logger,
+        IModuleTrustStore trust,
+        bool allowTrustOnFirstUse)
     {
         _loader = loader;
         _logger = logger;
         _trust = trust;
+        _allowTrustOnFirstUse = allowTrustOnFirstUse;
     }
 
     /// <summary>
@@ -70,17 +87,30 @@ public class ModuleManager
 
             foreach (var dll in candidates)
             {
-                // ── Pre-load integrity gate (security-audit-recheck §8.1) ──
+                // ── Pre-load integrity gate (security-audit-recheck §8.1, recheck-2 §4.2) ──
                 // Read the embedded module.json + compute the DLL hash via
                 // reflection-only metadata APIs BEFORE Assembly.LoadFrom
-                // executes any module code. A tampered DLL whose hash
-                // doesn't match the trust store's approved hash is
-                // refused outright — no Assembly.LoadFrom, no module
-                // type instantiation, no DI registration downstream.
-                if (!PreLoadIntegrityCheck(dll, out var declaredId, out var precomputedHash))
+                // executes any module code. Tri-state result:
+                //   NotModule     → not a module DLL (no embedded module.json)
+                //                   — skip without calling Assembly.LoadFrom
+                //                   so a transitive dep can never run static
+                //                   initializers just because it sat next to
+                //                   a module on disk
+                //   InvalidModule → it IS a module DLL but its hash doesn't
+                //                   match the trust store's approved hash
+                //                   (or trust-on-first-use is disabled and
+                //                    no record exists)
+                //                   — refused outright
+                //   ValidModule   → safe to load
+                var integrity = PreLoadIntegrityCheck(dll, out var declaredId);
+                if (integrity == PreLoadIntegrityResult.NotModule)
+                    continue;  // not even a candidate; never reaches Assembly.LoadFrom
+
+                if (integrity == PreLoadIntegrityResult.InvalidModule)
                 {
                     _logger.LogError(
-                        "Module DLL at '{Path}' failed pre-load integrity check — refusing to load.", dll);
+                        "Module DLL at '{Path}' (declared id '{Id}') failed pre-load integrity check — refusing to load.",
+                        dll, declaredId);
                     continue;
                 }
 
@@ -112,23 +142,22 @@ public class ModuleManager
     }
 
     /// <summary>
-    /// Reflection-only check of a candidate module DLL. Returns true when
-    /// the DLL has an embedded <c>module.json</c> AND its file hash matches
-    /// the approved hash for that ModuleId in the trust store (or no
-    /// stored hash exists yet — trust-on-first-use).
+    /// Reflection-only check of a candidate DLL. Returns one of three
+    /// states so the scanner can react precisely without loading any
+    /// module code into the host's AssemblyLoadContext.
     /// </summary>
     /// <remarks>
-    /// Uses <see cref="System.Reflection.MetadataLoadContext"/> so the DLL
-    /// is never loaded into the host's AssemblyLoadContext just to peek at
-    /// its manifest. The full assembly load only happens later, after this
-    /// check passes — see security-audit-recheck §8.1.
+    /// Uses <see cref="System.Reflection.MetadataLoadContext"/> exclusively
+    /// — no <c>Assembly.LoadFrom</c> until the result is
+    /// <see cref="PreLoadIntegrityResult.ValidModule"/>.
+    /// See security-audit-recheck §8.1 and recheck-2 §4.1, §4.2.
     /// </remarks>
-    private bool PreLoadIntegrityCheck(string dllPath, out string declaredModuleId, out string fileHash)
+    internal PreLoadIntegrityResult PreLoadIntegrityCheck(string dllPath, out string declaredModuleId)
     {
         declaredModuleId = "";
-        fileHash = "";
 
         // 1. Compute the file hash up front. Cheap and provider-independent.
+        string fileHash;
         try
         {
             using var fs = File.OpenRead(dllPath);
@@ -137,7 +166,8 @@ public class ModuleManager
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "PreLoadIntegrityCheck: could not hash {Path}", dllPath);
-            return false;
+            // Can't hash → can't trust. Refuse outright.
+            return PreLoadIntegrityResult.InvalidModule;
         }
 
         // 2. Read embedded module.json without executing any code from the DLL.
@@ -154,13 +184,16 @@ public class ModuleManager
                 .FirstOrDefault(n => n.EndsWith("module.json", StringComparison.OrdinalIgnoreCase));
             if (resourceName is null)
             {
-                // Not a module DLL at all — likely a transitive dep sitting
-                // in bin/Debug/. Let it pass; the loader will skip it later.
-                return true;
+                // Not a module DLL at all — almost certainly a transitive
+                // dep that happened to sit next to a real module under
+                // bin/Debug/. Skip it without Assembly.LoadFrom so any
+                // module-initializer/static-constructor code in a hostile
+                // dep never executes.
+                return PreLoadIntegrityResult.NotModule;
             }
 
             using var stream = asm.GetManifestResourceStream(resourceName);
-            if (stream is null) return true;
+            if (stream is null) return PreLoadIntegrityResult.NotModule;
             using var doc = JsonDocument.Parse(stream);
             if (doc.RootElement.TryGetProperty("ModuleId", out var idProp))
                 declaredModuleId = idProp.GetString() ?? "";
@@ -168,27 +201,44 @@ public class ModuleManager
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "PreLoadIntegrityCheck: metadata read failed for {Path}", dllPath);
-            return false;
+            // The DLL claimed to be readable (we hashed it) but the
+            // metadata reader rejected it — treat as a broken module
+            // package rather than a non-module file.
+            return PreLoadIntegrityResult.InvalidModule;
         }
 
         if (string.IsNullOrEmpty(declaredModuleId))
         {
-            // Module DLL without a usable ModuleId — let the loader's own
-            // logging surface the error. Skip integrity check (nothing to
-            // compare against).
-            return true;
+            // Embedded module.json exists but has no ModuleId — malformed
+            // module package, refuse rather than guess.
+            _logger.LogError("PreLoadIntegrityCheck: {Path} has module.json but no ModuleId.", dllPath);
+            return PreLoadIntegrityResult.InvalidModule;
         }
 
-        // 3. Compare against the trust store. Missing entry = trust on
-        // first use; the activator will record the hash for next boot.
+        // 3. Compare against the trust store.
         var approved = _trust.GetApprovedHash(declaredModuleId);
+
         if (approved is null)
         {
-            if (_trust.IsAvailable)
-                _logger.LogInformation(
-                    "PreLoadIntegrityCheck: no approved hash recorded yet for {Id}; trust-on-first-use.",
-                    declaredModuleId);
-            return true;
+            // No record yet — first time we've seen this module.
+            // - TOFU enabled (dev / fresh install): load, activator
+            //   records the hash for next boot.
+            // - TOFU disabled (production): refuse. Operator must
+            //   approve via the upload flow first.
+            if (_allowTrustOnFirstUse)
+            {
+                if (_trust.IsAvailable)
+                    _logger.LogInformation(
+                        "PreLoadIntegrityCheck: no approved hash recorded yet for {Id}; trust-on-first-use.",
+                        declaredModuleId);
+                return PreLoadIntegrityResult.ValidModule;
+            }
+
+            _logger.LogError(
+                "PreLoadIntegrityCheck: refusing {Id} — no approved hash recorded and trust-on-first-use is disabled. " +
+                "Re-upload via /admin/modules to record an approved hash.",
+                declaredModuleId);
+            return PreLoadIntegrityResult.InvalidModule;
         }
 
         if (!string.Equals(approved, fileHash, StringComparison.OrdinalIgnoreCase))
@@ -196,10 +246,10 @@ public class ModuleManager
             _logger.LogError(
                 "PreLoadIntegrityCheck: DLL tampering detected for {Id} — approved {Approved}, current {Current}.",
                 declaredModuleId, approved[..Math.Min(12, approved.Length)], fileHash[..12]);
-            return false;
+            return PreLoadIntegrityResult.InvalidModule;
         }
 
-        return true;
+        return PreLoadIntegrityResult.ValidModule;
     }
 
     /// <summary>

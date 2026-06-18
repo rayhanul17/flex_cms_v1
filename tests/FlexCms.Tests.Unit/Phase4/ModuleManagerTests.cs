@@ -124,6 +124,90 @@ public class ModuleManagerTests
         Assert.Empty(loaded);
     }
 
+    // ── recheck-2 §4.2: non-module DLLs must skip Assembly.LoadFrom ───────────
+
+    [Fact]
+    public void ScanAndLoad_skips_non_module_dll_without_loading()
+    {
+        // Drop a DLL with NO embedded module.json into a module folder.
+        // The pre-load gate must return NotModule and the scanner must
+        // continue without calling Assembly.LoadFrom on it.
+        var sampleDir = FindSampleHelloFolder();
+        if (sampleDir is null) return;
+
+        // Use the test assembly itself as a "non-module DLL" — it has
+        // no embedded module.json so the gate will return NotModule.
+        var nonModuleSrc = typeof(ModuleManagerTests).Assembly.Location;
+        if (!File.Exists(nonModuleSrc)) return;
+
+        using var tempRoot = new TempModuleRoot();
+        var folder = Path.Combine(tempRoot.Root, "RandomDll");
+        Directory.CreateDirectory(folder);
+        File.Copy(nonModuleSrc, Path.Combine(folder, Path.GetFileName(nonModuleSrc)), overwrite: true);
+
+        var manager = BuildManager();
+        var loaded = manager.ScanAndLoad(tempRoot.Root);
+        // Nothing in that folder is a module — and crucially, we never
+        // even called Assembly.LoadFrom on the test DLL itself.
+        Assert.DoesNotContain(loaded, m =>
+            string.Equals(m.ModuleId, typeof(ModuleManagerTests).Assembly.GetName().Name,
+                StringComparison.OrdinalIgnoreCase));
+    }
+
+    // ── recheck-2 §4.1: TOFU policy ───────────────────────────────────────────
+
+    [Fact]
+    public void ScanAndLoad_refuses_unknown_module_when_TOFU_disabled()
+    {
+        // Production posture: trust-on-first-use OFF. A module DLL with no
+        // recorded approved hash must be refused — operator must upload
+        // via /admin/modules first to land an approved hash in the store.
+        var sampleDir = FindSampleHelloFolder();
+        if (sampleDir is null) return;
+
+        using var tempRoot = new TempModuleRoot();
+        tempRoot.AddModuleFolder("FlexCms.Sample.Hello", sampleDir);
+
+        // IsAvailable=true ensures we hit the "no record + TOFU disabled"
+        // branch instead of falling through to the unavailable-store path.
+        var trust = new InMemoryTrustStore(new Dictionary<string, string>());
+        var manager = BuildManager(trust, allowTrustOnFirstUse: false);
+        var loaded = manager.ScanAndLoad(tempRoot.Root);
+        Assert.Empty(loaded);
+    }
+
+    [Fact]
+    public void ScanAndLoad_loads_module_when_TOFU_disabled_but_hash_matches()
+    {
+        // Inverse of the previous test: with the correct approved hash on
+        // record, the module loads even with TOFU off. This is the steady-
+        // state production posture once the operator has uploaded once.
+        var sampleDir = FindSampleHelloFolder();
+        if (sampleDir is null) return;
+
+        using var tempRoot = new TempModuleRoot();
+        tempRoot.AddModuleFolder("FlexCms.Sample.Hello", sampleDir);
+
+        var sampleDllPath = Path.Combine(tempRoot.Root, "FlexCms.Sample.Hello", "FlexCms.Sample.Hello.dll");
+        var actualHash = ComputeSha256(sampleDllPath);
+
+        var trust = new InMemoryTrustStore(new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["FlexCms.Sample.Hello"] = actualHash,
+        });
+        var manager = BuildManager(trust, allowTrustOnFirstUse: false);
+        var loaded = manager.ScanAndLoad(tempRoot.Root);
+        Assert.Single(loaded);
+        Assert.Equal("FlexCms.Sample.Hello", loaded[0].ModuleId);
+    }
+
+    private static string ComputeSha256(string path)
+    {
+        using var sha = System.Security.Cryptography.SHA256.Create();
+        using var fs = File.OpenRead(path);
+        return Convert.ToHexString(sha.ComputeHash(fs)).ToLowerInvariant();
+    }
+
     private static string? FindSampleHelloFolder()
     {
         // Locate the built sample DLL relative to the test bin. Returns
@@ -133,12 +217,15 @@ public class ModuleManagerTests
         return File.Exists(dll) ? here : null;
     }
 
-    private static ModuleManager BuildManager(IModuleTrustStore? trust = null)
+    private static ModuleManager BuildManager(
+        IModuleTrustStore? trust = null,
+        bool allowTrustOnFirstUse = true)
     {
         var loaderLog = Substitute.For<ILogger<ModuleLoader>>();
         var managerLog = Substitute.For<ILogger<ModuleManager>>();
         return new ModuleManager(new ModuleLoader(loaderLog), managerLog,
-            trust ?? NullModuleTrustStore.Instance);
+            trust ?? NullModuleTrustStore.Instance,
+            allowTrustOnFirstUse);
     }
 
     private sealed class InMemoryTrustStore : IModuleTrustStore

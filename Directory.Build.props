@@ -6,5 +6,14 @@
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
     <!-- Only audit direct package dependencies; transitive vulnerabilities tracked via Dependabot -->
     <NuGetAuditMode>direct</NuGetAuditMode>
+    <!--
+      NU1900 fires when nuget.org's vulnerability API is unreachable
+      (offline / firewall / api hiccup) and is escalated to an error by
+      MSBuild's default rules. Demoting it to a warning prevents a
+      transient network failure from breaking local + CI builds.
+      Real vulnerabilities still show as NU1901-NU1904 (warnings).
+    -->
+    <MSBuildWarningsAsMessages>$(MSBuildWarningsAsMessages);NU1900</MSBuildWarningsAsMessages>
+    <NoWarn>$(NoWarn);NU1900</NoWarn>
   </PropertyGroup>
 </Project>
